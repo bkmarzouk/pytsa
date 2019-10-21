@@ -13,6 +13,8 @@ pyt_root, smp_root = ds.get_pyt_paths()
 sys.path.append(pyt_root)
 sys.path.append(smp_root)
 
+print pyt_root
+
 
 # Setup PyTransport installation paths
 import PyTransSetup as PySet
@@ -172,7 +174,7 @@ sampler_file_dir = os.path.abspath(os.path.join(
 ))
 
 sampler_files = [
-    "mapreduce.py"
+    "run_sampler.py"
 ]
 
 
