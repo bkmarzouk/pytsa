@@ -8,34 +8,30 @@ To build a sampler, we are required to write a configuration file as follows
 import numpy as np
 import os
 import sys
-import dir_structure as ds
-
-
-
-""" Path Configuration | AUTOMATIC """
-
-
-# Get python path: This should be automatic assuming directory structure has not been altered
-pytpath, savedir = ds.get_pyt_paths()
 
 
 """ Computation Configuration | CHANGE ME """
 
 
 sampler_name = "dquad_example"
-saveloc = os.path.join(savedir, sampler_name)
+save_location = "default" # If default: outputs will be written to sampler-build directory
 
 
 sampler = {
     "SamplerName": sampler_name,          # Sampler name, should be unique from other sampler installations
-    "SaveLocation": saveloc,              # Save location for outputs
     "PyTransportModule": "PyTrans2Quad",  # Installed module, e.g. PyTrans2Quad
-    "NSamples": 200,                      # Compute N samples that support minimum number of efolds (see accept crit.)
+    "NSamples": 20,                      # Compute N samples that support minimum number of efolds (see accept crit.)
     "ExitTime": 55,                       # Assign number of efoldings before end of inflation that scales exit horizon
     "SubEvolution": 6,                    # Duration (efoldings) of sub-horizon evolution
     "tols": [1e-8, 1e-8]                  # Integration tolerance
 }
 
+""" Define system paths on construction | DO NOT CHANGE """
+system = {
+    # sys01
+    # sys02
+    # sys03
+}
 
 computations = {
     "2pf": True,  # Compute 2-point function observables

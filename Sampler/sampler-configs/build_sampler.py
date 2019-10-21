@@ -6,14 +6,27 @@ import sys
 import os
 import shutil
 import importlib
-import dir_structure as ds
 
-# Navigate directory structure to obtatin sampkler save files directory and PyTransport installation
-pyt_root, smp_root = ds.get_pyt_paths()
-sys.path.append(pyt_root)
-sys.path.append(smp_root)
+# Get python path
+pytpath = (
+    os.path.abspath(
+        os.path.join(
+            os.getcwd(), "../..", "PyTransport", "PyTransport"
+        )
+    )
+)
 
-print pyt_root
+# Get default location for samplers
+smppath = (
+    os.path.abspath(
+        os.path.join(
+            os.getcwd(), "..", "sampler-builds"
+        )
+    )
+)
+
+sys.path.append(pytpath)
+sys.path.append(smppath)
 
 
 # Setup PyTransport installation paths
@@ -152,20 +165,58 @@ function_lines = [
 
 
 # Build save directory
-saveloc = config.sampler['SaveLocation']
-assert not os.path.exists(saveloc), "Directory already exists! {}".format(saveloc)
-os.makedirs(saveloc)
+saveloc = config.save_location
+sampler = config.sampler_name
+
+if saveloc == "default":
+    assert os.path.exists(smppath), "sampler-build directory not found: {}".format(smppath)
+    savepath = os.path.join(smppath, sampler)
+else:
+    assert os.path.exists(saveloc), "directory for save files not found: {}".format(saveloc)
+    savepath = os.path.join(saveloc, sampler)
+
+    
+assert not os.path.exists(savepath), "Directory already exists! {}".format(saveloc)
+os.makedirs(savepath)
 
 
-# Define file for sample generator
-gfile = open(os.path.join(saveloc, "generator.py"), "w")
-
-
-# With file: Write all lines
+# Write sample generator file
+gfile = open(os.path.join(savepath, "generator.py"), "w")
 with gfile:
     print "-- Writing sample generator"
     for line in import_lines + function_lines:
         gfile.writelines(line)
+        
+# Write configuration file, with new directory information
+cfg_new_file = open(os.path.join(savepath, "config.py"), "w")
+cfg_old_file = open(config_module, "r")
+
+cfg_lines = []
+
+with cfg_old_file as c:
+    for line in c.readlines():
+        if "sys01" in line:
+            line_ = "\t'pytpath': '{}',\n".format(pytpath)
+            cfg_lines.append(line_)
+            print line_
+        elif "sys02" in line:
+            line_ = "\t'saveloc': '{}',\n".format(savepath)
+            cfg_lines.append(line_)
+            print line_
+        elif "sys03" in line:
+            line_ = "\t'smppath': '{}'".format(os.path.abspath(os.path.join(pytpath, "../../Sampler")))
+            cfg_lines.append(line_)
+            print line_
+        elif "save_location" in line:
+            pass
+        elif "sampler_name" in line:
+            pass
+        else:
+            cfg_lines.append(line)
+            
+with cfg_new_file as c:
+    for line in cfg_lines:
+        c.writelines(line)
 
 
 # Locate pre-written sampler files: e.g. mapreduce, etc
@@ -182,10 +233,11 @@ sampler_files = [
 for item in sampler_files:
     print "-- Copying {}".format(item)
     shutil.copyfile(
-        os.path.join(sampler_file_dir, item), os.path.join(saveloc, item)
+        os.path.join(sampler_file_dir, item), os.path.join(savepath, item)
     )
-shutil.copyfile(os.path.abspath(os.path.join(os.getcwd(), config_module)),
-                os.path.join(saveloc, "config.py"))
+# shutil.copyfile(os.path.abspath(os.path.join(os.getcwd(), config_module)),
+#                 os.path.join(saveloc, "config.py"))
+
 
 
 # Construct ensemble of
@@ -202,7 +254,7 @@ if config.computations['Mij'] is True: # Mass-Matrix data, (at Horizon crossing)
 
 for item in build_dirs:
 
-    d = os.path.join(saveloc, item)
+    d = os.path.join(savepath, item)
 
     assert not os.path.exists(d)
     

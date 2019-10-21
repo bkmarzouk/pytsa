@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
+
 # Import system tools
 import os
 import sys
@@ -10,28 +11,43 @@ import pickle as pk
 import time
 import warnings
 
-# Set Paths
-rootpath = os.getcwd(); os.environ['PyTSamplerRoot'] = rootpath
-path_2pf = os.path.join(rootpath, "2pf")
-path_3pf = os.path.join(rootpath, "3pf")
-Mij_path = os.path.join(rootpath, "Mij")
-cfg_path = os.path.join(rootpath, "config.py")
-smp_path = os.path.join(rootpath, "samples")
-tool_path = os.path.abspath(os.path.join(rootpath, "..", "..", "sampler-methods"))
-sys.path.append(tool_path)
-
-import pyt-methods as pytm
-import writer as w
 
 # Load configuration file, set PyTransport paths and import relevant modules
 import config as cfg
-sys.path.append(cfg.pytpath)
+pytpath = cfg.system['pytpath']  # PyTransport installation
+saveloc = cfg.system['saveloc']  # Save location for sampler outputs
+smppath = cfg.system['smppath']  # Sampler files directory
+
+
+# Export environment variables for external functions
+os.environ['PyTS_pytpath'] = pytpath
+os.environ['PyTS_saveloc'] = saveloc
+os.environ['PyTS_smppath'] = smppath
+
+
+# Set Paths
+rootpath = os.getcwd(); os.environ['PyTSamplerRoot'] = rootpath
+path_2pf = os.path.join(saveloc, "2pf")
+path_3pf = os.path.join(saveloc, "3pf")
+Mij_path = os.path.join(saveloc, "Mij")
+cfg_path = os.path.join(saveloc, "config.py")
+smp_path = os.path.join(saveloc, "samples")
+
+# Add methods to system path
+sys.path.append(os.path.join(smppath, "sampler-methods"))
+
+# Get additional tools
+import pyt_methods as pytm
+import writer as w
+
+# Set PyTransport internal paths
+sys.path.append(pytpath)
 import PyTransSetup
 PyTransSetup.pathSet()
 
+# Load PyTransport module installation and scripts
 PyT = importlib.import_module(cfg.sampler['PyTransportModule'])
 import PyTransScripts as PyS
-
 
 # Begin main function
 def main(pool):

@@ -19,8 +19,14 @@ smp_path = os.path.join(rootpath, "samples")
 
 # Load configuration file, set PyTransport paths and import relevant modules
 import config as cfg
+pytpath = cfg.system['pytpath']  # PyTransport installation
+saveloc = cfg.system['saveloc']  # Save location for sampler outputs
+smppath = cfg.system['smppath']  # Sampler build directory
 
-sys.path.append(cfg.pytpath)
+
+print pytpath
+
+sys.path.append(pytpath)
 import PyTransSetup
 
 PyTransSetup.pathSet()
@@ -39,7 +45,7 @@ if canonical is False:
 else:
     conditions = None
 
-from SampleGenerator import gen_sample
+from generator import gen_sample
 from realization import realization
 
 """
@@ -88,9 +94,13 @@ def Initialize(modelnumber):
         if type(Nend) == type('S32'):
             print "-- Integration failure, model: {}".format(modelnumber)
             return None
-
-        # Compute background evolution
-        back = PyT.backEvolve(t, initial, pvals, tols, False)
+        
+        elif Nend is None:
+            return None
+        
+        else:
+            # Compute background evolution
+            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False)
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
     else:
@@ -177,7 +187,7 @@ def Initialize(modelnumber):
     # Test adiabicity over lsat 5 efolds of inflation
     if cfg.accept_criteria['TestAdiabaticLimit'] is True:
         print "-- Searching for adiabatic limit: %05d" % modelnumber
-        last5 = np.where(back.T[0] >= Nend - 5.0)[0][0]  # Get indices for background steps 5 efolds before the end
+        last5 = np.where(back.T[0] >= Nend - 2.5)[0][0]  # Get indices for background steps 2.5 efolds before the end
         Mij_end = PyS.MijEvolve(back[last5:], pvals, PyT)
 
         for item in Mij_end:
@@ -310,8 +320,13 @@ def SpectralIndex(modelnumber):
         Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
 
         # Compute modes that exit at corresponding times
-        kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange];
+        kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
         kExitrange.insert(2, kExit)
+
+        if not all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)):
+            print "SHI", kExitrange
+            
+        assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)), kExitrange
 
         # Get initial conditions for modes
         ICsEvos = [PyS.ICs(subevo, kE, back, pvals, PyT) for kE in kExitrange]
@@ -338,9 +353,9 @@ def SpectralIndex(modelnumber):
         alpha = UnivariateSpline(logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExit)) + 0.
 
 
-    except AssertionError:
+    except (AssertionError, AttributeError) as e:
 
-        ns = None;
+        ns = None
         alpha = None
 
     # End calculation timer
@@ -417,7 +432,7 @@ def fNL(modelnumber, which3pf):
         fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
 
     # Except TypeError, typically propagates from bad BackExitMinus, i.e. float rather than ndarray
-    except AssertionError:
+    except (AssertionError,  AttributeError) as e:
         fNL = None
 
     fNL_dict = {'{}'.format(name): fNL, 'time': time.clock() - ti}

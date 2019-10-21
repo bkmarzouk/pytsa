@@ -598,8 +598,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
     # Potential gradients
     dV_sym = sym.symarray("dV,", nF)
 
-    print "-- Computing mass matrix elements"
-
+    # Hubble rate
     H_sym = sym.symbols("H")
 
     """ Iterate over every time step """
@@ -657,7 +656,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
                     Mij_num += Cij_num
                     Mij_num += Kij_num
 
-                    print "Hij, Cij, Kij =", Hij_num, Cij_num, Kij_num
+                    # print "Hij, Cij, Kij =", Hij_num, Cij_num, Kij_num
 
                 Mij[step][i, j] = Mij_num
 
