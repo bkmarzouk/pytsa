@@ -1,28 +1,34 @@
-""" Constructs sampler files for MapReduce programme"""
+""" Constructs sampler directory and programme """
 
+
+# Import system modules
 import sys
 import os
 import shutil
 import importlib
 
-""" FLAG IF TESTING: OVERRIDES OS.ERRORS """
-Testing = True
 
 # Load user arguments
 user_args = sys.argv
 assert len(user_args) == 2
 
+
 # Get configuration module of interest
 config_module = user_args[1]
+
 
 # Import as module based on cmd line arg
 config = importlib.import_module(config_module[:-3])
 
+
 # Get paths from config
-pytpath = config.pytpath; sys.path.append(pytpath)
-import PyTransSetup as PySet; PySet.pathSet()
+pytpath = config.pytpath
+sys.path.append(pytpath)
+
+import PyTransSetup as PySet
+PySet.pathSet()
 saveloc = config.saveloc
-generator_name = os.path.join(saveloc, "generator.py")
+
 
 # Check that module is installed
 sampler = config.sampler
@@ -33,30 +39,34 @@ except ImportError:
         sampler["PyTransportModule"]
     )
 
-print PyT.nP()
 
 # Get required modules for sample generator
 modules = config.required_modules
+
 
 # Load file ICs and model parameters
 field_positions  = config.field_positions
 field_velocities = config.field_velocities
 parameter_values = config.parameter_values
 
+
 # Get installation number for cross validation
 nF = PyT.nF()
 nV = PyT.nF()
 nP = PyT.nP()
+
 
 # Build set of fiducial values for fields, velocities and parameters
 fiducial_fvals = [None for i in range(nF)]; cf = 0
 fiducial_vvals = [None for i in range(nV)]; cv = 0
 fiducial_pvals = [None for i in range(nP)]; cp = 0
 
+
 # Read each field value: if "ALL" is found, replace fiducial values with method prescribed in confiuration
 for p in field_positions:
     if p["FieldNumber"] == "ALL":
         fiducial_fvals = [p["Command"] for i in range(nF)]
+
 
 # Now reiterate over items: If anything but "ALL" is found, replace the fiducial method for the field
 for p in field_positions:
@@ -137,15 +147,12 @@ function_lines = [
 
 
 # If not in testing mode: Build save directory
-if not Testing:
-    assert not os.path.exists(saveloc), "Directory already exists! {}".format(saveloc)
-else:
-    try: os.makedirs(saveloc)
-    except OSError: pass
+assert not os.path.exists(saveloc), "Directory already exists! {}".format(saveloc)
+os.makedirs(saveloc)
 
 
 # Define file for sample generator
-gfile = open(os.path.join(saveloc, "SampleGenerator.py"), "w")
+gfile = open(os.path.join(saveloc, "generator.py"), "w")
 
 
 # With file: Write all lines
@@ -157,11 +164,11 @@ with gfile:
 
 # Locate pre-written sampler files: e.g. mapreduce, etc
 sampler_file_dir = os.path.abspath(os.path.join(
-    os.getcwd(), "..", "samplerfiles"
+    os.getcwd(), "..", "sampler-methods"
 ))
+
 sampler_files = [
-    #"MapReduceV2.py", "ObservableScriptsV2.py", "taskhandlerV2.py", "writerV2.py", "realization.py"
-    "MapReduceV2.py"
+    "mapreduce.py"
 ]
 
 
@@ -174,14 +181,23 @@ for item in sampler_files:
 shutil.copyfile(os.path.abspath(os.path.join(os.getcwd(), config_module)),
                 os.path.join(saveloc, "config.py"))
 
+
 # Construct ensemble of
 build_dirs = ["samples", "outputs"]
-if config.computations['2pf'] is True: build_dirs.append("2pf")
-if config.computations['3pf'] is True: build_dirs.append("3pf")
-if config.computations['Mij'] is True: build_dirs.append("Mij")
+if config.computations['2pf'] is True: # 2-point function data
+    build_dirs.append("2pf")
+
+if config.computations['3pf'] is True: # 3-point function data
+    build_dirs.append("3pf")
+
+if config.computations['Mij'] is True: # Mass-Matrix data, (at Horizon crossing)
+    build_dirs.append("Mij")
+
 
 for item in build_dirs:
-    try:
-        os.makedirs(os.path.join(saveloc, item))
-    except:
-        if Testing is True: pass
+
+    d = os.path.join(saveloc, item)
+
+    assert not os.path.exists(d)
+    
+    os.makedirs(d)
