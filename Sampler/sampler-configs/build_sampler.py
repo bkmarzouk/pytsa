@@ -8,12 +8,20 @@ import shutil
 import importlib
 import dir_structure as ds
 
+# Navigate directory structure to obtatin sampkler save files directory and PyTransport installation
 pyt_root, smp_root = ds.get_pyt_paths()
+sys.path.append(pyt_root)
+sys.path.append(smp_root)
+
+
+# Setup PyTransport installation paths
+import PyTransSetup as PySet
+PySet.pathSet()
 
 
 # Load user arguments
 user_args = sys.argv
-assert len(user_args) == 2
+assert len(user_args) == 2, "command: 'python build_sampler.py <config>.py'"
 
 
 # Get configuration module of interest
@@ -24,19 +32,11 @@ config_module = user_args[1]
 config = importlib.import_module(config_module[:-3])
 
 
-# Get paths from config
-pytpath = config.pytpath
-sys.path.append(pytpath)
-
-import PyTransSetup as PySet
-PySet.pathSet()
-saveloc = config.saveloc
-
-
 # Check that module is installed
 sampler = config.sampler
 try:
     PyT = importlib.import_module(sampler["PyTransportModule"])
+
 except ImportError:
     raise ImportError, "Failed to import PyTransport module: {}, check installation.".format(
         sampler["PyTransportModule"]
@@ -149,7 +149,8 @@ function_lines = [
 ]
 
 
-# If not in testing mode: Build save directory
+# Build save directory
+saveloc = config.sampler['SaveLocation']
 assert not os.path.exists(saveloc), "Directory already exists! {}".format(saveloc)
 os.makedirs(saveloc)
 

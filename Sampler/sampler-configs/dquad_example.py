@@ -26,23 +26,25 @@ sampler_name = "dquad_example"
 saveloc = os.path.join(savedir, sampler_name)
 
 
-sampler = { #
-    "PyTransportModule": "PyTrans2Quad", # Installed module, e.g. PyTrans2Quad
-    "NSamples": 200,                    # Compute N samples that support minimum number of efolds (see accept crit.)
-    "ExitTime": 55,                      # Assign number of efoldings before end of inflation that scales exit horizon
-    "SubEvolution": 6,                   # Duration (efoldings) of sub-horizon evolution
-    "tols": [1e-8, 1e-8]                 # Integration tolerance
+sampler = {
+    "SamplerName": sampler_name,          # Sampler name, should be unique from other sampler installations
+    "SaveLocation": saveloc,              # Save location for outputs
+    "PyTransportModule": "PyTrans2Quad",  # Installed module, e.g. PyTrans2Quad
+    "NSamples": 200,                      # Compute N samples that support minimum number of efolds (see accept crit.)
+    "ExitTime": 55,                       # Assign number of efoldings before end of inflation that scales exit horizon
+    "SubEvolution": 6,                    # Duration (efoldings) of sub-horizon evolution
+    "tols": [1e-8, 1e-8]                  # Integration tolerance
 }
 
 
 computations = {
-    "2pf": True, # Compute 2-point function observables
-    "3pf": True, # Compute 3-point function observables
-    "Mij": True  # Evaluate Mass-Matrix Eigenvalues @ ExitTime, (indirectly) required if testing adiabatic limit
+    "2pf": True,  # Compute 2-point function observables
+    "3pf": True,  # Compute 3-point function observables
+    "Mij": True   # Evaluate Mass-Matrix Eigenvalues @ ExitTime, (indirectly) required if testing adiabatic limit
 }
 
 
-which3pf = [ # Assign sub-dictionaries specifying configuration name, latex commands and Ferg. Shell. params
+which3pf = [
     {"config_name": "eq", "latex": "f_{NL}^{eq}", "alpha": 1./3., "beta": 1./3.}
 ]
 
