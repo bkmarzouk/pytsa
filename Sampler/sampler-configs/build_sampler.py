@@ -6,6 +6,9 @@ import sys
 import os
 import shutil
 import importlib
+import dir_structure as ds
+
+pyt_root, smp_root = ds.get_pyt_paths()
 
 
 # Load user arguments

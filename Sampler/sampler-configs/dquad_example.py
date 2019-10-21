@@ -15,32 +15,8 @@ import dir_structure as ds
 """ Path Configuration | AUTOMATIC """
 
 
-
 # Get python path: This should be automatic assuming directory structure has not been altered
-pytpath = (
-    os.path.join(
-        os.getcwd(), "..", "PyTransport", "PyTransport"
-    )
-)
-if not os.path.exists(pytpath):
-    pytpath = os.path.abspath(
-        os.path.join(
-            os.getcwd(), "..", "..", "PyTransport", "PyTransport"
-        )
-    ); assert os.path.exists(pytpath), "PyTransport location not found: {}".format(pytpath)
-
-savedir = os.path.abspath(
-    os.path.join(
-        os.getcwd(), "..", "Samplers",
-    )
-)
-if not os.path.exists(savedir):
-    savedir = os.path.abspath(
-        os.path.join(
-            os.getcwd(), "..", "..", "Samplers"
-        )
-    ); assert os.path.exists(savedir), "Save location not found: {}".format(savedir)
-
+pytpath, savedir = ds.get_pyt_paths()
 
 
 """ Computation Configuration | CHANGE ME """

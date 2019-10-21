@@ -1,7 +1,7 @@
 import os
 import sympy as sym
 import sys
-tree = os.path.abspath(os.path.join(__file__, '..'))
+tree = os.path.abspath(os.path.join(__file__, '../..'))
 pytpath = os.path.join(tree, 'PyTransport', 'PyTransport')
 sys.path.append(pytpath)
 import PyTransSetup
