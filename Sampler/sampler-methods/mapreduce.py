@@ -17,11 +17,11 @@ path_3pf = os.path.join(rootpath, "3pf")
 Mij_path = os.path.join(rootpath, "Mij")
 cfg_path = os.path.join(rootpath, "config.py")
 smp_path = os.path.join(rootpath, "samples")
-tool_path = os.path.abspath(os.path.join(rootpath, "..", "..", "samplerfiles"))
+tool_path = os.path.abspath(os.path.join(rootpath, "..", "..", "sampler-methods"))
 sys.path.append(tool_path)
 
-import pyt-methods as oscript
-import Writer as w
+import pyt-methods as pytm
+import writer as w
 
 # Load configuration file, set PyTransport paths and import relevant modules
 import config as cfg
@@ -68,26 +68,10 @@ def main(pool):
     print "| -- Mij: {}".format(compute_Mij)
 
     nF, nP = PyT.nF(), PyT.nP()
-    #
-    # # Setup writer for results
-    # result_cols = ()
-    # if compute_2pf:
-    #     result_cols+=("ns", "alpha", "2pf_t")
-    #
-    # if compute_3pf:
-    #     for item in which3pf:result_cols+=(item['config_name'], "3pf_{}_t".format(item['config_name']))
-    #
-    # if compute_Mij:
-    #     for f in range(nF): result_cols+=("m_{}".format(f),)
-    #
-    # for p in cfg.parameter_values:
-    #     pname = p['ParameterName']
-    #     if pname is not None:result_cols+=(pname,)
-
 
     # Generate ensemble of models that support sufficient inflation
     print "\n-- Initializing ensemble\n"
-    pool.map(oscript.DemandSample, range(nsamples))
+    pool.map(pytm.DemandSample, range(nsamples))
 
     # Generate ensemble of tasks based on user specifications
     taskpool = []
@@ -106,7 +90,7 @@ def main(pool):
                 task = i, config['config_name']
                 taskpool.append(task)
 
-    pool.map(oscript.computations, taskpool)
+    pool.map(pytm.computations, taskpool)
 
     print "\n-- Updating sample objects\n"
     pool.map(w.update_samples, range(nsamples))
@@ -115,49 +99,7 @@ def main(pool):
 
     print "\n-- Writing result files\n"
     w.write_results(nF)
-
-    #
-    # print '\n-- Beginning MapReduce job: Background evolution\n'
-    #
-    #
-    # # Calculate background cosmology for samples
-    # BGcosmo = pool.map(oscript.ModelSetup, samples)
-    #
-    # print '\n-- finished MapReduce job: Background evolution\n'
-    #
-    # # For active observable types, build job pool
-    # jobpool = []
-    # for item in BGcosmo:
-    #
-    #     if item is not None:
-    #
-    #         if ns_active:
-    #             job = item, "ns"
-    #             jobpool.append(job)
-    #
-    #         for s in shapes:
-    #             job = item, s
-    #             jobpool.append(job)
-    #
-    #
-    # # MapReduce observables
-    # print '\n-- beginning MapReduce job: Observables\n'
-    #
-    # # Perform MapReduce on observables.
-    # # Note: We don't define variable, as all data is saved as pickle file and converted to results.txt file
-    # pool.map(taskhandler.observables, jobpool)
-    # pool.close()
-    #
-    # print '\n-- finished MapReduce job: Observables\n'
-    #
-    # print '\n-- begin writing phase\n'
-    #
-    # # Call writer to write initial ensemble file and results in GetDist format
-    # writer.writegetdist()
-    #
-    # print '\n-- writing phase complete.\n'
-    #
-    # print '\n-- Job complete.'
+    print "\n-- All Complete.\n"
 
 
 # MPI Pool settings
