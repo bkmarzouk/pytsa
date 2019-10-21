@@ -34,7 +34,7 @@ fname = str(N) + "QuadSetup.py"
 preamble = ["import os\n",
             "import sympy as sym\n",
             "import sys\n",
-            "tree = os.path.abspath(os.path.join(__file__, '..'))\n",
+            "tree = os.path.abspath(os.path.join(__file__, '../..'))\n",
             "pytpath = os.path.join(tree, 'PyTransport', 'PyTransport')\n",
             "sys.path.append(pytpath)\n",
             "import PyTransSetup\n",
