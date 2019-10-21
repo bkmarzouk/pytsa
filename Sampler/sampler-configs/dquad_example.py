@@ -8,6 +8,7 @@ To build a sampler, we are required to write a configuration file as follows
 import numpy as np
 import os
 import sys
+import dir_structure as ds
 
 
 
