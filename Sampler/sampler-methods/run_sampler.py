@@ -26,7 +26,9 @@ os.environ['PyTS_smppath'] = smppath
 
 
 # Set Paths
-rootpath = os.getcwd(); os.environ['PyTSamplerRoot'] = rootpath
+rootpath = os.getcwd()
+os.environ['PyTSamplerRoot'] = rootpath
+
 path_2pf = os.path.join(saveloc, "2pf")
 path_3pf = os.path.join(saveloc, "3pf")
 Mij_path = os.path.join(saveloc, "Mij")
@@ -50,7 +52,7 @@ PyT = importlib.import_module(cfg.sampler['PyTransportModule'])
 import PyTransScripts as PyS
 
 # Begin main function
-def main(pool, use_existing_samples):
+def main(pool, use_existing_samples, rerun_samples):
 
     print "\n... Beginning main...\n"
 
@@ -66,7 +68,8 @@ def main(pool, use_existing_samples):
         which3pf = cfg.which3pf
 
     compute_Mij = cfg.computations['Mij']
-    if compute_Mij: tasks.append('Mij')
+    if compute_Mij:
+        tasks.append('Mij')
 
     # Get sampler confiuration
     nsamples = cfg.sampler['NSamples']
@@ -88,15 +91,22 @@ def main(pool, use_existing_samples):
     nF, nP = PyT.nF(), PyT.nP()
 
     # Generate ensemble of models that support sufficient inflation
-    print "\n-- Initializing ensemble\n"
+    print "\n-- Initializing ensemble"
     
     # If use existing sample flag, get sample numbers from sample directory
-    if use_existing_samples is True:
+    if use_existing_samples is True and rerun_samples is False:
         print "----- Loading ensemble"
         sample_loc = os.path.join(cfg.system['saveloc'], "samples")
         sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(sample_loc)]
     
+    elif use_existing_samples is True and rerun_samples is True:
+        print "----- Re-running ensemble"
+        sample_loc = os.path.join(cfg.system['saveloc'], "samples")
+        sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(sample_loc)]
+        pool.map(pytm.DemandSample_rerun, sample_range)
+    
     else:
+        print "----- Building ensemble"
         sample_range = range(nsamples)
         pool.map(pytm.DemandSample, sample_range)
 
@@ -137,22 +147,33 @@ if __name__ == "__main__":
 
     # Import argument parser for cmd args
     from argparse import ArgumentParser
-    sb_parser = ArgumentParser(description="")
+    
+    # Build argument parser for cmd line
+    parser = ArgumentParser(description="Configure PyTransport Sampler Routine")
+    
+    # Build mutually exclusive group for Schwimmbad processes
+    sb_group = parser.add_mutually_exclusive_group()
 
-    # Add MPI standard args
-    group = sb_parser.add_mutually_exclusive_group()
-    group.add_argument("--ncores", dest="n_cores", default=1, type=int,
+    sb_group.add_argument("--ncores", dest="n_cores", default=1, type=int,
                        help="Number of processes (uses multiprocessing).")
-    group.add_argument("--mpi", dest="mpi", default=False,
+    
+    sb_group.add_argument("--mpi", dest="mpi", default=False,
                        action="store_true", help="Run with MPI.")
     
-    # Add flag for existing samples use
-    group.add_argument("--use_samples", dest="use_samples", default=False,
-                       action="store_true", help="Use existing sample data")
+    # Add group for PyTransport sampler
+    pyt_group = parser.add_argument_group()
     
-    args = sb_parser.parse_args()
+    pyt_group.add_argument("--use_samples", dest="use_samples", default=False,
+                       action="store_true", help="Use existing sample data")
 
+    # Add flag to rerun existing sample data, e.g. if we changed calculation pipeline
+    pyt_group.add_argument("--rerun_samples", dest="rerun_samples", default=False,
+                       action="store_true", help="Re-run with existing sample core data")
+    
+    
+    args = parser.parse_args()
+    
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)
 
     # Execute main program
-    main(pool, args.use_samples)
+    main(pool, args.use_samples, args.rerun_samples)

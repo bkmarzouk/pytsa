@@ -573,6 +573,9 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         c += 1
 
     if len(extensions) == 1:
+        
+        print "No Extension", BG_epsilon[-1][0]
+        
         return BG_epsilon, Nepsilon
 
     else:

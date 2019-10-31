@@ -23,9 +23,6 @@ pytpath = cfg.system['pytpath']  # PyTransport installation
 saveloc = cfg.system['saveloc']  # Save location for sampler outputs
 smppath = cfg.system['smppath']  # Sampler build directory
 
-
-print pytpath
-
 sys.path.append(pytpath)
 import PyTransSetup
 
@@ -56,12 +53,23 @@ For a given Sample and configuration module, we compute the end of inflation sub
 
 """
 
-def Initialize(modelnumber):
-    # Generate sample: ID, initial field values & velocties, parameters
-    n, fvals, vvals, pvals = gen_sample(modelnumber)
-    fvals = np.asarray(fvals)
-    vvals = np.asarray(vvals)
-    pvals = np.asarray(pvals)
+def Initialize(modelnumber, rerun_model=False):
+    
+    if rerun_model is False:
+        # Generate new sample with parameter & field priori
+        n, fvals, vvals, pvals = gen_sample(modelnumber)
+        fvals = np.asarray(fvals)
+        vvals = np.asarray(vvals)
+        pvals = np.asarray(pvals)
+    else:
+        # Load an existing set of parameters & model priori
+        model_path = os.path.join(saveloc, "samples", "{}.sample".format(modelnumber))
+        model_file = open(model_path, "rb")
+        with model_file as mf:
+            model = pk.load(mf)
+            fvals = model.fields
+            vvals = model.velocities
+            pvals = model.parameters
 
     # Cross-check the number of fields needed for the potential
     nF = PyT.nF()
@@ -168,7 +176,7 @@ def Initialize(modelnumber):
             if Nend - row[0] > 70:
                 initial = row[1:]
                 Nend = Nend - row[0]
-                t = np.linspace(0.0, Nend, int((Nend - Nstart) * 3))
+                t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
                 
                 if canonical is True:
                     back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
@@ -211,7 +219,8 @@ def Initialize(modelnumber):
                 break
 
     # Construct realisation, which is then saved under intialization to "samples" directory
-    realization(modelnumber, pvals, back, adiabatic, Nend, kExit, smp_path)
+    realization(modelnumber, fvals, vvals, pvals,
+                back, adiabatic, Nend, kExit, smp_path, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
 
@@ -224,6 +233,14 @@ def DemandSample(modelnumber):
     c = 1
     while ii != modelnumber:
         ii = Initialize(modelnumber)
+        c+=1
+
+def DemandSample_rerun(modelnumber):
+    """ Repeat initialization until successful sample is found """
+    ii = -1
+    c = 1
+    while ii != modelnumber:
+        ii = Initialize(modelnumber, rerun_model=True)
         c+=1
 
 
@@ -312,8 +329,9 @@ def SpectralIndex(modelnumber):
     back = sample.background
     Nend = sample.Nend;
     assert Nend is not None, "Nend = None should not be a saved sample"
-    kExit = sample.kExit
     pvals = np.asarray(sample.parameters)
+    
+    kExit = sample.kExit
 
     # Define savepath for spectral index and running
     twoPt_savepath = os.path.join(path_2pf, "{}.2pf".format(modelnumber))
@@ -323,14 +341,17 @@ def SpectralIndex(modelnumber):
 
     try:
         
-        # back, Neps = PyS.ExtendedBackEvolve(back[0][1:], pvals, PyT)
-        # kExit = PyS.kexitN(Nexit, back, pvals, PyT)
-        
         # Define range of N times about exit scale of interest
-        Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 2, 3, 4]]
+        Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
 
         # Compute modes that exit at corresponding times
         kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
+        
+        Nrange.insert(2, Nend - Nexit)
+        kExitrange.insert(2, kExit)
+
+        print "Nexit", Nrange
+        print "kExit", kExitrange
 
         # Check that momenta size is monotonically increasing
         assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
@@ -364,7 +385,6 @@ def SpectralIndex(modelnumber):
         
         print ns, alpha
         
-        raise
 
 
     except (AssertionError, AttributeError) as e:
@@ -401,7 +421,7 @@ def fNL(modelnumber, which3pf):
 
     # Unload core data for observable calculation
     back = sample.background
-    Nend = sample.Nend;
+    Nend = sample.Nend
     assert Nend is not None, "Nend = None should not be a saved sample"
     kExit = sample.kExit
     pvals = np.asarray(sample.parameters)
