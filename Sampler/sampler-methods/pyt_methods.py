@@ -160,21 +160,32 @@ def Initialize(modelnumber):
 
     # If more than 70 eFolds to the end of inflation, adjust the initial conditions
     # such that we don't end up with exp large nums for momenta k
-    # if Nend > 70.0:
-    #     for row in np.flipud(back):
-    #
-    #         # If more than 70 eFolds to go, reposition ICs to this point
-    #         # and break out of the search
-    #         if Nend - row[0] > 70:
-    #             initial = row[-(len(row) - 1):]
-    #             Nend = Nend - row[0]
-    #             t = np.linspace(0.0, Nend, int((Nend - Nstart) * 3))
-    #             back = PyT.backEvolve(t, initial, pvals, tols, False)
-    #             break
+    if Nend > 70.0:
+        for row in np.flipud(back):
 
-    if type(back) != np.ndarray:
-        print "** Incorrect background data type: %05d" % modelnumber
-        return None
+            # If more than 70 eFolds to go, reposition ICs to this point
+            # and break out of the search
+            if Nend - row[0] > 70:
+                initial = row[1:]
+                Nend = Nend - row[0]
+                t = np.linspace(0.0, Nend, int((Nend - Nstart) * 3))
+                
+                if canonical is True:
+                    back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
+                    break
+                    
+                else:
+                    back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
+                    break
+    else:
+        back_adj = back
+
+    # If rescaling routine gives rise to a failed trajectory, refer to initial evolution
+    if type(back_adj) != np.ndarray:
+        print "-- Background rescaling failed"
+    else:
+        print "-- Background rescaling successful"
+        back = back_adj
 
     # Compute exit time for scales of interest & corresponding Fourier mode
     kExit = PyS.kexitN(Nend - Nexit, back, pvals, PyT)
@@ -184,7 +195,7 @@ def Initialize(modelnumber):
 
     adiabatic = True
 
-    # Test adiabicity over lsat 5 efolds of inflation
+    # Test adiabicity over last 2.5 efolds of inflation
     if cfg.accept_criteria['TestAdiabaticLimit'] is True:
         print "-- Searching for adiabatic limit: %05d" % modelnumber
         last5 = np.where(back.T[0] >= Nend - 2.5)[0][0]  # Get indices for background steps 2.5 efolds before the end
@@ -213,7 +224,6 @@ def DemandSample(modelnumber):
     c = 1
     while ii != modelnumber:
         ii = Initialize(modelnumber)
-        print c
         c+=1
 
 
@@ -283,10 +293,7 @@ def Mij(modelnumber):
     Mij_file = open(Mij_savepath, "wb")
     with Mij_file:
         pk.dump(Mij_eig, Mij_file)
-
-
-# Initialize(0)
-# Mij(0)
+        
 
 def SpectralIndex(modelnumber):
     # Begin by loading pickled sample
@@ -315,22 +322,23 @@ def SpectralIndex(modelnumber):
     ti = time.clock()
 
     try:
-
+        
+        # back, Neps = PyS.ExtendedBackEvolve(back[0][1:], pvals, PyT)
+        # kExit = PyS.kexitN(Nexit, back, pvals, PyT)
+        
         # Define range of N times about exit scale of interest
-        Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
+        Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 2, 3, 4]]
 
         # Compute modes that exit at corresponding times
         kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
-        kExitrange.insert(2, kExit)
 
-        if not all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)):
-            print "SHI", kExitrange
-            
-        assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)), kExitrange
+        # Check that momenta size is monotonically increasing
+        assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
 
-        # Get initial conditions for modes
+        # Get initial conditions for momenta
         ICsEvos = [PyS.ICs(subevo, kE, back, pvals, PyT) for kE in kExitrange]
 
+        # Check at initial conditions array(s) are correct length of correct dtype
         for item in ICsEvos:
             assert len(item) == 2, "Initial conditions incorrect length"
         for item in ICsEvos:
@@ -340,7 +348,7 @@ def SpectralIndex(modelnumber):
         Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
 
         # Compute the two point function for each mode at evaluation times
-        twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, True).T for NkBack in zip(
+        twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False).T for NkBack in zip(
             Nevals, kExitrange, ICsEvos
         )]
 
@@ -348,12 +356,20 @@ def SpectralIndex(modelnumber):
         logPz = [np.log(xx[1][-1]) for xx in twoPt]
         logkE = [np.log(kE) for kE in kExitrange]
 
-        # Compute spectral index kExit range
-        ns = UnivariateSpline(logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExit)) + 4.
-        alpha = UnivariateSpline(logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExit)) + 0.
+        # Compute spectral index and running for pivot scale at end of inflation
+        ns = UnivariateSpline(
+            logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExitrange[2])) + 4.
+        alpha = UnivariateSpline(
+            logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExitrange[2])) + 0.
+        
+        print ns, alpha
+        
+        raise
 
 
     except (AssertionError, AttributeError) as e:
+        
+        print "-- ns Failure"
 
         ns = None
         alpha = None
@@ -366,8 +382,6 @@ def SpectralIndex(modelnumber):
     with twoPt_file:
         pk.dump(twoPt_dict, twoPt_file)
 
-
-# SpectralIndex(0)
 
 # fNL calculation
 def fNL(modelnumber, which3pf):
@@ -441,15 +455,7 @@ def fNL(modelnumber, which3pf):
 
     with fNL_file:
         pk.dump(fNL_dict, fNL_file)
-
-
-# print "-- End fNL calculation: model {m}, config {c}, value {v}".format(m=modelnumber, c=name, v=fNL)
-
-
-c = {"config_name": "eq", "latex": "f_\\text{NL}^\\text{eq}", "alpha": 1. / 3., "beta": 1. / 3.}
-
-
-# fNL(0, c)
+        
 
 def computations(mn_calc):
     modelnumber, calculation = mn_calc
@@ -473,11 +479,5 @@ def computations(mn_calc):
                 fNL(modelnumber, config)
                 print "--   End fNL: model %06d, config {}".format(config['config_name']) % modelnumber
 
-        if len(w) > 0: print "-- {t} TASK FAILURE, MODEL {m}".format(t=calculation, m=modelnumber)
-
-# initial [0.9 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0. ]
-# pvals [ 1.13436649e-02  6.57608256e-01  9.07505356e-04 -2.50411061e+00
-#  -1.31970961e+00  7.22917349e-01  1.66703036e-01 -1.05323158e+00
-#   8.37908668e-01]
-# tols [1.e-08 1.e-08]
-# Nstart 0.0
+        if len(w) > 0:
+            print "-- {t} TASK FAILURE, MODEL {m}".format(t=calculation, m=modelnumber)

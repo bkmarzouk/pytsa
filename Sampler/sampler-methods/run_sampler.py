@@ -50,7 +50,7 @@ PyT = importlib.import_module(cfg.sampler['PyTransportModule'])
 import PyTransScripts as PyS
 
 # Begin main function
-def main(pool):
+def main(pool, use_existing_samples):
 
     print "\n... Beginning main...\n"
 
@@ -68,30 +68,41 @@ def main(pool):
     compute_Mij = cfg.computations['Mij']
     if compute_Mij: tasks.append('Mij')
 
-
-    assert compute_2pf or compute_3pf or compute_Mij, "No calculations found."
-
     # Get sampler confiuration
     nsamples = cfg.sampler['NSamples']
     pytmod   = cfg.sampler['PyTransportModule']
+    
+    if sum([compute_2pf, compute_3pf, compute_Mij])==0:
+        print "| Begin sampling routing: {}".format(pytmod)
+        print "| -- Background only"
 
-    print "| Begin sampling routing: {}".format(pytmod)
-    print "| -- 2pf: {}".format(compute_2pf)
-    print "| -- 3pf: {}".format(compute_3pf)
-    if compute_3pf:
-        for item in which3pf:
-            print "|         fNL {}".format(item['config_name'])
-    print "| -- Mij: {}".format(compute_Mij)
+    else:
+        print "| Begin sampling routing: {}".format(pytmod)
+        print "| -- 2pf: {}".format(compute_2pf)
+        print "| -- 3pf: {}".format(compute_3pf)
+        if compute_3pf:
+            for item in which3pf:
+                print "|         fNL {}".format(item['config_name'])
+        print "| -- Mij: {}".format(compute_Mij)
 
     nF, nP = PyT.nF(), PyT.nP()
 
     # Generate ensemble of models that support sufficient inflation
     print "\n-- Initializing ensemble\n"
-    pool.map(pytm.DemandSample, range(nsamples))
+    
+    # If use existing sample flag, get sample numbers from sample directory
+    if use_existing_samples is True:
+        print "----- Loading ensemble"
+        sample_loc = os.path.join(cfg.system['saveloc'], "samples")
+        sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(sample_loc)]
+    
+    else:
+        sample_range = range(nsamples)
+        pool.map(pytm.DemandSample, sample_range)
 
     # Generate ensemble of tasks based on user specifications
     taskpool = []
-    for i in range(nsamples):
+    for i in sample_range:
 
         if compute_2pf is True:
             task = i, "2pf"
@@ -109,7 +120,7 @@ def main(pool):
     pool.map(pytm.computations, taskpool)
 
     print "\n-- Updating sample objects\n"
-    pool.map(w.update_samples, range(nsamples))
+    pool.map(w.update_samples, sample_range)
 
     pool.close()
 
@@ -121,21 +132,27 @@ def main(pool):
 # MPI Pool settings
 if __name__ == "__main__":
 
+    # Import schwimmbad for MPI pool processes
     import schwimmbad
 
-    # Import argument parser for handling command line arguments, setup parser for Schwimmbad
+    # Import argument parser for cmd args
     from argparse import ArgumentParser
     sb_parser = ArgumentParser(description="")
 
-    # We define the mutually exclusive group for MPI standard procedures
+    # Add MPI standard args
     group = sb_parser.add_mutually_exclusive_group()
     group.add_argument("--ncores", dest="n_cores", default=1, type=int,
                        help="Number of processes (uses multiprocessing).")
-    group.add_argument("--mpi", dest="mpi", default=False, action="store_true", help="Run with MPI.")
-
+    group.add_argument("--mpi", dest="mpi", default=False,
+                       action="store_true", help="Run with MPI.")
+    
+    # Add flag for existing samples use
+    group.add_argument("--use_samples", dest="use_samples", default=False,
+                       action="store_true", help="Use existing sample data")
+    
     args = sb_parser.parse_args()
 
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)
 
     # Execute main program
-    main(pool)
+    main(pool, args.use_samples)

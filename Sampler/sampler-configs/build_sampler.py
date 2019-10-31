@@ -198,15 +198,12 @@ with cfg_old_file as c:
         if "sys01" in line:
             line_ = "\t'pytpath': '{}',\n".format(pytpath)
             cfg_lines.append(line_)
-            print line_
         elif "sys02" in line:
             line_ = "\t'saveloc': '{}',\n".format(savepath)
             cfg_lines.append(line_)
-            print line_
         elif "sys03" in line:
             line_ = "\t'smppath': '{}'".format(os.path.abspath(os.path.join(pytpath, "../../Sampler")))
             cfg_lines.append(line_)
-            print line_
         elif "save_location" in line:
             pass
         elif "sampler_name" in line:

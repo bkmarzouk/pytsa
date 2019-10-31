@@ -8,15 +8,11 @@ from idp import OperationMatrix
 
 class Curvature:
 	"""
-
 	Compute curvature quantities for a given metric
-
 	`metric' should be a sympy matrix
 	'coords' should be sympy symbolic args for metric coordinates that define the metric
 	'params' is optional, but should be symbolic like 'coords'
 	'precompute' computes all curvature quantities upon initialization
-
-
 	"""
 
 
@@ -143,12 +139,9 @@ class Curvature:
 
 	def Christoffel(self, a, b, c, symbolic_args=True, simplify=False):
 		"""
-
 		Computes Christoffel symbols of the second kind, \Gamma^a_{bc}
-
 		a, b, c can correspond to index elements of the initialized coordinates or
 		a, b, c can be symbolic, the same as those prescribed in initialization
-
 		"""
 
 		if symbolic_args is True:

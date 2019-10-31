@@ -445,6 +445,54 @@ def dotdotfields(back, MTE, params):
 
     return phidotdot
 
+def EvolveKE(back, params, MTE):
+    """ Computes the Kinetic Energy of the fields along the background trajectory """
+
+    # Find curvature records directory and create file instance to lead curvature class obj.
+    dir = os.path.dirname(__file__)
+    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
+    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
+    curv_path = os.path.join(curv_dir, curv_name)
+    curv_file = open(curv_path, 'r')
+    with curv_file:
+        curv_obj = pk.load(curv_file)
+        
+    # Inverse metric
+    metric = curv_obj.metric
+
+    # Get number of fields and params
+    nF = MTE.nF()
+    nP = MTE.nP()
+    
+    print "-- Building dict"
+    
+    # Build lambda functions for metric
+    pdict = dict()
+    for i in range(nP):
+        pdict[curv_obj.params[i]] = params[i]
+
+    print "-- Building lambda functions"
+    
+    metric_lambdas = np.empty((nF, nF), dtype=object)
+    
+    for i in range(nF):
+        for j in range(nF):
+            metric_lambdas[i, j] = sym.lambdify([f for f in curv_obj.coords], metric[i, j].subs(pdict), "numpy")
+    
+    print "-- Computing K.E. evolution"
+    
+    # Build dictionary for symbolic substitutions
+    def g_ab(a, b, step):
+        fields = list(step[1:1+nF])
+        m_eval =  metric_lambdas[a, b](*fields)
+        return m_eval
+    
+    # Kinetic Energy = 1/2 * g_{ab} * dt phi^a dt phi^b
+    backKE = np.array([0.5 * sum([g_ab(a, b, step) * step[1+nF+a] * step[1+nF+b] for a in range(nF) for b in range(nF)]) for step in back ])
+    
+    # return 2 x N numpy array, with the the first col containing efold number and the second the fields K.E.
+    return np.vstack([back.T[0], backKE]).T
+
 
 def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     """ Computes the kinetic energy of the fields. Assumes canonical lagrangian kinetic term """
@@ -483,7 +531,7 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     return KE
 
 
-def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, tols=np.array([1e-8, 1e-8])):
+def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, tols=np.array([1e-10, 1e-10])):
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
 
@@ -523,11 +571,8 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         extensions.append(bg_ext[1:])
 
         c += 1
-        #print c
 
     if len(extensions) == 1:
-        # No further extensinos to background evolution successful, return background epsilon
-        print "Extended backgroudn unsuccessfully"
         return BG_epsilon, Nepsilon
 
     else:
@@ -535,9 +580,6 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         stacked = np.vstack((bg for bg in extensions))
     
         print "Extended background by N = {}".format(stacked.T[0][-1] - Nepsilon)
-        print "X epsilon", stacked[idx_epsilon][1]
-        print "X FINAL", stacked[-1][1]
-        print "X MIN", min(stacked.T[1])
     
         # return the background, as well as the efolding where slow-roll was violated
         return stacked, Nepsilon
@@ -600,6 +642,10 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
 
     # Hubble rate
     H_sym = sym.symbols("H")
+    
+    """ Generate lambda functions for numerical evaluation """
+    
+    
 
     """ Iterate over every time step """
 
