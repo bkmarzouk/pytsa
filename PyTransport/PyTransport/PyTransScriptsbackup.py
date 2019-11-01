@@ -20,7 +20,9 @@ import numpy as np
 from scipy import interpolate
 import timeit
 import sys
-from gravtools_pyt import Curvature
+# import curvature
+# import PyNStein
+import gravtools_pyt
 import os
 import pickle as pk
 
@@ -594,10 +596,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
     curv_name = str(MTE).split("'")[1][7:] + ".curvature"
     curv_path = os.path.join(curv_dir, curv_name)
-    curv_file = open(curv_path, 'rb')
-    
-    print curv_path
-    
+    curv_file = open(curv_path, 'r')
     with curv_file:
         curv_obj = pk.load(curv_file)
 
@@ -621,205 +620,155 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
 
     # Transpose background evolution into horizontal components
     backT = back.T
+
+    """ Build symbolic quantities to evaluate against background data"""
+
+    # Call group elements of mass matrix
+    Hij_sym = curv_obj.Hij
+    Cij_sym = curv_obj.Cij
+    Kij_sym = curv_obj.Kij
+    Mij = [np.zeros((nF, nF)) for i in back]
+
+    # Field time derivatives
+    phidot_syms_u = sym.symarray("phidot", nF)  # Field derivative symbols
+    phidotdot_syms_u = sym.symarray("phidotdot", nF)  # Field derivative symbols
+
+    # Covariant time derivative expressions
+    phidot_syms_d = [sum(curv_obj.metric[i, j] * phidot_syms_u[i] for j in range(nF)) for i in range(nF)]
+    phidotdot_syms_d = [sum(curv_obj.metric[i, j] * phidotdot_syms_u[i] for j in range(nF)) for i in range(nF)]
+
+    # Hessian Matrix
+    ddV_sym = sym.symarray("ddV,", (nF, nF))
+
+    # Potential gradients
+    dV_sym = sym.symarray("dV,", nF)
+
+    # Hubble rate
+    H_sym = sym.symbols("H")
     
-    G = curv_obj.metric
-    Ginv = curv_obj.metric_inverse
+    """ Generate lambda functions for numerical evaluation """
     
-    rnf = range(nF)
-    
-    def cov_ftensor(con_ftensor, index, subs):
-        """ Lowers the index of a contravariant field tensor """
-        return sum([G[a, index].evalf(subs=subs)*con_ftensor[a] for a in rnf])
-    
-    f_syms = curv_obj.coords
-    p_syms = curv_obj.params
-    def get_subs(fvals, pvals):
-        fdic = dict(zip(f_syms, fvals))
-        pdic = dict(zip(p_syms, pvals))
-        
-        fdic.update(pdic)
-        
-        return fdic
-    
-        
-    csyms = curv_obj.Csyms
-    rsyms = curv_obj.Rsyms
-    
-    mij_evo = []
-    eig_evo = []
-    
+
+    """ Iterate over every time step """
+
     for step in range(len(back)):
-        
-        # Unpack fields at time step
+
+        # Get index up fields
         phi = fields[step]
-        dphi = dotfields[step]
-        ddphi = ddtfields[step]
-        
-        # Get metric substitutions and lower indices
-        g_subs = get_subs(phi, params)
-        phi_d = [cov_ftensor(phi, i, g_subs) for i in rnf]
-        dphi_d = [cov_ftensor(dphi, i, g_subs) for i in rnf]
-        ddphi_d = [cov_ftensor(ddphi, i, g_subs) for i in rnf]
-        
-        # Build kinetic energy term
-        ke = sum([0.5 * G[a, b].evalf(subs=g_subs)*dphi[a]*dphi[b] for a in rnf for b in rnf])
-        
-        # Get hubble rate
-        h = hubble[step]
-        
-        covhess = np.zeros((nF, nF), dtype=float)
-        riemann = np.zeros((nF, nF), dtype=float)
-        kinetic = np.zeros((nF, nF), dtype=float)
-        
+        phidot = dotfields[step]
+        phidotdot = ddtfields[step]
+
+        # Get contravariant potential derivatives
         dV = dV_evo[step]
         ddV = ddV_evo[step]
-        
-        for a in rnf:
-            for b in rnf:
-                try:
-                    covhess[a, b] += ddV[a, b] - sum([csyms[k, a, b].evalf(subs=g_subs)*dV[k] for k in rnf])
-                except AttributeError:
-                    pass
-                
-                try:
-                    riemann[a, b] += -sum([rsyms[a, k, l, b].evalf(subs=g_subs)*dphi[k]*dphi[l] for k in rnf for l in rnf])
-                except AttributeError:
-                    pass
-                
-                kinetic[a, b] += -(3. - ke / h / h)*dphi_d[a]*dphi_d[b]
-                
-                kinetic[a, b] += -(dphi_d[a]*ddphi[b] + ddphi_d[a]*dphi_d[b])
-                
-                try:
-                    kinetic[a, b] += dphi_d[a]*sum([dphi[k]*csyms[p, b, k].evalf(subs=g_subs)*dphi_d[p] for k in rnf for p in rnf])
-                except AttributeError:
-                    pass
-                
-                try:
-                    kinetic[a, b] += dphi_d[b]*sum([dphi[k]*csyms[p, a, k].evalf(subs=g_subs)*dphi_d[p] for k in rnf for p in rnf])
-                except AttributeError:
-                    pass
-                
-        # Build covariant mass matrix
-        mij_d = covhess + riemann + kinetic
-        
-        # print mij_d
 
-        # raise an index
-        mij = np.zeros((nF, nF), dtype=float)
-        for i in rnf:
-            for j in rnf:
-                mij[i, j] = sum([Ginv[a, i].evalf(subs=g_subs)*mij_d[a, j] for a in rnf])
-                
-        mij_evo.append(mij)
-        
-        print mij
-        
-        eig, eigv = np.linalg.eig(mij)
-        
-        eig_sorted = np.sort(eig)
-        
-        eig_sorted *= 1./ h / h
-        
-        eig_evo.append(eig_sorted)
-        
-    eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
+        # Get hubble numeric value
+        H = hubble[step]
+
+        # Build dictionary for numerical evaluation
+        sub_dict = dict()
+        sub_dict[H_sym] = H
+
+        """ Build dictionary of quantities to substitute """
+
+        for i in range(nF):
+            sub_dict[curv_obj.coords[i]] = phi[i]  # Assign field values
+            sub_dict[phidot_syms_u[i]] = phidot[i]  # Assign field time derivative values
+            sub_dict[phidotdot_syms_u[i]] = phidotdot[i]  # Assign second time derivative of fields
+            sub_dict[dV_sym[i]] = dV[i]  # Assign potential derivative values
+            for j in range(nF):
+                sub_dict[ddV_sym[i, j]] = ddV[i, j]
+
+        if curv_obj.params is not None:
+            for i in range(nP): sub_dict[curv_obj.params[i]] = params[i]  # Assign parameter values
+
+        """ Iterate over field space indices I,J and compute M_{IJ} """
+
+        for i in range(nF):
+
+            for j in range(nF):
+
+                # Initialize mass matrix element
+                Mij_num = 0
+
+                # Compute covariant Hessian contribution
+                Hij_num = Hij_sym[i, j].evalf(subs=sub_dict)
+                Mij_num += Hij_num
+
+                if DropKineticTerms is False:
+                    
+                    # Compute kinetic contributions
+                    Cij_num = Cij_sym[i, j].evalf(subs=sub_dict)
+                    Kij_num = Kij_sym[i, j].evalf(subs=sub_dict)
+
+                    Mij_num += Cij_num
+                    Mij_num += Kij_num
+
+                    # print "Hij, Cij, Kij =", Hij_num, Cij_num, Kij_num
+
+                Mij[step][i, j] = Mij_num
+
+    """ Compute eigenvalues of MIj """
+
+    MIj_eig = []
+
+    # Iterate over background evolution
+    for step in range(len(back)):
+
+        MIj = np.zeros((nF, nF), dtype=float)
+
+        # Get index up fields
+        phi = fields[step]
+        phidot = dotfields[step]
+        phidotdot = ddtfields[step]
+
+        # Get contravariant potential derivatives
+        dV = dV_evo[step]
+        ddV = ddV_evo[step]
+
+        sub_dict = dict()
+
+        for i in range(nF):
+            sub_dict[curv_obj.coords[i]] = phi[i]  # Assign field values
+            sub_dict[phidot_syms_u[i]] = phidot[i]  # Assign field time derivative values
+            sub_dict[phidotdot_syms_u[i]] = phidotdot[i]  # Assign second time derivative of fields
+            sub_dict[dV_sym[i]] = dV[i]  # Assign potential derivative values
+            for j in range(nF):
+                sub_dict[ddV_sym[i, j]] = ddV[i, j]
+
+
+        if curv_obj.params is not None:
+            for i in range(nP):
+                sub_dict[curv_obj.params[i]] = params[i]  # Assign parameter values
+
+        for I in range(nF):
+            for j in range(nF):
+                component = sum(curv_obj.metric_inverse[I, k]*Mij[step][k, j] for k in range(nF))
+                component = component.evalf(subs=sub_dict)
+                MIj[I, j] = component
+
+        # Compute eigenvalues (e) and eigenvectors (v)
+        e, v = np.linalg.eig(MIj)
+
+        # Sort eigenvalues s.t. ordering corresponds from light -> heavy
+        e_sorted = np.sort(e)
+
+        # Scale masses by abs(sqrt(e)) if True
+        scale_masses = False
+        if scale_masses is True:
+            e_sorted = np.sign(e_sorted) * np.sqrt(np.abs(e_sorted))
+
+        # Scale eigenvalues by Hubble rate at given time step
+        e_sorted *= 1. / hubble[step] / hubble[step]
+
+        MIj_eig.append(e_sorted)
+
+    """ Construct N x (nF+1) Matrix for eigenvalue evolution """
+
+    # There are N rows for every time step. The zeroth column is the number of efolds at evaluation
+    # then there are nF columns for each eigenvalue
+    eigstack = np.vstack([np.asarray(eig) for eig in MIj_eig])
     eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
 
     # Return matrix in typical PyTransport format
     return eigstack
-    
-    # """ Build symbolic quantities to evaluate against background data"""
-    #
-    # # Call group elements of mass matrix
-    # Hij_sym = curv_obj.Hij
-    # Cij_sym = curv_obj.Cij
-    # Kij_sym = curv_obj.Kij
-    # Mij_sym = Hij_sym + Cij_sym + Kij_sym
-    #
-    # Mij = [np.zeros((nF, nF)) for i in back]
-    #
-    # # Build symbols for symbolic subs
-    # rnf = range(nF)
-    #
-    # # Symbolically define field time derivatives
-    # dphi = sym.symarray("df", nF)
-    # ddphi = sym.symarray("ddf", nF)
-    #
-    # # Symbol for Hubble rate
-    # H_sym = sym.symbols("H")
-    #
-    # # Symbolically define derivatives of the potential
-    # dV_sym = sym.symarray("dV", nF)
-    # ddV_sym = sym.symarray("ddV", (nF, nF))
-    #
-    # Hij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Hij_sym, 'numpy'
-    # )
-    #
-    # Cij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Cij_sym, 'numpy'
-    # )
-    #
-    # Kij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Kij_sym, 'numpy'
-    # )
-    #
-    # for step in range(len(back)):
-    #
-    #     args = [p for p in fields[step]] +\
-    #            [p for p in dotfields[step]] +\
-    #            [p for p in ddtfields[step]] +\
-    #            [hubble[step]] +\
-    #            [d for d in dV_evo[step]] +\
-    #            [d for d in ddV_evo[step].flatten()] +\
-    #            [p for p in params]
-    #
-    #     r1 = Hij_lambda(*args)
-    #     r2 = Cij_lambda(*args)
-    #     r3 = Kij_lambda(*args)
-    #
-    #     r = r1 + r2 + r3
-    #
-    #     print r1/r
-    #
-    #     print r2/r
-    #
-    #     print r3/r
-    #
-    #     e, v = np.linalg.eig(r)
-    #
-    #     print e / hubble[step] / hubble[step]
-    #
-    #     Mij.append(r)
-    #
-    #
-    # MijEig = []
-    # for i in range(len(back)):
-    #
-    #     e, v = np.linalg.eig(Mij[i])
-    #
-    #     # Sort eigenvalues s.t. ordering corresponds from light -> heavy
-    #     e_sorted = np.sort(e)
-    #
-    #     # Scale masses by abs(sqrt(e)) if True
-    #     scale_masses = False
-    #     if scale_masses is True:
-    #         e_sorted = np.sign(e_sorted) * np.sqrt(np.abs(e_sorted))
-    #
-    #     # Scale eigenvalues by Hubble rate at given time step
-    #     e_sorted *= 1. / hubble[i] / hubble[i]
-    #
-    #     MijEig.append(e_sorted)
-    # """ Construct N x (nF+1) Matrix for eigenvalue evolution """
-    #
-    # # There are N rows for every time step. The zeroth column is the number of efolds at evaluation
-    # # then there are nF columns for each eigenvalue
-    # eigstack = np.vstack([np.asarray(eig) for eig in MijEig])
-    # eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
-    #
-    # # Return matrix in typical PyTransport format
-    # return eigstack
