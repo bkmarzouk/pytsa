@@ -291,13 +291,35 @@ def Mij(modelnumber):
             UnivariateSpline(
                 Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=4) for i in range(1, 1 + nF)
         ]
-
+        
         vsplines = [
             UnivariateSpline(
                 Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=4) for i in range(1 + nF, 1 + 2 * nF)
         ]
 
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
+
+        # import matplotlib.pyplot as plt
+        #
+        # plt.figure()
+        # plt.title("fields")
+        # for i in range(nF):
+        #     plt.scatter(Nsmooth, backT[1 + i][Nstar_idx], label="f_{}".format(i))
+        #     plt.plot([N for N in Nsmooth], [fsplines[i](N) for N in Nsmooth], label="f_{} fit".format(i))
+        #     plt.scatter(back_star[0], back_star[1+i], color='k')
+        #
+        # plt.legend()
+        #
+        # plt.figure()
+        # plt.title("velocities")
+        # for i in range(nF):
+        #     plt.scatter(Nsmooth, backT[1 + nF + i][Nstar_idx], label="v_{}".format(i))
+        #     plt.plot([N for N in Nsmooth], [vsplines[i](N) for N in Nsmooth], label="v_{} fit".format(i))
+        #     plt.scatter(back_star[0], back_star[1+nF+i], color='k')
+        # plt.legend()
+        # plt.show()
+        
+        print "SHOULD BE SAME:\n", back_star[0] + 55., Nend
 
     Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, DropKineticTerms=False)[0][1:]
 

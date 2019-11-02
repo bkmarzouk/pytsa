@@ -671,39 +671,48 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
         riemann = np.zeros((nF, nF), dtype=float)
         kinetic = np.zeros((nF, nF), dtype=float)
         
+        std_kin = np.zeros((nF, nF), dtype=float)
+        chr_kin = np.zeros((nF, nF), dtype=float)
+        
         dV = dV_evo[step]
         ddV = ddV_evo[step]
         
+        def try_evalf(obj, subs):
+            try:
+                r = obj.evalf(subs=g_subs)
+            except:
+                r = float(obj)
+            
+            return r
+        
         for a in rnf:
             for b in rnf:
-                try:
-                    covhess[a, b] += ddV[a, b] - sum([csyms[k, a, b].evalf(subs=g_subs)*dV[k] for k in rnf])
-                except AttributeError:
-                    pass
                 
-                try:
-                    riemann[a, b] += -sum([rsyms[a, k, l, b].evalf(subs=g_subs)*dphi[k]*dphi[l] for k in rnf for l in rnf])
-                except AttributeError:
-                    pass
+                covhess[a, b] += ddV[a, b] - sum([try_evalf(csyms[k, a, b], g_subs)*dV[k] for k in rnf])
+                
+                riemann[a, b] += -sum(
+                    [try_evalf(rsyms[a, k, l, b], g_subs)*dphi[k]*dphi[l] for k in rnf for l in rnf])
                 
                 kinetic[a, b] += -(3. - ke / h / h)*dphi_d[a]*dphi_d[b]
                 
-                kinetic[a, b] += -(dphi_d[a]*ddphi[b] + ddphi_d[a]*dphi_d[b])
+                kinetic[a, b] += -(dphi_d[a]*ddphi[b] + ddphi_d[a]*dphi_d[b]) / h
                 
-                try:
-                    kinetic[a, b] += dphi_d[a]*sum([dphi[k]*csyms[p, b, k].evalf(subs=g_subs)*dphi_d[p] for k in rnf for p in rnf])
-                except AttributeError:
-                    pass
+                kinetic[a, b] += dphi_d[a]*sum(
+                    [dphi_d[k]*try_evalf(csyms[p, b, k], g_subs)*dphi_d[p] for k in rnf for p in rnf]) / h
                 
-                try:
-                    kinetic[a, b] += dphi_d[b]*sum([dphi[k]*csyms[p, a, k].evalf(subs=g_subs)*dphi_d[p] for k in rnf for p in rnf])
-                except AttributeError:
-                    pass
+                kinetic[a, b] += dphi_d[b]*sum(
+                    [dphi_d[k]*try_evalf(csyms[p, a, k], g_subs)*dphi_d[p] for k in rnf for p in rnf]) / h
                 
+        
         # Build covariant mass matrix
         mij_d = covhess + riemann + kinetic
-        
-        # print mij_d
+
+        # 0.20225832558029772
+        # 0.20619102559621472
+        # 0.21251641627677464
+        # 0.22870841910381412
+        # 0.24683174861887558
+        # 0.25729020732011665
 
         # raise an index
         mij = np.zeros((nF, nF), dtype=float)
@@ -713,13 +722,18 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
                 
         mij_evo.append(mij)
         
-        print mij
         
         eig, eigv = np.linalg.eig(mij)
         
         eig_sorted = np.sort(eig)
         
-        eig_sorted *= 1./ h / h
+        scale_eigs = True
+        if scale_eigs:
+            eig_sorted *= 1./ np.sqrt(np.abs(eig_sorted))
+            eig_sorted *= 1./ h #/ h
+            
+        else:
+            eig_sorted *= 1. / h / h
         
         eig_evo.append(eig_sorted)
         
