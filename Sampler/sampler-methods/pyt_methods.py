@@ -280,51 +280,36 @@ def Mij(modelnumber):
         back_star = back[Nstar_idx]
 
     else:
-        idx_above = np.where(Nevo > Nstar)[0][0:3]  # Use 3 index values above Nstar
-        idx_below = np.where(Nevo < Nstar)[0][-3:]  # Use 3 index values below Nstar
+        # We consider the evolution of the mass matrix at +/- 1 eFold about the pivot scale
+        idx_above = np.where(np.logical_and(Nevo>Nstar, Nevo<Nstar+1.))[0]
+        idx_below = np.where(np.logical_and(Nevo < Nstar, Nevo > Nstar-1.))[0]
         Nstar_idx = list(np.concatenate([idx_below, idx_above]))
 
-        # Smooth over background evolution about horizon exit time
+        # Define efold range to "smooth" over
         Nsmooth = [Nevo[idx] for idx in Nstar_idx]
 
+        # Construct splines for the field evolution w.r.t. N time
         fsplines = [
             UnivariateSpline(
-                Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=4) for i in range(1, 1 + nF)
+                Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1, 1 + nF)
         ]
         
+        # Construct splines for the velocity evolution w.r.t. N time
         vsplines = [
             UnivariateSpline(
-                Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=4) for i in range(1 + nF, 1 + 2 * nF)
+                Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1 + nF, 1 + 2 * nF)
         ]
 
+        # Evaluate the background at N_star = Nend - Nexit
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
-
-        # import matplotlib.pyplot as plt
-        #
-        # plt.figure()
-        # plt.title("fields")
-        # for i in range(nF):
-        #     plt.scatter(Nsmooth, backT[1 + i][Nstar_idx], label="f_{}".format(i))
-        #     plt.plot([N for N in Nsmooth], [fsplines[i](N) for N in Nsmooth], label="f_{} fit".format(i))
-        #     plt.scatter(back_star[0], back_star[1+i], color='k')
-        #
-        # plt.legend()
-        #
-        # plt.figure()
-        # plt.title("velocities")
-        # for i in range(nF):
-        #     plt.scatter(Nsmooth, backT[1 + nF + i][Nstar_idx], label="v_{}".format(i))
-        #     plt.plot([N for N in Nsmooth], [vsplines[i](N) for N in Nsmooth], label="v_{} fit".format(i))
-        #     plt.scatter(back_star[0], back_star[1+nF+i], color='k')
-        # plt.legend()
-        # plt.show()
         
-        print "SHOULD BE SAME:\n", back_star[0] + 55., Nend
+    # Compute mass matrix eigenvalues
+    Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, scale_eigs=False)[0][1:]
 
-    Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, DropKineticTerms=False)[0][1:]
-
+    # Write dictionary values for masses
     Mij_eig = {}
-    for i in range(len(Mij)): Mij_eig['m{}'.format(i)] = Mij[i]
+    for i in range(len(Mij)):
+        Mij_eig['m{}'.format(i)] = Mij[i]
 
     # End timer
     Mij_eig['time'] = time.clock() - ti

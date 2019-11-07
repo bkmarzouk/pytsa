@@ -41,7 +41,7 @@ def unPackAlp(threePtOut, MTE):
     sig2R = threePtOut[:, 1 + 4 + 2 * nF + 2 * nF * 2 * nF:1 + 4 + 2 * nF + 2 * 2 * nF * 2 * nF]
     sig3R = threePtOut[:, 1 + 4 + 2 * nF + 2 * 2 * nF * 2 * nF:1 + 4 + 2 * nF + 3 * 2 * nF * 2 * nF]
     alp = threePtOut[:, 1 + 4 + 2 * nF + 6 * 2 * nF * 2 * nF:]
-
+    
     return zetaMs, np.reshape(sig1R, (np.size(threePtOut[:, 0]), 2 * nF, 2 * nF)), np.reshape(sig2R, (
         np.size(threePtOut[:, 0]), 2 * nF, 2 * nF)), np.reshape(sig3R,
                                                                 (
@@ -57,14 +57,14 @@ def unPackSig(twoPtOut, MTE):
         return np.nan, np.nan
     zeta = twoPtOut[:, 1]
     sig = twoPtOut[:, 1 + 1 + 2 * nF:1 + 1 + 2 * nF + 2 * nF * 2 * nF]
-
+    
     return zeta, np.reshape(sig, (np.size(twoPtOut[:, 0]), 2 * nF, 2 * nF))
 
 
 def ICsBM(NBMassless, k, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
     massEff = -1;
-
+    
     # calculate the element of back for which -k^2/a^2 + M^2 for M the largest eigenvalue of mass matrix
     jj = 0
     while (massEff < 0 and jj < np.size(back[:, 0]) - 1):
@@ -82,14 +82,14 @@ def ICsBM(NBMassless, k, back, params, MTE):
     while (Ncond < 0.0 and ll < np.size(back[:, 0]) - 1):
         Ncond = back[ll, 0] - (NMassless - NBMassless)
         ll = ll + 1
-
+    
     if ll == np.size(back[:, 0]) or (NMassless - back[0, 0]) < NBMassless:
         print ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
-
+    
     NexitMinus = back[ll - 2, 0]
     backExitMinus = back[ll - 2, 1:]
-
+    
     return NexitMinus, backExitMinus
 
 
@@ -113,13 +113,13 @@ def ICsBE(NBExit, k, back, params, MTE):
     while (Ncond < 0 and ll < np.size(back[:, 0]) - 1):
         Ncond = back[ll, 0] - (NExit - NBExit)
         ll = ll + 1
-
+    
     if ll == np.size(back[:, 0]) or (NExit - back[0, 0]) < NBExit:
         print  ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
     NexitMinus = back[ll - 2, 0]
     backExitMinus = back[ll - 2, 1:]
-
+    
     return NexitMinus, backExitMinus
 
 
@@ -127,7 +127,7 @@ def ICsBE(NBExit, k, back, params, MTE):
 def ICs(NB, k, back, params, MTE):
     NBEs, fieldBE = ICsBE(NB, k, back, params, MTE)
     NBMs, fieldBM = ICsBM(NB, k, back, params, MTE)
-
+    
     if (NBEs < NBMs):
         return NBEs, fieldBE
     return NBMs, fieldBM
@@ -138,13 +138,13 @@ def pSpectra(kA, back, params, NB, tols, MTE):
     zzOut = np.array([])
     times = np.array([])
     num = np.size(kA)
-
+    
     for ii in range(0, num):
         print ("\n \n \n performing " + str(ii + 1) + " of " + str(num) + "\n \n \n")
         k = kA[ii]
         Nstart, backExitMinus = ICs(NB, k, back, params, MTE)
         start_time = timeit.default_timer()
-
+        
         if Nstart == np.nan:
             twoPt = numpy.empty((2, 2))
             twoPt[:] = np.nan
@@ -155,7 +155,7 @@ def pSpectra(kA, back, params, NB, tols, MTE):
                                   True)  # all data from three point run goes into threePt array
         zzOut = np.append(zzOut, twoPt[-1, 1])
         times = np.append(times, timeit.default_timer() - start_time)
-
+    
     return zzOut, times
 
 
@@ -163,38 +163,38 @@ def pSpectra(kA, back, params, NB, tols, MTE):
 def pSpecMpi(kA, back, params, NB, tols, MTE):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
-
+    
     rank = comm.Get_rank()
     size = comm.Get_size()
     points = np.size(kA)
     num = points / size;
-
+    
     if float(points) / size != float(points // size):
         if rank == 0:
             print ("\n \n \n warning! number of points is divisable by number of processes, exiting \n \n \n ")
         return (np.empty, np.empty)
-
+    
     kOutL = kA[rank * num:rank * num + num]
-
+    
     zzL, timesL = pSpectra(kOutL, back, params, NB, tols, MTE)
-
+    
     if rank != 0:
         comm.Send(zzL, dest=0)
         comm.Send(timesL, dest=0)
-
+    
     if rank == 0:
         zzzOut = np.array([])
         zzOut = np.array([])
         timesOut = np.array([])
         zzOut = np.append(zzOut, zzL)
         timesOut = np.append(timesOut, timesL)
-
+        
         for jj in range(1, size):
             comm.Recv(zzL, source=jj)
             comm.Recv(timesL, source=jj)
             zzOut = np.append(zzOut, zzL)
             timesOut = np.append(timesOut, timesL)
-
+        
         return (zzOut, timesOut)
     else:
         return (np.empty, np.empty)
@@ -206,7 +206,7 @@ def eqSpectra(kA, back, params, NB, tols, MTE):
     zzOut = np.array([])
     times = np.array([])
     num = np.size(kA)
-
+    
     for ii in range(0, num):
         print ("\n \n \n performing " + str(ii + 1) + " of " + str(num) + "\n \n \n")
         k = kA[ii]
@@ -217,7 +217,7 @@ def eqSpectra(kA, back, params, NB, tols, MTE):
         k3 = k;
         # run solver for this triangle
         start_time = timeit.default_timer()
-
+        
         if Nstart == np.nan:
             nF = MTE.nF();
             threePt = numpy.empty((2, 5))
@@ -235,26 +235,26 @@ def eqSpectra(kA, back, params, NB, tols, MTE):
 def eqSpecMpi(kA, back, params, NB, tols, MTE):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
-
+    
     rank = comm.Get_rank()
     size = comm.Get_size()
     points = np.size(kA)
     num = points / size;
-
+    
     if float(points) / size != float(points // size):
         if rank == 0:
             print ("\n \n \n warning! number of points is divisable by number of processes, exiting \n \n \n ")
         return (np.empty, np.empty, np.empty)
-
+    
     kOutL = kA[rank * num:rank * num + num]
-
+    
     zzL, zzzL, timesL = eqSpectra(kOutL, back, params, NB, tols, MTE)
-
+    
     if rank != 0:
         comm.Send(zzzL, dest=0)
         comm.Send(zzL, dest=0)
         comm.Send(timesL, dest=0)
-
+    
     if rank == 0:
         zzzOut = np.array([])
         zzOut = np.array([])
@@ -262,16 +262,16 @@ def eqSpecMpi(kA, back, params, NB, tols, MTE):
         zzzOut = np.append(zzzOut, zzzL)
         zzOut = np.append(zzOut, zzL)
         timesOut = np.append(timesOut, timesL)
-
+        
         for jj in range(1, size):
             comm.Recv(zzzL, source=jj)
             comm.Recv(zzL, source=jj)
             comm.Recv(timesL, source=jj)
-
+            
             zzzOut = np.append(zzzOut, zzzL)
             zzOut = np.append(zzOut, zzL)
             timesOut = np.append(timesOut, timesL)
-
+        
         return (zzOut, zzzOut, timesOut)
     else:
         return (np.empty, np.empty, np.empty)
@@ -290,13 +290,13 @@ def alpBetSpectra(kt, alphaIn, betaIn, back, params, NB, nsnaps, tols, MTE):
     if (nsnaps == 1 or nsnaps == 0):
         snaps = np.array([Nend])
         nsnaps = 1
-
+    
     biAOut = np.zeros([np.size(alphaIn), np.size(betaIn), np.size(snaps)])
     zz1 = np.zeros([np.size(alphaIn), np.size(betaIn), np.size(snaps)])
     zz2 = np.zeros([np.size(alphaIn), np.size(betaIn), np.size(snaps)])
     zz3 = np.zeros([np.size(alphaIn), np.size(betaIn), np.size(snaps)])
     times = np.zeros([np.size(alphaIn), np.size(betaIn)])
-
+    
     for l in range(0, np.size(alphaIn)):
         alpha = alphaIn[l]
         for j in range(0, np.size(betaIn)):
@@ -318,7 +318,7 @@ def alpBetSpectra(kt, alphaIn, betaIn, back, params, NB, nsnaps, tols, MTE):
                 else:
                     threePt = MTE.alphaEvolve(t, k1, k2, k3, backExitMinus, params, tols, True)
                 zzz = threePt[:, :5]
-
+                
                 for ii in range(1, nsnaps + 1):
                     biAOut[l, j, ii - 1] = zzz[ii, 4]
                     zz1[l, j, ii - 1] = zzz[ii, 1]
@@ -330,7 +330,7 @@ def alpBetSpectra(kt, alphaIn, betaIn, back, params, NB, nsnaps, tols, MTE):
                     zz1[l, j, ii - 1] = np.nan
                     zz2[l, j, ii - 1] = np.nan
                     zz3[l, j, ii - 1] = np.nan
-
+            
             times[l, j] = timeit.default_timer() - timebefore
     return (biAOut, zz1, zz2, zz3, times, snaps)
 
@@ -344,24 +344,24 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
     rank = comm.Get_rank()
     size = comm.Get_size()
     num = side / size;
-
+    
     if float(side) / size != float(side // size):
         if rank == 0:
             print ("\n \n \n warning! number size of alpha must be divisable by number of processes, exiting \n \n \n ")
         return (np.empty, np.empty, np.empty, np.empty, np.empty)
     else:
-
+        
         alphaL = alpha[rank * num:rank * num + num]
-
+        
         BzL, Pz1L, Pz2L, Pz3L, timesL, snaps = alpBetSpectra(kt, alphaL, beta, back, params, Nbefore, nsnaps, tols, MTE)
-
+        
         if rank != 0:
             comm.send(Pz1L, dest=0)
             comm.send(Pz2L, dest=0)
             comm.send(Pz3L, dest=0)
             comm.send(BzL, dest=0)
             comm.send(timesL, dest=0)
-
+        
         if rank == 0:
             Bztot = np.zeros([np.size(alpha), np.size(beta), np.size(BzL[0, 0, :])])
             Pz1tot = np.zeros([np.size(alpha), np.size(beta), np.size(BzL[0, 0, :])])
@@ -373,14 +373,14 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
             Pz2tot[0:num, :, :] = Pz2L
             Pz3tot[0:num, :, :] = Pz3L
             timestot[0:num, :] = timesL
-
+            
             for jj in range(1, size):
                 Pz1L = comm.recv(source=jj)
                 Pz2L = comm.recv(source=jj)
                 Pz3L = comm.recv(source=jj)
                 BzL = comm.recv(source=jj)
                 timesL = comm.recv(source=jj)
-
+                
                 Bztot[jj * num:jj * num + num, :, :] = BzL
                 Pz1tot[jj * num:jj * num + num, :, :] = Pz1L
                 Pz2tot[jj * num:jj * num + num, :, :] = Pz2L
@@ -394,7 +394,7 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 def kexitN(Nexit, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
     backExit = np.zeros(2 * nF)
-
+    
     for i in range(1, 2 * nF + 1):
         backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
     k = np.exp(Nexit) * MTE.H(backExit, params);
@@ -406,7 +406,7 @@ def kexitPhi(PhiExit, n, back, params, MTE):
     backExit = np.zeros(2 * nF)
     positions = np.argsort(back[:, n])
     Nexit = interpolate.splev(PhiExit, interpolate.splrep(back[positions, n], back[positions, 0], s=1e-15), der=0)
-
+    
     for i in range(1, 2 * nF + 1):
         backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
     k = np.exp(Nexit) * MTE.H(backExit, params);
@@ -415,37 +415,37 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 def derivative(x, y, k=3, s=0, M=100):
     y_spl = interpolate.UnivariateSpline(x, y, k=k, s=s)
-
+    
     x_fine = np.linspace(x[0], x[-1], M * len(x));
     s = x_fine[1] - x_fine[0]
     y_fine = y_spl(x_fine)
-
+    
     dy = [(y_fine[i + 1] - y_fine[i]) / s for i in range(len(y_fine) - 1)]
-
+    
     dy_spl = interpolate.UnivariateSpline(x_fine[:-1], dy, k=k, s=s)
     return y_spl, y_spl.derivative()
 
 
 def dotdotfields(back, MTE, params):
     """ Computes second time derivatives of the fields. Uses analytic form of background evolution equations. """
-
-    backT = back.T
-    nF = MTE.nF()
-
-    # Get Hubble values to transform N derivatives to t derivatives
-    Hseries = np.asarray([MTE.H(np.array([step[1:]][0]), params) for step in back])
-
-    dV = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]
-
-    phidotdot = np.vstack(
-        (-3. * Hseries * backT[1 + nF + i] - np.asarray(dV).T[i] for i in range(nF))
-    ).T
-
-    return phidotdot
-
-def EvolveKE(back, params, MTE):
-    """ Computes the Kinetic Energy of the fields along the background trajectory """
-
+    
+    # backT = back.T
+    # nF = MTE.nF()
+    #
+    # # Get Hubble values to transform N derivatives to t derivatives
+    # Hseries = np.asarray([MTE.H(np.array([step[1:]][0]), params) for step in back])
+    #
+    # dV = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]
+    #
+    # phidotdot = np.vstack(
+    #     (-3. * Hseries * backT[1 + nF + i] - np.asarray(dV).T[i] for i in range(nF))
+    # ).T
+    #
+    # return phidotdot
+    
+    """ Returns second time derivatives of the fields using analytic form of the background equations of motion
+        as a contravariant object"""
+    
     # Find curvature records directory and create file instance to lead curvature class obj.
     dir = os.path.dirname(__file__)
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
@@ -454,10 +454,53 @@ def EvolveKE(back, params, MTE):
     curv_file = open(curv_path, 'r')
     with curv_file:
         curv_obj = pk.load(curv_file)
+    
+    nF = MTE.nF()
+
+    # Get Hubble values to transform N derivatives to t derivatives
+    Hubble = np.array([MTE.H(np.array([step[1:]][0]), params) for step in back])
+    
+    # Get field time derivatives from background data
+    phi = np.array([step[1:1+nF] for step in back])
+    phidot = np.array([step[1 + nF:1+2*nF] for step in back])
+    
+    subs = []
+    for s in range(len(back)):
+        # = {}
         
+        for i in range(nF):
+            subs[curv_obj.coords[i]] = phi[i]
+
+    # Get derivatives of the potential from background data
+    dV_ = np.array([[MTE.dV(fvals[1:1 + nF], params) for fvals in back]])
+    
+    # Raise an index from dV
+    Ginv = curv_obj.metric_inverse
+    dV = np.array([Ginv[a, b]*dV_[b] for a in range(nF) for b in range(nF)])
+    
+    # Compute second time derivative of the fields
+    phidotdot = np.vstack(
+        (-3. * Hubble[i] * phidot[i] - dV[i] for i in range(nF))
+    )
+
+    return phidotdot
+
+
+def EvolveKE(back, params, MTE):
+    """ Computes the Kinetic Energy of the fields along the background trajectory """
+    
+    # Find curvature records directory and create file instance to lead curvature class obj.
+    dir = os.path.dirname(__file__)
+    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
+    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
+    curv_path = os.path.join(curv_dir, curv_name)
+    curv_file = open(curv_path, 'r')
+    with curv_file:
+        curv_obj = pk.load(curv_file)
+    
     # Inverse metric
     metric = curv_obj.metric
-
+    
     # Get number of fields and params
     nF = MTE.nF()
     nP = MTE.nP()
@@ -468,7 +511,7 @@ def EvolveKE(back, params, MTE):
     pdict = dict()
     for i in range(nP):
         pdict[curv_obj.params[i]] = params[i]
-
+    
     print "-- Building lambda functions"
     
     metric_lambdas = np.empty((nF, nF), dtype=object)
@@ -479,14 +522,18 @@ def EvolveKE(back, params, MTE):
     
     print "-- Computing K.E. evolution"
     
+    
     # Build dictionary for symbolic substitutions
     def g_ab(a, b, step):
-        fields = list(step[1:1+nF])
-        m_eval =  metric_lambdas[a, b](*fields)
+        fields = list(step[1:1 + nF])
+        m_eval = metric_lambdas[a, b](*fields)
         return m_eval
     
+    
     # Kinetic Energy = 1/2 * g_{ab} * dt phi^a dt phi^b
-    backKE = np.array([0.5 * sum([g_ab(a, b, step) * step[1+nF+a] * step[1+nF+b] for a in range(nF) for b in range(nF)]) for step in back ])
+    backKE = np.array(
+        [0.5 * sum([g_ab(a, b, step) * step[1 + nF + a] * step[1 + nF +  b] for a in range(nF) for b in range(nF)]) for
+         step in back])
     
     # return 2 x N numpy array, with the the first col containing efold number and the second the fields K.E.
     return np.vstack([back.T[0], backKE]).T
@@ -494,7 +541,7 @@ def EvolveKE(back, params, MTE):
 
 def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     """ Computes the kinetic energy of the fields. Assumes canonical lagrangian kinetic term """
-
+    
     if curv_obj is None:
         # Find curvature records directory and create file instance to lead curvature class obj.
         dir = os.path.dirname(__file__)
@@ -504,14 +551,14 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
         curv_file = open(curv_path, 'r')
         with curv_file:
             curv_obj = pk.load(curv_file)
-
+    
     # Inverse metric
     metric = curv_obj.metric
-
+    
     nF = MTE.nF()
     nP = MTE.nP()
     KE = 0
-
+    
     # Build dictionary for symbolic substitutions
     sub_dict = dict()
     for i in range(nF):
@@ -519,76 +566,76 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     if curv_obj.params is not None:
         for i in range(nP):
             sub_dict[curv_obj.params[i]] = params[i]
-
+    
     # Iterate over field indices
     for I in range(nF):
         for J in range(nF):
             # Contract field velocities with field metric to get kinetic energy
             KE += 0.5 * metric[I, J].subs(sub_dict) * dotfields[I] * dotfields[J]
-
+    
     return KE
 
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, tols=np.array([1e-10, 1e-10])):
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
-
+    
     # Get fiducial end of inflation, i.e. when epsilon=1
     Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000)
-
+    
     # If integration failure, return None
     if type(Nepsilon) == type('S32'):
         return None
-
+    
     # Define initial efolding range and compute background
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True)
-
+    
     idx_epsilon = len(BG_epsilon)
-
+    
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]
-
+    
     c = 0
-    tols = np.array([1e-12, 1e-12]) # Adapt to higher precision
+    tols = np.array([1e-12, 1e-12])  # Adapt to higher precision
     while c < n_iter:
-
+        
         # Define new initial conditions to be the field data at the previous background segment
         N_init = extensions[-1][-1][0]
         bg_init = extensions[-1][-1][1:]
-
+        
         # define new efolding range and compute extension to background
         N_space = np.linspace(N_init, N_init + adpt_step, 100)
         bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False)
-
+        
         # If we fail to compute the backgroud, break out of iterative cycle
         if type(bg_ext) != np.ndarray:
             break
-
+        
         # Otherwise add segment to the list of background data
         extensions.append(bg_ext[1:])
-
+        
         c += 1
-
+    
     if len(extensions) == 1:
         
         print "No Extension", BG_epsilon[-1][0]
         
         return BG_epsilon, Nepsilon
-
+    
     else:
         # Stack together into numpy ndarray, structured consistently with typical backEvolve
         stacked = np.vstack((bg for bg in extensions))
-    
+        
         print "Extended background by N = {}".format(stacked.T[0][-1] - Nepsilon)
-    
+        
         # return the background, as well as the efolding where slow-roll was violated
         return stacked, Nepsilon
 
 
-def MijEvolve(back, params, MTE, DropKineticTerms=False):
+def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
-
+    
     # Find curvature records directory and create file instance to lead curvature class obj.
     dir = os.path.dirname(__file__)
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
@@ -600,239 +647,293 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False):
     
     with curv_file:
         curv_obj = pk.load(curv_file)
-
+    
     # Number of fields and parameters
     nF = MTE.nF()
     nP = MTE.nP()
-
+    
     """ Get evolution of background quantities """
-
+    
     # Field evolution and derivatives
     fields = [np.asarray(df[1:1 + nF]) for df in back]
     dotfields = [np.asarray(df[1 + nF:]) for df in back]
-    ddtfields = [np.asarray(item) for item in dotdotfields(back, MTE, params)]
-
+    #ddtfields = [np.asarray(item) for item in dotdotfields(back, MTE, params)]
+    
     # Potential derivatives
     dV_evo = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 1st deriv. pot.
     ddV_evo = [MTE.ddV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 2nd deriv. pot.
-
+    
     # Hubble rate
     hubble = [MTE.H(np.concatenate([fields[step], dotfields[step]]), params) for step in range(len(back))]
-
+    
     # Transpose background evolution into horizontal components
     backT = back.T
+
+    # Get symbolic definitions for background
+    f_syms = curv_obj.coords        # fields
+    v_syms = sym.symarray("v", nF)  # velocities
+    p_syms = curv_obj.params        # parameters
+    fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
     
-    G = curv_obj.metric
-    Ginv = curv_obj.metric_inverse
-    
-    rnf = range(nF)
-    
-    def cov_ftensor(con_ftensor, index, subs):
-        """ Lowers the index of a contravariant field tensor """
-        return sum([G[a, index].evalf(subs=subs)*con_ftensor[a] for a in rnf])
-    
-    f_syms = curv_obj.coords
-    p_syms = curv_obj.params
-    def get_subs(fvals, pvals):
-        fdic = dict(zip(f_syms, fvals))
-        pdic = dict(zip(p_syms, pvals))
-        
-        fdic.update(pdic)
-        
-        return fdic
-    
-        
+    # Get Christoffel symbols and Riemann tensor
     csyms = curv_obj.Csyms
     rsyms = curv_obj.Rsyms
     
-    mij_evo = []
-    eig_evo = []
+    # Get field space metric and inverse
+    G = curv_obj.metric
+    Ginv = curv_obj.metric_inverse
     
-    for step in range(len(back)):
+    # Build array and populate with field space lambda functions
+    Glambdas = np.empty(np.shape(G), dtype=object)
+    Ginvlambdas = np.empty(np.shape(Ginv), dtype=object)
+    clambdas = np.empty(np.shape(csyms), dtype=object)
+    rlambdas = np.empty(np.shape(rsyms), dtype=object)
+
+    # Define coordinate index range to iterate over
+    rnf = range(nF)
+
+    # Build kinetic energy expression
+    KE = sum([sym.Rational(1,2)*G[a, b]*v_syms[a]*v_syms[b] for a in rnf for b in rnf])
+
+    print "-- lambdifying"
+    
+    # Lambdify symbolic expressions
+    kelambda = sym.lambdify(fp_syms, KE, "numpy")
+    for a in rnf:
+        for b in rnf:
+            Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
+            Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
+            for c in rnf:
+                clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
+                for d in rnf:
+                    rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
+    print "-- done"
+    
+    eig_evo = []
+    s = 0
+    lb = len(back)
+    
+    for s in range(lb):
         
-        # Unpack fields at time step
-        phi = fields[step]
-        dphi = dotfields[step]
-        ddphi = ddtfields[step]
+        # Background step
+        step = back[s]
         
-        # Get metric substitutions and lower indices
-        g_subs = get_subs(phi, params)
-        phi_d = [cov_ftensor(phi, i, g_subs) for i in rnf]
-        dphi_d = [cov_ftensor(dphi, i, g_subs) for i in rnf]
-        ddphi_d = [cov_ftensor(ddphi, i, g_subs) for i in rnf]
+        # Fields and field time derivatives
+        phi = step[1:1+nF]
+        dtphi = step[1+nF:1+2*nF]
         
-        # Build kinetic energy term
-        ke = sum([0.5 * G[a, b].evalf(subs=g_subs)*dphi[a]*dphi[b] for a in rnf for b in rnf])
+        # Values for symbolic evaluations
+        sym_subs = [x for x in phi] + [x for x in dtphi] + [x for x in params]
         
-        # Get hubble rate
-        h = hubble[step]
+        # Hubble rate at current step
+        H = hubble[s]
         
+        # Get values for potential and derivatives
+        dV = dV_evo[s]
+        ddV = ddV_evo[s]
+        
+        # Initialize covariant Hessian, Riemann and Kinetic term
         covhess = np.zeros((nF, nF), dtype=float)
         riemann = np.zeros((nF, nF), dtype=float)
         kinetic = np.zeros((nF, nF), dtype=float)
-        
-        std_kin = np.zeros((nF, nF), dtype=float)
-        chr_kin = np.zeros((nF, nF), dtype=float)
-        
-        dV = dV_evo[step]
-        ddV = ddV_evo[step]
-        
-        def try_evalf(obj, subs):
-            try:
-                r = obj.evalf(subs=g_subs)
-            except:
-                r = float(obj)
-            
-            return r
+        k1 = np.zeros((nF, nF), dtype=float)
+        k2 = np.zeros((nF, nF), dtype=float)
         
         for a in rnf:
             for b in rnf:
+                covhess[a, b] += sum([Ginvlambdas[a, x](*sym_subs)*ddV[x, b]
+                                      for x in rnf])
                 
-                covhess[a, b] += ddV[a, b] - sum([try_evalf(csyms[k, a, b], g_subs)*dV[k] for k in rnf])
+                covhess[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*clambdas[k, x, b](*sym_subs)*dV[k]
+                                      for x in rnf for k in rnf])
                 
-                riemann[a, b] += -sum(
-                    [try_evalf(rsyms[a, k, l, b], g_subs)*dphi[k]*dphi[l] for k in rnf for l in rnf])
+                riemann[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*rlambdas[x, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
+                                      for x in rnf for k in rnf for l in rnf])
                 
-                kinetic[a, b] += -(3. - ke / h / h)*dphi_d[a]*dphi_d[b]
+                k1[a, b] += sum([Glambdas[c, b](*sym_subs)*(3. - kelambda(*sym_subs)/H/H)*dtphi[a]*dtphi[c]
+                                      for c in rnf])
                 
-                kinetic[a, b] += -(dphi_d[a]*ddphi[b] + ddphi_d[a]*dphi_d[b]) / h
-                
-                kinetic[a, b] += dphi_d[a]*sum(
-                    [dphi_d[k]*try_evalf(csyms[p, b, k], g_subs)*dphi_d[p] for k in rnf for p in rnf]) / h
-                
-                kinetic[a, b] += dphi_d[b]*sum(
-                    [dphi_d[k]*try_evalf(csyms[p, a, k], g_subs)*dphi_d[p] for k in rnf for p in rnf]) / h
-                
+                k2[a, b] += sum([Glambdas[c, b](*sym_subs)*(dtphi[c]*Ginvlambdas[a, k](*sym_subs) +
+                                                                 dtphi[a]*Ginvlambdas[c, k](*sym_subs))*dV[k]
+                                      for c in rnf for k in rnf])/H
         
-        # Build covariant mass matrix
-        mij_d = covhess + riemann + kinetic
+        R =  k1/k2
+        
+        print R.flatten()
+        
+        kinetic += k1 + k2
+        
+        MIj = covhess + riemann + kinetic
 
-        # 0.20225832558029772
-        # 0.20619102559621472
-        # 0.21251641627677464
-        # 0.22870841910381412
-        # 0.24683174861887558
-        # 0.25729020732011665
+        eig, eigv = np.linalg.eig(MIj)
 
-        # raise an index
-        mij = np.zeros((nF, nF), dtype=float)
-        for i in rnf:
-            for j in rnf:
-                mij[i, j] = sum([Ginv[a, i].evalf(subs=g_subs)*mij_d[a, j] for a in rnf])
-                
-        mij_evo.append(mij)
-        
-        
-        eig, eigv = np.linalg.eig(mij)
-        
+        eig *= 1./ H / H
+
         eig_sorted = np.sort(eig)
-        
-        scale_eigs = True
+
         if scale_eigs:
-            eig_sorted *= 1./ np.sqrt(np.abs(eig_sorted))
-            eig_sorted *= 1./ h #/ h
-            
-        else:
-            eig_sorted *= 1. / h / h
-        
+            eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
+
         eig_evo.append(eig_sorted)
-        
+
     eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
+
     eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
 
     # Return matrix in typical PyTransport format
     return eigstack
+                
+        
     
-    # """ Build symbolic quantities to evaluate against background data"""
+    # # Build lists to populate with matrix / eigenvalue evolution
+    # mij_evo = []
+    # eig_evo = []
     #
-    # # Call group elements of mass matrix
-    # Hij_sym = curv_obj.Hij
-    # Cij_sym = curv_obj.Cij
-    # Kij_sym = curv_obj.Kij
-    # Mij_sym = Hij_sym + Cij_sym + Kij_sym
+    # s = 0
+    # lb = len(back)
     #
-    # Mij = [np.zeros((nF, nF)) for i in back]
-    #
-    # # Build symbols for symbolic subs
-    # rnf = range(nF)
-    #
-    # # Symbolically define field time derivatives
-    # dphi = sym.symarray("df", nF)
-    # ddphi = sym.symarray("ddf", nF)
-    #
-    # # Symbol for Hubble rate
-    # H_sym = sym.symbols("H")
-    #
-    # # Symbolically define derivatives of the potential
-    # dV_sym = sym.symarray("dV", nF)
-    # ddV_sym = sym.symarray("ddV", (nF, nF))
-    #
-    # Hij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Hij_sym, 'numpy'
-    # )
-    #
-    # Cij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Cij_sym, 'numpy'
-    # )
-    #
-    # Kij_lambda = sym.lambdify(
-    #     [c for c in curv_obj.coords] + [p for p in dphi] + [p for p in ddphi] + [H_sym] +
-    #     [d for d in dV_sym] + [d for d in sym.flatten(ddV_sym)] + [p for p in curv_obj.params], Kij_sym, 'numpy'
-    # )
-    #
+    # # Iterate over background evolution
     # for step in range(len(back)):
+    #     s+=1
+    #     print s, "/", lb
     #
-    #     args = [p for p in fields[step]] +\
-    #            [p for p in dotfields[step]] +\
-    #            [p for p in ddtfields[step]] +\
-    #            [hubble[step]] +\
-    #            [d for d in dV_evo[step]] +\
-    #            [d for d in ddV_evo[step].flatten()] +\
-    #            [p for p in params]
+    #     # Unpack fields at time step
+    #     phi = fields[step]
+    #     dphi = dotfields[step]
+    #     # ddphi = ddtfields[step]
     #
-    #     r1 = Hij_lambda(*args)
-    #     r2 = Cij_lambda(*args)
-    #     r3 = Kij_lambda(*args)
+    #     # Args for symbolic expressions lambdification
+    #     fp_args = [p for p in phi] + [p for p in params] # + [v for v in dphi]
     #
-    #     r = r1 + r2 + r3
+    #     # Get field space kinetic energy
+    #     ke = kelambda(*fp_args)
     #
-    #     print r1/r
+    #     # Get hubble rate
+    #     h = hubble[step]
     #
-    #     print r2/r
+    #     # Get potential derivatives
+    #     dV = dV_evo[step]
+    #     ddV = ddV_evo[step]
     #
-    #     print r3/r
+    #     # Build empty arrays to construct components of mass matrix within
+    #     covhess = np.zeros((nF, nF), dtype=float)
+    #     riemann = np.zeros((nF, nF), dtype=float)
+    #     kinetic = np.zeros((nF, nF), dtype=float)
     #
-    #     e, v = np.linalg.eig(r)
+    #     # Iterate over mass matrix elements
+    #     for a in rnf:
+    #         for b in rnf:
     #
-    #     print e / hubble[step] / hubble[step]
+    #             covhess[a, b] += sum(
+    #                 [Ginvlambdas[x, a](*fp_args)* ddV[x, b] for x in rnf]
+    #             )
     #
-    #     Mij.append(r)
+    #             covhess[a, b] += sum(
+    #                 [-Ginvlambdas[x, a](*fp_args)*clambdas[k, x, b](*fp_args)*dV[k] for k in rnf for x in rnf]
+    #             )
     #
+    #             riemann[a, b] += sum(
+    #                 [-Ginvlambdas[x, a](*fp_args)*rlambdas[x, k, l, b](*fp_args)*dphi[k]*dphi[l]
+    #                  for x in rnf for k in rnf for l in rnf]
+    #             )
     #
-    # MijEig = []
-    # for i in range(len(back)):
+    #             kinetic[a, b] += sum(
+    #                 [-(3.+ke/h/h)*dphi[a]*Glambdas[x, b](*fp_args)*dphi[x]
+    #                  for x in rnf]
+    #             )
     #
-    #     e, v = np.linalg.eig(Mij[i])
+    #             kinetic[a, b] += sum(
+    #                 [-Glambdas[b, d](*fp_args) * (dphi[d]*ddphi[a] + ddphi[d]*dphi[a])
+    #                  for d in rnf]
+    #             )/h
     #
-    #     # Sort eigenvalues s.t. ordering corresponds from light -> heavy
-    #     e_sorted = np.sort(e)
+    #             # kinetic[a, b] += sum(
+    #             #     [-Glambdas[b, d](*fp_args) * dphi[e]*dphi[k]*(dphi[d]*clambdas[a, e, k](*fp_args) + dphi[a]*clambdas[d, e, k](*fp_args))
+    #             #      for d in rnf for e in rnf for k in rnf]
+    #             # )/h
     #
-    #     # Scale masses by abs(sqrt(e)) if True
-    #     scale_masses = False
-    #     if scale_masses is True:
-    #         e_sorted = np.sign(e_sorted) * np.sqrt(np.abs(e_sorted))
+    #     MIj = covhess + riemann + kinetic
     #
-    #     # Scale eigenvalues by Hubble rate at given time step
-    #     e_sorted *= 1. / hubble[i] / hubble[i]
+    #     eig, eigv = np.linalg.eig(MIj)
     #
-    #     MijEig.append(e_sorted)
-    # """ Construct N x (nF+1) Matrix for eigenvalue evolution """
+    #     eig *= 1./ h / h
     #
-    # # There are N rows for every time step. The zeroth column is the number of efolds at evaluation
-    # # then there are nF columns for each eigenvalue
-    # eigstack = np.vstack([np.asarray(eig) for eig in MijEig])
+    #     eig_sorted = np.sort(eig)
+    #
+    #     if scale_eigs:
+    #         eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
+    #
+    #     eig_evo.append(eig_sorted)
+    #
+    # eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
+    #
+    # eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
+    #
+    # # Return matrix in typical PyTransport format
+    # return eigstack
+
+    
+        
+    #
+    #             # Build Riemann term: -R_{a, k, l, b} \dot phi^k \dot phi^l
+    #             riemann[a, b] += -sum([try_evalf(rsyms[a, k, l, b], g_subs) * dphi[k] * dphi[l] for k in rnf for l in rnf])
+    #
+    #             # Build 1st kinetic term: -(3 + 0.5 \dot sigma^2 / H^2) G_{ac} \dot phi^c G_{bd} \dot phi^d
+    #             kinetic[a, b] += -sum(
+    #                 [(3. + ke / h / h) * try_evalf(G[a, c] * G[b, d], g_subs) * dphi[c] * dphi[d]
+    #                  for c in rnf for d in rnf]
+    #             )
+    #
+    #             # Build 2nd kinetic term:
+    #
+    #             for c in rnf:
+    #                 for d in rnf:
+    #                     Kab = 0.
+    #
+    #                     Kab += -dphi[d] * ddphi[c] + ddphi[d] * dphi[c]
+    #
+    #                     # for e in rnf:
+    #                     #     Kab += -sum([dphi[e]*dphi[k]*(
+    #                     #         dphi[d]*try_evalf(csyms[c, e, k], g_subs) + dphi[c]*try_evalf(csyms[d, e, k], g_subs)
+    #                     #     ) for k in rnf])
+    #
+    #                     Kab *= try_evalf(G[a, c] * G[b, d], g_subs) / h
+    #
+    #                     kinetic[a, b] += Kab
+    #
+    #     # Build covariant mass matrix
+    #     mij_d = covhess + riemann + kinetic
+    #
+    #     # 0.20225832558029772
+    #     # 0.20619102559621472
+    #     # 0.21251641627677464
+    #     # 0.22870841910381412
+    #     # 0.24683174861887558
+    #     # 0.25729020732011665
+    #
+    #     # raise an index
+    #     mij = np.zeros((nF, nF), dtype=float)
+    #     for i in rnf:
+    #         for j in rnf:
+    #             mij[i, j] = sum([Ginv[a, i].evalf(subs=g_subs) * mij_d[a, j] for a in rnf])
+    #
+    #     mij_evo.append(mij)
+    #
+    #     eig, eigv = np.linalg.eig(mij)
+    #
+    #     eig_sorted = np.sort(eig)
+    #
+    #     scale_eigs = True
+    #     if scale_eigs:
+    #         eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
+    #         eig_sorted *= 1. / h  # / h
+    #
+    #     else:
+    #         eig_sorted *= 1. / h / h
+    #
+    #     eig_evo.append(eig_sorted)
+    #
+    # eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
     # eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
     #
     # # Return matrix in typical PyTransport format

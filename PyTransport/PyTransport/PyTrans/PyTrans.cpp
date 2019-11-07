@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Wed Oct 23 13:19:37 2019
+// Package recompile attempted at: Thu Nov  7 12:18:54 2019
 
 
 // Changes python array into C array (or rather points to pyarray data)
