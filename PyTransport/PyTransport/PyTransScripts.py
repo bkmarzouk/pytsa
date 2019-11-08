@@ -709,11 +709,15 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
                     rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
     print "-- done"
     
-    eig_evo = []
+    eig_evo_raw = []
+    eig_evo_hub = []
+    
     s = 0
     lb = len(back)
     
     for s in range(lb):
+        
+        print s+1, "/", lb
         
         # Background step
         step = back[s]
@@ -757,31 +761,28 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
                                                                  dtphi[a]*Ginvlambdas[c, k](*sym_subs))*dV[k]
                                       for c in rnf for k in rnf])/H
         
-        R =  k1/k2
-        
-        print R.flatten()
-        
         kinetic += k1 + k2
         
         MIj = covhess + riemann + kinetic
 
         eig, eigv = np.linalg.eig(MIj)
-
-        eig *= 1./ H / H
-
+        
         eig_sorted = np.sort(eig)
+        eig_sorted_sqrt = np.sqrt(np.abs(eig_sorted)) * np.sign(eig_sorted)
 
-        if scale_eigs:
-            eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
+        eig_sorted_hubble = eig_sorted_sqrt / H
+        
+        eig_evo_raw.append(eig_sorted_sqrt)
+        eig_evo_hub.append(eig_sorted_hubble)
 
-        eig_evo.append(eig_sorted)
+    eigstack_raw = np.vstack([np.asarray(eig) for eig in eig_evo_raw])
+    eigstack_raw = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_raw])
 
-    eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
-
-    eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
+    eigstack_hub = np.vstack([np.asarray(eig) for eig in eig_evo_hub])
+    eigstack_hub = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_hub])
 
     # Return matrix in typical PyTransport format
-    return eigstack
+    return eigstack_raw, eigstack_hub
                 
         
     
