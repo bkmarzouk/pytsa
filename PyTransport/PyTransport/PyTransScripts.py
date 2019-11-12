@@ -652,17 +652,13 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     
     """ Get evolution of background quantities """
     
-    # Field evolution and derivatives
-    fields = [np.asarray(df[1:1 + nF]) for df in back]
-    dotfields = [np.asarray(df[1 + nF:]) for df in back]
-    
     # Potential & derivatives efold evolution
-    V_evo = [MTE.V(fvals[1:1 + nF], params) for fvals in back] # Time series of potential
-    dV_evo = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 1st deriv. pot.
-    ddV_evo = [MTE.ddV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 2nd deriv. pot.
+    V_evo = [MTE.V(step[1:1 + nF], params) for step in back] # Time series of potential
+    dV_evo = [MTE.dV(step[1:1 + nF], params) for step in back]  # Time series of 1st deriv. pot.
+    ddV_evo = [MTE.ddV(step[1:1 + nF], params) for step in back]  # Time series of 2nd deriv. pot.
     
     # Hubble rate
-    hubble = [MTE.H(np.concatenate([fields[step], dotfields[step]]), params) for step in range(len(back))]
+    hubble = [MTE.H(np.concatenate([step[1:1 + nF], step[1 + nF:1+2*nF]]), params) for step in back]
     
     # Transpose background evolution into horizontal components
     backT = back.T
@@ -690,8 +686,6 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     # Define coordinate index range to iterate over
     rnf = range(nF)
 
-    # Build kinetic energy expression
-
     print "-- lambdifying"
     
     # Lambdify symbolic expressions
@@ -705,11 +699,19 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
                     rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
     print "-- done"
     
-    eig_evo_raw = []
-    eig_evo_hub = []
+    eig_evo_raw = [] # Record raw eigenvalues of mass-matrix
+    eig_evo_hub = [] # Record Hubble normalized eigenvalues of mass-matrix
     
     s = 0
     lb = len(back)
+    
+    def lp(*terms):
+        # Logarithmic product
+        
+        signs = np.array([np.sign(item) for item in terms])
+        logs  = np.array([np.log(abs(item)) for item in terms])
+        
+        return np.prod(signs)*np.exp(np.sum(logs))
     
     for s in range(lb):
         
@@ -738,72 +740,39 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
         riemann = np.zeros((nF, nF), dtype=float)
         kinetic = np.zeros((nF, nF), dtype=float)
         
-        # Further kinetic contributions ot the mass matrix
-        k1 = np.zeros((nF, nF), dtype=float)
-        k2 = np.zeros((nF, nF), dtype=float)
-        k3 = np.zeros((nF, nF), dtype=float)
+        def covdt_dtphi_up(idx):
+            return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx](*sym_subs)*dV[k] for k in rnf])
         
-        def covdt_phidt_up(idx):
-            return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx]*dV[k] for k in rnf])
+        def covdt_dtphi_down(idx):
+            return sum([-3.*H*Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf]) - dV[idx]
         
-        def covdt_phidt_down(idx):
-            return sum([-3.*H*Glambdas[idx, k]*dtphi[k] for k in rnf]) - dV[idx]
+        def dtphi_down(idx):
+            return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
         
-        half_sigmadot_sq = 3.*H**2 - V
-        Hdot = - half_sigmadot_sq
+        Hdot = V - 3.*H**2
         
         for a in rnf:
             for b in rnf:
                 
-                covhess[a, b] += ddV[a, b]
-                covhess[a, b] += - sum([clambdas[k, a, b](*sym_subs)*dV[k] for k in rnf])
+                covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
+                                      for k in rnf])
                 
-                riemann[a, b] += - sum([rlambdas[a, k, l, b](*sym_subs)*dtphi[k]*dtphi[l] for k in rnf for l in rnf])
+                covhess[a, b] += -sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
+                                       for k in rnf for l in rnf])
                 
-                k1[a, b] += sum([Glambdas[a, c](*sym_subs)*Glambdas[b, d](*sym_subs)*(V/H/H)*dtphi[c]*dtphi[d]
-                             for c in rnf for d in rnf])
+                riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
+                                        for k in rnf for l in rnf for m in rnf])
                 
-                k2[a, b] += sum([Glambdas[a, c](*sym_subs)*dtphi[c]*dV[b]/H for c in rnf])
-                
-                k3[a, b] += sum([Glambdas[b, d](*sym_subs)*dtphi[d]*dV[a]/H for d in rnf])
-                # covhess[a, b] += sum([Ginvlambdas[a, x](*sym_subs)*ddV[x, b]
-                #                       for x in rnf])
-                #
-                # # covhess[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*clambdas[k, x, b](*sym_subs)*dV[k]
-                # #                       for x in rnf for k in rnf])
-                #
-                # riemann[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*rlambdas[x, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
-                #                       for x in rnf for k in rnf for l in rnf])
-                #
-                # # k1[a, b] += -sum([Glambdas[c, b](*sym_subs)*(-3. + kelambda(*sym_subs)/H/H)*dtphi[a]*dtphi[c]
-                # #                       for c in rnf])
-                #
-                # k1[a, b] += sum([Glambdas[c, b](*sym_subs)*(V/H/H)*dtphi[a]*dtphi[c]
-                #                   for c in rnf])
-                #
-                # lower_dtphib = sum([Glambdas[c, b](*sym_subs)*dtphi[c] for c in rnf])
-                #
-                # # k2[a, b] += dtphi[a]*3.*lower_dtphib
-                # k2[a, b] += dtphi[a]*dV[b]/H
-                #
-                # # k3[a, b] += lower_dtphib*3.*dtphi[a]
-                # k3[a, b] += lower_dtphib*sum([Ginvlambdas[a, k](*sym_subs)*dV[k] for k in rnf]) / H
-                
+                kinetic[a, b] += -(3.-Hdot / H / H)*dtphi[a]*dtphi_down(b) - (dtphi[a]*covdt_dtphi_down(b) +
+                                                                            covdt_dtphi_up(a)*dtphi_down(b))/H
         
-        kinetic += k1 + k2 + k3
-        #
-        # MIj = covhess + riemann + kinetic
-        
-        Mij = covhess + riemann + kinetic
-        
-        MIj = np.zeros(np.shape(Mij), dtype=float)
-        
-        for I in rnf:
-            for j in rnf:
-                MIj[I, j] += sum(Ginvlambdas[I, k](*sym_subs)*Mij[k, j] for k in rnf)
+        # Combine terms to produce mass-squared-matrix
+        MIj = covhess + riemann + kinetic
 
+        # Compute eigenvalues
         eig, eigv = np.linalg.eig(MIj)
         
+        # Sort eigenvalues into
         eig_sorted = np.sort(eig)
         eig_sorted_sqrt = np.sqrt(np.abs(eig_sorted)) * np.sign(eig_sorted)
 
@@ -820,159 +789,3 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
 
     # Return matrix in typical PyTransport format
     return eigstack_raw, eigstack_hub
-                
-        
-    
-    # # Build lists to populate with matrix / eigenvalue evolution
-    # mij_evo = []
-    # eig_evo = []
-    #
-    # s = 0
-    # lb = len(back)
-    #
-    # # Iterate over background evolution
-    # for step in range(len(back)):
-    #     s+=1
-    #     print s, "/", lb
-    #
-    #     # Unpack fields at time step
-    #     phi = fields[step]
-    #     dphi = dotfields[step]
-    #     # ddphi = ddtfields[step]
-    #
-    #     # Args for symbolic expressions lambdification
-    #     fp_args = [p for p in phi] + [p for p in params] # + [v for v in dphi]
-    #
-    #     # Get field space kinetic energy
-    #     ke = kelambda(*fp_args)
-    #
-    #     # Get hubble rate
-    #     h = hubble[step]
-    #
-    #     # Get potential derivatives
-    #     dV = dV_evo[step]
-    #     ddV = ddV_evo[step]
-    #
-    #     # Build empty arrays to construct components of mass matrix within
-    #     covhess = np.zeros((nF, nF), dtype=float)
-    #     riemann = np.zeros((nF, nF), dtype=float)
-    #     kinetic = np.zeros((nF, nF), dtype=float)
-    #
-    #     # Iterate over mass matrix elements
-    #     for a in rnf:
-    #         for b in rnf:
-    #
-    #             covhess[a, b] += sum(
-    #                 [Ginvlambdas[x, a](*fp_args)* ddV[x, b] for x in rnf]
-    #             )
-    #
-    #             covhess[a, b] += sum(
-    #                 [-Ginvlambdas[x, a](*fp_args)*clambdas[k, x, b](*fp_args)*dV[k] for k in rnf for x in rnf]
-    #             )
-    #
-    #             riemann[a, b] += sum(
-    #                 [-Ginvlambdas[x, a](*fp_args)*rlambdas[x, k, l, b](*fp_args)*dphi[k]*dphi[l]
-    #                  for x in rnf for k in rnf for l in rnf]
-    #             )
-    #
-    #             kinetic[a, b] += sum(
-    #                 [-(3.+ke/h/h)*dphi[a]*Glambdas[x, b](*fp_args)*dphi[x]
-    #                  for x in rnf]
-    #             )
-    #
-    #             kinetic[a, b] += sum(
-    #                 [-Glambdas[b, d](*fp_args) * (dphi[d]*ddphi[a] + ddphi[d]*dphi[a])
-    #                  for d in rnf]
-    #             )/h
-    #
-    #             # kinetic[a, b] += sum(
-    #             #     [-Glambdas[b, d](*fp_args) * dphi[e]*dphi[k]*(dphi[d]*clambdas[a, e, k](*fp_args) + dphi[a]*clambdas[d, e, k](*fp_args))
-    #             #      for d in rnf for e in rnf for k in rnf]
-    #             # )/h
-    #
-    #     MIj = covhess + riemann + kinetic
-    #
-    #     eig, eigv = np.linalg.eig(MIj)
-    #
-    #     eig *= 1./ h / h
-    #
-    #     eig_sorted = np.sort(eig)
-    #
-    #     if scale_eigs:
-    #         eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
-    #
-    #     eig_evo.append(eig_sorted)
-    #
-    # eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
-    #
-    # eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
-    #
-    # # Return matrix in typical PyTransport format
-    # return eigstack
-
-    
-        
-    #
-    #             # Build Riemann term: -R_{a, k, l, b} \dot phi^k \dot phi^l
-    #             riemann[a, b] += -sum([try_evalf(rsyms[a, k, l, b], g_subs) * dphi[k] * dphi[l] for k in rnf for l in rnf])
-    #
-    #             # Build 1st kinetic term: -(3 + 0.5 \dot sigma^2 / H^2) G_{ac} \dot phi^c G_{bd} \dot phi^d
-    #             kinetic[a, b] += -sum(
-    #                 [(3. + ke / h / h) * try_evalf(G[a, c] * G[b, d], g_subs) * dphi[c] * dphi[d]
-    #                  for c in rnf for d in rnf]
-    #             )
-    #
-    #             # Build 2nd kinetic term:
-    #
-    #             for c in rnf:
-    #                 for d in rnf:
-    #                     Kab = 0.
-    #
-    #                     Kab += -dphi[d] * ddphi[c] + ddphi[d] * dphi[c]
-    #
-    #                     # for e in rnf:
-    #                     #     Kab += -sum([dphi[e]*dphi[k]*(
-    #                     #         dphi[d]*try_evalf(csyms[c, e, k], g_subs) + dphi[c]*try_evalf(csyms[d, e, k], g_subs)
-    #                     #     ) for k in rnf])
-    #
-    #                     Kab *= try_evalf(G[a, c] * G[b, d], g_subs) / h
-    #
-    #                     kinetic[a, b] += Kab
-    #
-    #     # Build covariant mass matrix
-    #     mij_d = covhess + riemann + kinetic
-    #
-    #     # 0.20225832558029772
-    #     # 0.20619102559621472
-    #     # 0.21251641627677464
-    #     # 0.22870841910381412
-    #     # 0.24683174861887558
-    #     # 0.25729020732011665
-    #
-    #     # raise an index
-    #     mij = np.zeros((nF, nF), dtype=float)
-    #     for i in rnf:
-    #         for j in rnf:
-    #             mij[i, j] = sum([Ginv[a, i].evalf(subs=g_subs) * mij_d[a, j] for a in rnf])
-    #
-    #     mij_evo.append(mij)
-    #
-    #     eig, eigv = np.linalg.eig(mij)
-    #
-    #     eig_sorted = np.sort(eig)
-    #
-    #     scale_eigs = True
-    #     if scale_eigs:
-    #         eig_sorted *= 1. / np.sqrt(np.abs(eig_sorted))
-    #         eig_sorted *= 1. / h  # / h
-    #
-    #     else:
-    #         eig_sorted *= 1. / h / h
-    #
-    #     eig_evo.append(eig_sorted)
-    #
-    # eigstack = np.vstack([np.asarray(eig) for eig in eig_evo])
-    # eigstack = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack])
-    #
-    # # Return matrix in typical PyTransport format
-    # return eigstack
