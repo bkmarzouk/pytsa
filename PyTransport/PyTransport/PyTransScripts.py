@@ -643,8 +643,6 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     curv_path = os.path.join(curv_dir, curv_name)
     curv_file = open(curv_path, 'rb')
     
-    print curv_path
-    
     with curv_file:
         curv_obj = pk.load(curv_file)
     
@@ -657,9 +655,9 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     # Field evolution and derivatives
     fields = [np.asarray(df[1:1 + nF]) for df in back]
     dotfields = [np.asarray(df[1 + nF:]) for df in back]
-    #ddtfields = [np.asarray(item) for item in dotdotfields(back, MTE, params)]
     
-    # Potential derivatives
+    # Potential & derivatives efold evolution
+    V_evo = [MTE.V(fvals[1:1 + nF], params) for fvals in back] # Time series of potential
     dV_evo = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 1st deriv. pot.
     ddV_evo = [MTE.ddV(fvals[1:1 + nF], params) for fvals in back]  # Time series of 2nd deriv. pot.
     
@@ -693,12 +691,10 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     rnf = range(nF)
 
     # Build kinetic energy expression
-    KE = sum([sym.Rational(1,2)*G[a, b]*v_syms[a]*v_syms[b] for a in rnf for b in rnf])
 
     print "-- lambdifying"
     
     # Lambdify symbolic expressions
-    kelambda = sym.lambdify(fp_syms, KE, "numpy")
     for a in rnf:
         for b in rnf:
             Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
@@ -733,6 +729,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
         H = hubble[s]
         
         # Get values for potential and derivatives
+        V = V_evo[s]
         dV = dV_evo[s]
         ddV = ddV_evo[s]
         
@@ -740,30 +737,70 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
         covhess = np.zeros((nF, nF), dtype=float)
         riemann = np.zeros((nF, nF), dtype=float)
         kinetic = np.zeros((nF, nF), dtype=float)
+        
+        # Further kinetic contributions ot the mass matrix
         k1 = np.zeros((nF, nF), dtype=float)
         k2 = np.zeros((nF, nF), dtype=float)
+        k3 = np.zeros((nF, nF), dtype=float)
+        
+        def covdt_phidt_up(idx):
+            return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx]*dV[k] for k in rnf])
+        
+        def covdt_phidt_down(idx):
+            return sum([-3.*H*Glambdas[idx, k]*dtphi[k] for k in rnf]) - dV[idx]
+        
+        half_sigmadot_sq = 3.*H**2 - V
+        Hdot = - half_sigmadot_sq
         
         for a in rnf:
             for b in rnf:
-                covhess[a, b] += sum([Ginvlambdas[a, x](*sym_subs)*ddV[x, b]
-                                      for x in rnf])
                 
-                covhess[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*clambdas[k, x, b](*sym_subs)*dV[k]
-                                      for x in rnf for k in rnf])
+                covhess[a, b] += ddV[a, b]
+                covhess[a, b] += - sum([clambdas[k, a, b](*sym_subs)*dV[k] for k in rnf])
                 
-                riemann[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*rlambdas[x, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
-                                      for x in rnf for k in rnf for l in rnf])
+                riemann[a, b] += - sum([rlambdas[a, k, l, b](*sym_subs)*dtphi[k]*dtphi[l] for k in rnf for l in rnf])
                 
-                k1[a, b] += sum([Glambdas[c, b](*sym_subs)*(3. - kelambda(*sym_subs)/H/H)*dtphi[a]*dtphi[c]
-                                      for c in rnf])
+                k1[a, b] += sum([Glambdas[a, c](*sym_subs)*Glambdas[b, d](*sym_subs)*(V/H/H)*dtphi[c]*dtphi[d]
+                             for c in rnf for d in rnf])
                 
-                k2[a, b] += sum([Glambdas[c, b](*sym_subs)*(dtphi[c]*Ginvlambdas[a, k](*sym_subs) +
-                                                                 dtphi[a]*Ginvlambdas[c, k](*sym_subs))*dV[k]
-                                      for c in rnf for k in rnf])/H
+                k2[a, b] += sum([Glambdas[a, c](*sym_subs)*dtphi[c]*dV[b]/H for c in rnf])
+                
+                k3[a, b] += sum([Glambdas[b, d](*sym_subs)*dtphi[d]*dV[a]/H for d in rnf])
+                # covhess[a, b] += sum([Ginvlambdas[a, x](*sym_subs)*ddV[x, b]
+                #                       for x in rnf])
+                #
+                # # covhess[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*clambdas[k, x, b](*sym_subs)*dV[k]
+                # #                       for x in rnf for k in rnf])
+                #
+                # riemann[a, b] += sum([-Ginvlambdas[a, x](*sym_subs)*rlambdas[x, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
+                #                       for x in rnf for k in rnf for l in rnf])
+                #
+                # # k1[a, b] += -sum([Glambdas[c, b](*sym_subs)*(-3. + kelambda(*sym_subs)/H/H)*dtphi[a]*dtphi[c]
+                # #                       for c in rnf])
+                #
+                # k1[a, b] += sum([Glambdas[c, b](*sym_subs)*(V/H/H)*dtphi[a]*dtphi[c]
+                #                   for c in rnf])
+                #
+                # lower_dtphib = sum([Glambdas[c, b](*sym_subs)*dtphi[c] for c in rnf])
+                #
+                # # k2[a, b] += dtphi[a]*3.*lower_dtphib
+                # k2[a, b] += dtphi[a]*dV[b]/H
+                #
+                # # k3[a, b] += lower_dtphib*3.*dtphi[a]
+                # k3[a, b] += lower_dtphib*sum([Ginvlambdas[a, k](*sym_subs)*dV[k] for k in rnf]) / H
+                
         
-        kinetic += k1 + k2
+        kinetic += k1 + k2 + k3
+        #
+        # MIj = covhess + riemann + kinetic
         
-        MIj = covhess + riemann + kinetic
+        Mij = covhess + riemann + kinetic
+        
+        MIj = np.zeros(np.shape(Mij), dtype=float)
+        
+        for I in rnf:
+            for j in rnf:
+                MIj[I, j] += sum(Ginvlambdas[I, k](*sym_subs)*Mij[k, j] for k in rnf)
 
         eig, eigv = np.linalg.eig(MIj)
         
