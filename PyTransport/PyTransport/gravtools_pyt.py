@@ -78,75 +78,6 @@ class Curvature:
             self.precompute()
             self.computed = True
         
-        # """ We construct additional quantities for PyTransport here """
-        #
-        # nF = len(coords)
-        # rnf = range(nF)
-        #
-        # # Symbolically define field time derivatives
-        # dphi = sym.symarray("df", nF)
-        # ddphi = sym.symarray("ddf", nF)
-        #
-        # # Symbol for Hubble rate
-        # H = sym.symbols("H")
-        #
-        # # Symbolically define derivatives of the potential
-        # dV = sym.symarray("dV", nF)
-        # ddV = sym.symarray("ddV", (nF, nF))
-        #
-        # # Define kinetic energy
-        # KE = sym.Rational(1, 2) * sum([metric[a, b] * dphi[a] * dphi[b] for a in rnf for b in rnf])
-        #
-        # CovHess = sym.Matrix.zeros(nF, nF)
-        # RieTerm = sym.Matrix.zeros(nF, nF)
-        # Ki1Term = sym.Matrix.zeros(nF, nF)
-        # Ki2Term = sym.Matrix.zeros(nF, nF)
-        # Ki3Term = sym.Matrix.zeros(nF, nF)
-        #
-        # print "-- Precomputing Mass Matrix Expression"
-        #
-        # c = 0
-        # for i in rnf:
-        #     for j in rnf:
-	    #
-        #         c+=1
-        #
-        #         print "----- Computing element {}/{}".format(c, nF*nF)
-	    #
-        #         for a in rnf:
-        #
-        #             CovHess[i, j] += ddV[a, j]
-        #
-        #             Ki1Term[i, j] += -(3 - KE / H / H) * metric[a, j] * dphi[a] * dphi[i]
-        #
-        #             Ki2Term[i, j] += -metric[a, j] * (dphi[a] * ddphi[i] + ddphi[a] * dphi[i]) / H
-        #
-        #             for k in rnf:
-	    #
-        #                 CovHess[i, j] += -self.Csyms[k, a, j] * dV[k]
-        #
-        #                 RieTerm[i, j] += -self.RiemannUp(i, k, a, j, symbolic_args=False) * dphi[k] * dphi[a]
-        #
-        #                 Ki3Term[i, j] += - dphi[a] * dphi[i] * dphi[k] * sym.diff(metric[a, j], coords[k]) / H
-        #
-        #                 for b in rnf:
-        #
-        #                     Ki3Term[i, j] += -metric[b, j] * self.Csyms[i, a, k] * dphi[a] * dphi[b] * dphi[k] / H
-        #
-        #                     Ki3Term[i, j] += metric[a, b] * self.Csyms[a, j, k] * dphi[b] * dphi[i] * dphi[k] / H
-        #
-        #             CovHess[i, j] *= self.metric_inverse[i, a]
-        #
-        #         # CovHess[i, j] = sym.simplify(CovHess[i, j])
-        #         # RieTerm[i, j] = sym.simplify(RieTerm[i, j])
-        #         # Ki1Term[i, j] = sym.simplify(Ki1Term[i, j])
-        #         # Ki2Term[i, j] = sym.simplify(Ki2Term[i, j])
-        #         # Ki3Term[i, j] = sym.simplify(Ki3Term[i, j])
-        #
-        # self.Hij = CovHess  # Covariant Hessian term
-        # self.Cij = RieTerm  # Riemann term
-        # self.Kij = Ki1Term + Ki2Term + Ki3Term  # Kinetic terms
-        
         print "-- Curvature object constructed"
     
     
@@ -181,14 +112,11 @@ class Curvature:
             for d_idx in range(0, len(self.coords)):
                 d = self.coords[d_idx]
                 
-                gamma += sym.Rational(1, 2) * self.metric_inverse[a_idx, d_idx] * (0  # 0.5 * g^{ad}  * (
-                                                                                   + sym.diff(self.metric[d_idx, c_idx],
-                                                                                              b)  # grad_b g_{dc} +
-                                                                                   + sym.diff(self.metric[b_idx, d_idx],
-                                                                                              c)  # grad_c g_{bd} -
-                                                                                   - sym.diff(self.metric[b_idx, c_idx],
-                                                                                              d)  # grad_d g_{bc}  )
-                                                                                   )
+                gamma += sym.Rational(1, 2) * self.metric_inverse[a_idx, d_idx] * sum([
+                    sym.diff(self.metric[d_idx, c_idx], b),  # partial_b g_{dc} +
+                    sym.diff(self.metric[b_idx, d_idx], c),  # partial_c g_{bd} -
+                    -sym.diff(self.metric[b_idx, c_idx], d)  # partial_d g_{bc}
+                ])
         
         # Return Christoffel symbol with simplification as desired
         if simplify is True: gamma = sym.simplify(gamma)

@@ -670,7 +670,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
     
     # Get Christoffel symbols and Riemann tensor
-    csyms = curv_obj.Csyms
+    # csyms = curv_obj.Csyms
     rsyms = curv_obj.Rsyms
     
     # Get field space metric and inverse
@@ -680,7 +680,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     # Build array and populate with field space lambda functions
     Glambdas = np.empty(np.shape(G), dtype=object)
     Ginvlambdas = np.empty(np.shape(Ginv), dtype=object)
-    clambdas = np.empty(np.shape(csyms), dtype=object)
+    # clambdas = np.empty(np.shape(csyms), dtype=object)
     rlambdas = np.empty(np.shape(rsyms), dtype=object)
 
     # Define coordinate index range to iterate over
@@ -694,7 +694,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
             Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
             Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
             for c in rnf:
-                clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
+            #     clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
                 for d in rnf:
                     rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
     print "-- done"
@@ -757,15 +757,15 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
                 covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
                                       for k in rnf])
                 
-                covhess[a, b] += -sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
-                                       for k in rnf for l in rnf])
-                
+                # covhess[a, b] += -sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
+                #                        for k in rnf for l in rnf])
+                #
                 riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
                                         for k in rnf for l in rnf for m in rnf])
-                
+
                 kinetic[a, b] += -(3.-Hdot / H / H)*dtphi[a]*dtphi_down(b) - (dtphi[a]*covdt_dtphi_down(b) +
                                                                             covdt_dtphi_up(a)*dtphi_down(b))/H
-        
+
         # Combine terms to produce mass-squared-matrix
         MIj = covhess + riemann + kinetic
 
