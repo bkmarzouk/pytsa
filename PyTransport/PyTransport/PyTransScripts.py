@@ -619,7 +619,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
     
     if len(extensions) == 1:
         
-        print "No Extension", BG_epsilon[-1][0]
+        # print "No Extension", BG_epsilon[-1][0]
         
         return BG_epsilon, Nepsilon
     
@@ -633,7 +633,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         return stacked, Nepsilon
 
 
-def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
+def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbose=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
     
     # Find curvature records directory and create file instance to lead curvature class obj.
@@ -686,7 +686,8 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     # Define coordinate index range to iterate over
     rnf = range(nF)
 
-    print "-- lambdifying"
+    if verbose is True:
+        print "-- lambdifying"
     
     # Lambdify symbolic expressions
     for a in rnf:
@@ -697,7 +698,9 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
             #     clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
                 for d in rnf:
                     rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
-    print "-- done"
+
+    if verbose is True:
+        print "-- done"
     
     eig_evo_raw = [] # Record raw eigenvalues of mass-matrix
     eig_evo_hub = [] # Record Hubble normalized eigenvalues of mass-matrix
@@ -705,17 +708,10 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
     s = 0
     lb = len(back)
     
-    def lp(*terms):
-        # Logarithmic product
-        
-        signs = np.array([np.sign(item) for item in terms])
-        logs  = np.array([np.log(abs(item)) for item in terms])
-        
-        return np.prod(signs)*np.exp(np.sum(logs))
-    
     for s in range(lb):
         
-        print s+1, "/", lb
+        if verbose is True:
+            print s+1, "/", lb
         
         # Background step
         step = back[s]
@@ -749,7 +745,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
         def dtphi_down(idx):
             return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
         
-        Hdot = V - 3.*H**2
+        # Hdot = V - 3.*H**2
         
         for a in rnf:
             for b in rnf:
@@ -763,7 +759,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
                 riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
                                         for k in rnf for l in rnf for m in rnf])
 
-                kinetic[a, b] += -(3.-Hdot / H / H)*dtphi[a]*dtphi_down(b) - (dtphi[a]*covdt_dtphi_down(b) +
+                kinetic[a, b] += -(V/H/H)*dtphi[a]*dtphi_down(b) - (dtphi[a]*covdt_dtphi_down(b) +
                                                                             covdt_dtphi_up(a)*dtphi_down(b))/H
 
         # Combine terms to produce mass-squared-matrix
@@ -772,20 +768,27 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False):
         # Compute eigenvalues
         eig, eigv = np.linalg.eig(MIj)
         
-        # Sort eigenvalues into
+        # Sort eigenvalues from most light -> heavy
         eig_sorted = np.sort(eig)
+        
+        # Scale eigenvalues by sqrt of absolute value, identifying tachyonic behaviour as negative
         eig_sorted_sqrt = np.sqrt(np.abs(eig_sorted)) * np.sign(eig_sorted)
 
+        # Normalize to hubble rate
         eig_sorted_hubble = eig_sorted_sqrt / H
         
+        # Track evolution of matrices
         eig_evo_raw.append(eig_sorted_sqrt)
         eig_evo_hub.append(eig_sorted_hubble)
 
+    # Construct 1 + nF x N_efolds arrays; with zeroth column corresponding to N and the nF columns for eigenvalues
     eigstack_raw = np.vstack([np.asarray(eig) for eig in eig_evo_raw])
     eigstack_raw = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_raw])
-
     eigstack_hub = np.vstack([np.asarray(eig) for eig in eig_evo_hub])
     eigstack_hub = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_hub])
 
     # Return matrix in typical PyTransport format
-    return eigstack_raw, eigstack_hub
+    if scale_eigs is True:
+        return eigstack_hub
+    else:
+        return np.sign(eigstack_hub)*eigstack_hub**2

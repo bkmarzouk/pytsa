@@ -96,12 +96,12 @@ def Initialize(modelnumber, rerun_model=False):
     # If we choose to end inflation with eps = 1
     if canonical is True:
 
-        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 1000)
+        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000)
 
         # If integration fails, string type('S32') is returned
         if type(Nend) == type('S32'):
             print "-- Integration failure, model: {}".format(modelnumber)
-            return None
+            return "feoi_fail"
         
         elif Nend is None:
             return None
@@ -118,7 +118,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         if back_ext is None:
             print "-- Integration failure, model: {}".format(modelnumber)
-            return None
+            return "feoi_fail"
 
         back, Nepsilon = back_ext
 
@@ -190,16 +190,17 @@ def Initialize(modelnumber, rerun_model=False):
 
     # If rescaling routine gives rise to a failed trajectory, refer to initial evolution
     if type(back_adj) != np.ndarray:
-        print "-- Background rescaling failed"
+        # print "-- Background rescaling failed"
+        pass
     else:
-        print "-- Background rescaling successful"
+        # print "-- Background rescaling successful"
         back = back_adj
 
     # Compute exit time for scales of interest & corresponding Fourier mode
     kExit = PyS.kexitN(Nend - Nexit, back, pvals, PyT)
     if type(kExit) not in [float, np.float, np.float32, np.float64]:
         print "** Incorrect momenta 'k' data type: %05d" % modelnumber
-        return None
+        return "kexitn_fail"
 
     adiabatic = True
 
@@ -230,18 +231,38 @@ def Initialize(modelnumber, rerun_model=False):
 def DemandSample(modelnumber):
     """ Repeat initialization until successful sample is found """
     ii = -1
-    c = 1
+    n_trials = 1
+    n_kexitn_fail = 0
+    n_feoi_fail = 0
+    
     while ii != modelnumber:
         ii = Initialize(modelnumber)
-        c+=1
+        n_trials += 1
+        if ii == "kexitn_fail":
+            n_kexitn_fail += 1
+            ii = -1
+        elif ii = "feoi_fail":
+            n_feoi_fail += 1
+        else:
+            pass
 
 def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found """
     ii = -1
-    c = 1
+    n_trials = 1
+    n_kexitn_fail = 0
+    n_feoi_fail = 0
+    
     while ii != modelnumber:
         ii = Initialize(modelnumber, rerun_model=True)
-        c+=1
+        n_trials += 1
+        if ii == "kexitn_fail":
+            n_kexitn_fail += 1
+            ii = -1
+        elif ii = "feoi_fail":
+            n_feoi_fail += 1
+        else:
+            pass
 
 
 def Mij(modelnumber):
@@ -304,7 +325,7 @@ def Mij(modelnumber):
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
         
     # Compute mass matrix eigenvalues
-    Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, scale_eigs=False)[0][1:]
+    Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, scale_eigs=True)[0][1:]
 
     # Write dictionary values for masses
     Mij_eig = {}
