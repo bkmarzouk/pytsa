@@ -1,0 +1,25 @@
+# Ignore compiled python files everywhere
+**/.pyc
+
+# Ignore curvature files everywhere
+**/.curvature
+
+# Ignore Pytransport model compile files
+**/.egg-info
+**/.so
+
+# Ignore Installation Directory (except for examples)
+*/Install
+!/Install/2QuadSetup.py
+!/Install/NQuadGenerator.py
+!/Install/agarwal_dmax_6pt0.py
+
+# Ignore sampler builds, but keep directory
+*/Sampler/sampler-builds
+!/Sampler/sampler-builds/.gitkeep
+
+# Ignore sampler configs (except for examples)
+*/Sampler/sampler-configs
+!/Sampler/sampler-configs/agarwal.py
+!/Sampler/sampler-configs/dquad_example.py
+!/Sampler/sampler-configs/build_sampler.py
