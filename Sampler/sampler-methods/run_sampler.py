@@ -23,11 +23,13 @@ smppath = cfg.system['smppath']  # Sampler files directory
 os.environ['PyTS_pytpath'] = pytpath
 os.environ['PyTS_saveloc'] = saveloc
 os.environ['PyTS_smppath'] = smppath
+os.environ['PyTS_logpath'] = os.path.join(saveloc, "sampler_stats")
 
 
 # Set Paths
 rootpath = os.getcwd()
 os.environ['PyTSamplerRoot'] = rootpath
+
 
 path_2pf = os.path.join(saveloc, "2pf")
 path_3pf = os.path.join(saveloc, "3pf")
@@ -35,46 +37,55 @@ Mij_path = os.path.join(saveloc, "Mij")
 cfg_path = os.path.join(saveloc, "config.py")
 smp_path = os.path.join(saveloc, "samples")
 
+
 # Add methods to system path
 sys.path.append(os.path.join(smppath, "sampler-methods"))
 
-# Get additional tools
+
+# Import PyTransport and writer tools
 import pyt_methods as pytm
 import writer as w
+
 
 # Set PyTransport internal paths
 sys.path.append(pytpath)
 import PyTransSetup
 PyTransSetup.pathSet()
 
+
 # Load PyTransport module installation and scripts
 PyT = importlib.import_module(cfg.sampler['PyTransportModule'])
 import PyTransScripts as PyS
 
-# Begin main function
+
+
 def main(pool, use_existing_samples, rerun_samples):
 
     print "\n... Beginning main...\n"
 
-    # Determine which computations
+    # Determine tasks for sampler run
     tasks = []
 
+    # Get 2pt tasks
     compute_2pf = cfg.computations['2pf']
     if compute_2pf: tasks.append('2pf')
 
+    # Get 3pt tasks
     compute_3pf = cfg.computations['3pf']
     if compute_3pf:
         tasks.append('3pf')
         which3pf = cfg.which3pf
 
+    # Get mass-matrix tasks
     compute_Mij = cfg.computations['Mij']
     if compute_Mij:
         tasks.append('Mij')
 
-    # Get sampler confiuration
+    # Get macro-parameters for sampler run
     nsamples = cfg.sampler['NSamples']
     pytmod   = cfg.sampler['PyTransportModule']
     
+    # Print sampler configuration
     if sum([compute_2pf, compute_3pf, compute_Mij])==0:
         print "| Begin sampling routing: {}".format(pytmod)
         print "| -- Background only"
@@ -88,30 +99,36 @@ def main(pool, use_existing_samples, rerun_samples):
                 print "|         fNL {}".format(item['config_name'])
         print "| -- Mij: {}".format(compute_Mij)
 
+    # Get number of fields and model parameters
     nF, nP = PyT.nF(), PyT.nP()
 
-    # Generate ensemble of models that support sufficient inflation
+
     print "\n-- Initializing ensemble"
     
-    # If use existing sample flag, get sample numbers from sample directory
+    
+    # Run samples with their associated background (and params)
     if use_existing_samples is True and rerun_samples is False:
         print "----- Loading ensemble"
         sample_loc = os.path.join(cfg.system['saveloc'], "samples")
         sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(sample_loc)]
     
+    # Recompute samples from scratch (maintaining params only)
     elif use_existing_samples is True and rerun_samples is True:
         print "----- Re-running ensemble"
         sample_loc = os.path.join(cfg.system['saveloc'], "samples")
         sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(sample_loc)]
         pool.map(pytm.DemandSample_rerun, sample_range)
     
+    # Build ensemble from scratch
     else:
         print "----- Building ensemble"
         sample_range = range(nsamples)
         pool.map(pytm.DemandSample, sample_range)
 
-    # Generate ensemble of tasks based on user specifications
+    # Generate task pool from specs. in configuration file
     taskpool = []
+    
+    # Each task is defined via a model number and key for task execution
     for i in sample_range:
 
         if compute_2pf is True:
@@ -127,19 +144,22 @@ def main(pool, use_existing_samples, rerun_samples):
                 task = i, config['config_name']
                 taskpool.append(task)
 
+    # Map task pool to computation handler
     pool.map(pytm.computations, taskpool)
 
+    # Update samples with results from task pool
     print "\n-- Updating sample objects\n"
     pool.map(w.update_samples, sample_range)
 
+    # Close pool
     pool.close()
 
+    # Write results file(s)
     print "\n-- Writing result files\n"
     w.write_results(nF)
     print "\n-- All Complete.\n"
 
 
-# MPI Pool settings
 if __name__ == "__main__":
 
     # Import schwimmbad for MPI pool processes
@@ -163,17 +183,18 @@ if __name__ == "__main__":
     # Add group for PyTransport sampler
     pyt_group = parser.add_argument_group()
     
+    # Flag to rerun computations from existing saved samples
     pyt_group.add_argument("--use_samples", dest="use_samples", default=False,
                        action="store_true", help="Use existing sample data")
 
-    # Add flag to rerun existing sample data, e.g. if we changed calculation pipeline
+    # Flag to rerun samples with their associated parameters from scratch
     pyt_group.add_argument("--rerun_samples", dest="rerun_samples", default=False,
                        action="store_true", help="Re-run with existing sample core data")
     
-    
     args = parser.parse_args()
     
+    # Build pool via schwimmbad
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)
 
-    # Execute main program
+    # Execute main
     main(pool, args.use_samples, args.rerun_samples)
