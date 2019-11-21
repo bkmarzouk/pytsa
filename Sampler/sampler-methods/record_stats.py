@@ -7,7 +7,7 @@ def log_stats(modelnumber, key, loc):
     log_path = os.path.join(loc, "{}.stats".format(modelnumber))
     
     # Define possible keys for dict
-    keys = ['short', 'kexit', 'feoi', 'back', "end"]
+    keys = ['short', 'kexit', 'feoi', 'back', "violated", "eternal", "end"]
     
     # Assert that key is valid option, i.e. custom keys should not be passed!
     assert key in keys, "Key not vailid for log file: {}".format(key)
@@ -25,10 +25,10 @@ def log_stats(modelnumber, key, loc):
     
     # Otherwise build new log file
     else:
-        log = {'short': 0, 'kexit': 0, 'feoi': 0, 'back': 0}
+        log = {'short': 0, 'kexit': 0, 'feoi': 0, 'back': 0, "violated": 0, "eternal": 0}
         
     # If key corresponds to an iterable update
-    if key in ['short', 'kexit', 'feoi', 'back']:
+    if key in ['short', 'kexit', 'feoi', 'back', "violated", "eternal"]:
         log[key] += 1
     
     # If key corresponds to a sample being obtained
@@ -43,4 +43,4 @@ def log_stats(modelnumber, key, loc):
     # Write new dictionary
     f = open(log_path, "wb")
     with f:
-        pk.dump(log_path, f)
+        pk.dump(log, f)

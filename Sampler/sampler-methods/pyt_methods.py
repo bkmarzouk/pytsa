@@ -44,7 +44,7 @@ else:
 
 from generator import gen_sample
 from realization import realization
-from record_stats import *
+import record_stats
 
 """
 
@@ -99,17 +99,21 @@ def Initialize(modelnumber, rerun_model=False):
 
         Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000)
 
-        # If integration fails, string type('S32') is returned
+        # Integration failure
         if type(Nend) == type('S32'):
-            print "-- Integration failure, model: {}".format(modelnumber)
             return "feoi_fail"
         
+        # If no end to inflation is found
         elif Nend is None:
-            return None
+            return "eternal"
         
+        # Attempt computation of background
         else:
-            # Compute background evolution
             back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False)
+            
+            # If not numpy array, background computation failed
+            if type(back) != np.ndarray:
+                return "back_fail"
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
     else:
@@ -117,15 +121,17 @@ def Initialize(modelnumber, rerun_model=False):
         # Compute extended background evolution
         back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
 
-        if back_ext is None:
-            print "-- Integration failure, model: {}".format(modelnumber)
-            return "back_fail"
+        # If integration / background failure / eternal model is reported, return this information
+        if back_ext ["feoi_fail", "back_fail", "eternal"]:
+            return back_ext
 
+        # Otherwise unpack background and efolding where epsilon = 1
         back, Nepsilon = back_ext
 
-        for item in conditions:  # Iterate over conditions list
+        # Iterate over conditions list
+        for item in conditions:
 
-            # Unpack condition data
+            # Unpack conditions for fields values subject to background data
             field_number = item['FieldNumber']
             field_value = item['FieldValue']
             from_above = item['FromAbove']
@@ -134,120 +140,162 @@ def Initialize(modelnumber, rerun_model=False):
             # Transpose evolution to extract independent evolution for field in question
             Nevo = back.T[0]
             Fevo = back.T[1 + field_number]
-            Vevo = back.T[1 + field_number + PyT.nF()]
+            Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
 
+            # Try to find instances of field conditions within background evolution
             try:
-
-                # Scan for field value
+                # If conditional field value is approached from above
                 if from_above is True:
-                    Nloc = np.where(Fevo <= field_value)[0][0]
+                    Nloc = np.where(Fevo <= field_value)[0][0] # Find first instance of condition being True
+                    
+                # If conditional field value is approached from below
                 elif from_above is False:
-                    Nloc = np.where(Fevo >= field_value)[0][0]
+                    Nloc = np.where(Fevo >= field_value)[0][0] # Fine first instance of condition being True
+                
                 else:
-                    raise ValueError, "Unrecognized value assignment: {}".format(from_above)
+                    raise ValueError, "Unrecognized value assignment 'from above': {}".format(from_above)
 
-                # Redefine end of inflation according to condition
+                # If condition successfully ends inflation, redefine Nend to this point
                 if successful is True:
                     Nend = Nevo[Nloc]
+                    
+                # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
                 elif successful is False:
                     Nend = "Violated"
+                    
                 else:
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
-            except IndexError:  # Index error is raised if value is not found in background evolution
+            # Index error is raised if field value condition cannot be foudn
+            except IndexError:
 
-                # Define model failure of terminating condition is not found
+                # If the condition corresponded to a successful end to the evolution, return "NotFound"
                 if successful is True:
-                    Nend = "NotFound"  # If condition is for successful models, Nend is not found
+                    Nend = "NotFound"
+                
+                # If the condition was supposed to terminate the evolution, pass (everything is OK)
                 elif successful is False:
-                    pass  # If condition for failed model is not found, do nothing
+                    pass
+                
                 else:
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
+    # We infer whether the background evolution was successful and whether it was too short subject to definition
     if Nend in ["Violated", "NotFound"] or Nend < minN:
         if Nend < minN:
             return "Short"
         return Nend
 
-    # If more than 70 eFolds to the end of inflation, adjust the initial conditions
-    # such that we don't end up with exp large nums for momenta k
+    # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
+        
+        # Search background from bottom to top
         for row in np.flipud(back):
 
-            # If more than 70 eFolds to go, reposition ICs to this point
-            # and break out of the search
+            # When the background step is 70 efolds away from the "end" of inflation
             if Nend - row[0] > 70:
+                
+                # Redefine initial conditions to this point & rerun background compution
                 initial = row[1:]
                 Nend = Nend - row[0]
-                t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
                 
+                # For canonical end, this should be straightforward
                 if canonical is True:
+                    t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
                     back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
-                    break
-                    
+                
+                # For non-canonical
                 else:
-                    back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
-                    break
+                    
+                    # *Small* chance that extension may mess up, returning ValueError
+                    try:
+                        back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
+                    except ValueError:
+                        back_adj = None
+                
+                # Break out of search window
+                break
     else:
         back_adj = back
 
-    # If rescaling routine gives rise to a failed trajectory, refer to initial evolution
-    if type(back_adj) != np.ndarray:
-        # print "-- Background rescaling failed"
+    # If rescaling procedure fails: Revert to initial background compution
+    if type(back_adj) == np.ndarray:
         pass
     else:
-        # print "-- Background rescaling successful"
         back = back_adj
 
-    # Compute exit time for scales of interest & corresponding Fourier mode
+    # Attempt computation of momenta at horizon crossing, this will be used in all calculations of observables
     kExit = PyS.kexitN(Nend - Nexit, back, pvals, PyT)
+    
+    # Asses success by data type of momenta result
     if type(kExit) not in [float, np.float, np.float32, np.float64]:
-        print "** Incorrect momenta 'k' data type: %05d" % modelnumber
         return "kexitn_fail"
 
+    # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
 
-    # Test adiabicity over last 2.5 efolds of inflation
     if cfg.accept_criteria['TestAdiabaticLimit'] is True:
+        
         print "-- Searching for adiabatic limit: %05d" % modelnumber
-        last5 = np.where(back.T[0] >= Nend - 2.5)[0][0]  # Get indices for background steps 2.5 efolds before the end
+        
+        # Define number of efolds from end of inflation which should be adiabatic TODO: Wrap this into config. file
+        Nadiabatic = 1.
+        
+        # Find first efoldign to perform eigenvalue test
+        Nadiabatic_start = np.where(back.T[0] >= Nend - Nadiabatic)[0][0]
+        
+        # Compute mass-matrix evolution from this point
         Mij_end = PyS.MijEvolve(back[last5:], pvals, PyT)
 
+        # For each mass-matrix evolution step
         for item in Mij_end:
+            
+            # Determine if lightest mass is tachyonic
             tachyon = item[1] < 0
-            rest_large = sum([eig > 1 for eig in item[2:]]) == nF - 1
+            
+            # Determine number of hubble scale heavier masses
+            rest_large = sum([eig >= 1 for eig in item[2:]]) == nF - 1
 
+            # If there is no tachyon or the remaining masses aren't large for the portion of evolution
             if not (tachyon and rest_large):
+                
+                # Change adiabatic property to False, and break out of search window
                 adiabatic = False
+                
                 print "-- Adiabatic limit not found: %05d" % modelnumber
                 break
 
-    # Construct realisation, which is then saved under intialization to "samples" directory
+    # Record all sample data
     realization(modelnumber, fvals, vvals, pvals,
                 back, adiabatic, Nend, kExit, smp_path, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
 
+    # Return model number, acts as flag to confirm successful sample
     return modelnumber
 
 
-def DemandSample(modelnumber):
+def DemandSample(modelnumber, sample_stats_dir):
     """ Repeat initialization until successful sample is found """
     ii = -1
-    n_trials = 1
-    n_kexitn_fail = 0
-    n_feoi_fail = 0
     
+    # If successful sample generation, the model number is returned
     while ii != modelnumber:
         ii = Initialize(modelnumber)
-        n_trials += 1
-        if ii == "kexitn_fail":
-            n_kexitn_fail += 1
-            ii = -1
-        elif ii = "feoi_fail":
-            n_feoi_fail += 1
+        
+        # If str type, ii is a key for stats records
+        if type(ii) == str:
+            key = ii
+            
+        # If model number, sum number of iterations
+        elif ii == modelnumber:
+            key = "end"
         else:
-            pass
+            raise KeyError, ii
+        
+        # Record statistics on background efforts
+        record_stats.log_stats(modelnumber, key, sample_stats_dir)
+        
 
 def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found """
