@@ -585,7 +585,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
     
     # If integration failure, return None
     if type(Nepsilon) == type('S32'):
-        return "feoi_fail"
+        return "feoi"
     elif Nepsilon is None:
         return "eternal"
     else: pass
@@ -594,7 +594,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True)
     if type(BG_epsilon) != np.ndarray:
-        return "back_fail"
+        return "back"
     
     idx_epsilon = len(BG_epsilon)
     

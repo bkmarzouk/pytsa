@@ -101,7 +101,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Integration failure
         if type(Nend) == type('S32'):
-            return "feoi_fail"
+            return "feoi"
         
         # If no end to inflation is found
         elif Nend is None:
@@ -113,7 +113,7 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) != np.ndarray:
-                return "back_fail"
+                return "back"
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
     else:
@@ -122,7 +122,7 @@ def Initialize(modelnumber, rerun_model=False):
         back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
 
         # If integration / background failure / eternal model is reported, return this information
-        if back_ext ["feoi_fail", "back_fail", "eternal"]:
+        if back_ext ["feoi", "back", "eternal"]:
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1
@@ -161,7 +161,7 @@ def Initialize(modelnumber, rerun_model=False):
                     
                 # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
                 elif successful is False:
-                    Nend = "Violated"
+                    Nend = "violated"
                     
                 else:
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
@@ -171,7 +171,7 @@ def Initialize(modelnumber, rerun_model=False):
 
                 # If the condition corresponded to a successful end to the evolution, return "NotFound"
                 if successful is True:
-                    Nend = "NotFound"
+                    Nend = "eternal"
                 
                 # If the condition was supposed to terminate the evolution, pass (everything is OK)
                 elif successful is False:
@@ -181,9 +181,9 @@ def Initialize(modelnumber, rerun_model=False):
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if Nend in ["Violated", "NotFound"] or Nend < minN:
+    if Nend in ["violated", "eternal"] or Nend < minN:
         if Nend < minN:
-            return "Short"
+            return "short"
         return Nend
 
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
@@ -229,7 +229,7 @@ def Initialize(modelnumber, rerun_model=False):
     
     # Asses success by data type of momenta result
     if type(kExit) not in [float, np.float, np.float32, np.float64]:
-        return "kexitn_fail"
+        return "kexit"
 
     # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
@@ -245,7 +245,7 @@ def Initialize(modelnumber, rerun_model=False):
         Nadiabatic_start = np.where(back.T[0] >= Nend - Nadiabatic)[0][0]
         
         # Compute mass-matrix evolution from this point
-        Mij_end = PyS.MijEvolve(back[last5:], pvals, PyT)
+        Mij_end = PyS.MijEvolve(back[Nadiabatic_start:], pvals, PyT)
 
         # For each mass-matrix evolution step
         for item in Mij_end:
@@ -277,6 +277,10 @@ def Initialize(modelnumber, rerun_model=False):
 
 def DemandSample(modelnumber, sample_stats_dir):
     """ Repeat initialization until successful sample is found """
+    
+    # Start timer
+    tstart = time.clock()
+    
     ii = -1
     
     # If successful sample generation, the model number is returned
@@ -286,73 +290,89 @@ def DemandSample(modelnumber, sample_stats_dir):
         # If str type, ii is a key for stats records
         if type(ii) == str:
             key = ii
-            
+            record_stats.log_stats(modelnumber, key, sample_stats_dir)
+        
         # If model number, sum number of iterations
         elif ii == modelnumber:
             key = "end"
+            record_stats.log_stats(modelnumber, key, sample_stats_dir, time.clock() - tstart)
         else:
             raise KeyError, ii
-        
-        # Record statistics on background efforts
-        record_stats.log_stats(modelnumber, key, sample_stats_dir)
-        
 
-def DemandSample_rerun(modelnumber):
+
+def DemandSample_rerun(modelnumber, sample_stats_dir):
     """ Repeat initialization until successful sample is found """
-    ii = -1
-    n_trials = 1
-    n_kexitn_fail = 0
-    n_feoi_fail = 0
     
+    # Start timer
+    tstart = time.clock()
+    
+    ii = -1
+    
+    # If successful sample generation, the model number is returned
     while ii != modelnumber:
         ii = Initialize(modelnumber, rerun_model=True)
-        n_trials += 1
-        if ii == "kexitn_fail":
-            n_kexitn_fail += 1
-            ii = -1
-        elif ii = "feoi_fail":
-            n_feoi_fail += 1
+        
+        # If str type, ii is a key for stats records
+        if type(ii) == str:
+            key = ii
+            record_stats.log_stats(modelnumber, key, sample_stats_dir)
+        
+        # If model number, sum number of iterations
+        elif ii == modelnumber:
+            key = "end"
+            record_stats.log_stats(modelnumber, key, sample_stats_dir, time.clock() - tstart)
         else:
-            pass
+            raise KeyError, ii
 
 
 def Mij(modelnumber):
-    # Begin by loading pickled sample
+    
+    # Unload sample data
     sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
     assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
+    
     s = open(sampler_path, "rb")
     with s:
         sample = pk.load(s)
 
-    # Cross check model numbers to ensure that we are reading and computing with the correct data
+    # Cross-check model number identifier
     assert sample.modelnumber == modelnumber, "Pickled model data does not match! {m1} != {m2}".format(
         m1=modelnumber, m2=sample.modelnumber
     )
 
-    # Unload core data for observable calculation
+    # Unpack background data
     back = sample.background
-    backT = back.T
     Nend = sample.Nend
-    assert Nend is not None, "Nend = None should not be a saved sample"
+    assert Nend is not None, "Nend = None -> Sample construction failure!"
     pvals = np.asarray(sample.parameters)
 
-    # Define locations and savenames for spectral index and running
+    # Transport background for col evolution rather than row evolution
+    backT = back.T
+    
+    # Build save path for mass-matrix eigenvalues
     Mij_savepath = os.path.join(Mij_path, "{}.Mij".format(modelnumber))
 
+    # Get number of fields
     nF = PyT.nF()
 
     # Begin timer
     ti = time.clock()
 
-    Nstar = Nend - cfg.sampler['ExitTime'];
+    # Define Nstar, i.e. exit time of interest
+    Nstar = Nend - cfg.sampler['ExitTime']
+    
+    # Unpack efold evolution
     Nevo = backT[0]
 
+    # If Nstar falls exactly in the background, simply load this background step
     if Nstar in Nevo:
         Nstar_idx = [Nevo.index(Nstar)]
         back_star = back[Nstar_idx]
 
+    # Otherwise we build a spline about Nstar
     else:
-        # We consider the evolution of the mass matrix at +/- 1 eFold about the pivot scale
+        
+        # Get background index values +/- 1 efold around the prescribed exit time
         idx_above = np.where(np.logical_and(Nevo>Nstar, Nevo<Nstar+1.))[0]
         idx_below = np.where(np.logical_and(Nevo < Nstar, Nevo > Nstar-1.))[0]
         Nstar_idx = list(np.concatenate([idx_below, idx_above]))
@@ -360,13 +380,13 @@ def Mij(modelnumber):
         # Define efold range to "smooth" over
         Nsmooth = [Nevo[idx] for idx in Nstar_idx]
 
-        # Construct splines for the field evolution w.r.t. N time
+        # Construct splines for the field evolution over Nsmooth
         fsplines = [
             UnivariateSpline(
                 Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1, 1 + nF)
         ]
         
-        # Construct splines for the velocity evolution w.r.t. N time
+        # Construct splines for the velocity evolution over Nsmooth
         vsplines = [
             UnivariateSpline(
                 Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1 + nF, 1 + 2 * nF)
@@ -375,10 +395,10 @@ def Mij(modelnumber):
         # Evaluate the background at N_star = Nend - Nexit
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
         
-    # Compute mass matrix eigenvalues
+    # Compute mass matrix eigenvalues at the exit time
     Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, scale_eigs=True)[0][1:]
 
-    # Write dictionary values for masses
+    # Build dictionary of masses
     Mij_eig = {}
     for i in range(len(Mij)):
         Mij_eig['m{}'.format(i)] = Mij[i]
@@ -386,146 +406,145 @@ def Mij(modelnumber):
     # End timer
     Mij_eig['time'] = time.clock() - ti
 
+    # Write binary file
     Mij_file = open(Mij_savepath, "wb")
     with Mij_file:
         pk.dump(Mij_eig, Mij_file)
         
 
 def SpectralIndex(modelnumber):
-    # Begin by loading pickled sample
+    
+    # Unload sample data
     sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
     assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
+    
     s = open(sampler_path, "rb")
     with s:
         sample = pk.load(s)
 
-    # Cross check model numbers to ensure that we are reading and computing with the correct data
+    # Cross-check model number identifier
     assert sample.modelnumber == modelnumber, "Pickled model data does not match! {m1} != {m2}".format(
         m1=modelnumber, m2=sample.modelnumber
     )
 
-    # Unload core data for observable calculation
+    # Unpack background information
     back = sample.background
     Nend = sample.Nend;
     assert Nend is not None, "Nend = None should not be a saved sample"
     pvals = np.asarray(sample.parameters)
     
+    # Get exit time momenta
     kExit = sample.kExit
 
-    # Define savepath for spectral index and running
+    # Build path for two-point function result
     twoPt_savepath = os.path.join(path_2pf, "{}.2pf".format(modelnumber))
 
-    # Begin timing calculation
+    # Begin timer
     ti = time.clock()
 
+    # Try and compute two-point function: Assert dtypes & catch attribute errors from failed calculations
     try:
         
-        # Define range of N times about exit scale of interest
+        # Define an efolding range 2-efolds above and below the exit time
         Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
 
-        # Compute modes that exit at corresponding times
+        # Compute the corresponding momenta at horizon exit times
         kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
         
+        # Insert existing results from model initialization
         Nrange.insert(2, Nend - Nexit)
         kExitrange.insert(2, kExit)
 
-        print "Nexit", Nrange
-        print "kExit", kExitrange
-
-        # Check that momenta size is monotonically increasing
+        # Check momenta are monotonically increasing
         assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
 
-        # Get initial conditions for momenta
+        # Get initial condition for each momenta
         ICsEvos = [PyS.ICs(subevo, kE, back, pvals, PyT) for kE in kExitrange]
 
-        # Check at initial conditions array(s) are correct length of correct dtype
+        # Check initial conditions array(s) are correct length of correct dtype
         for item in ICsEvos:
             assert len(item) == 2, "Initial conditions incorrect length"
         for item in ICsEvos:
             assert type(item[1]) == np.ndarray, "Initial conditions are wrong dtype"
 
-        # Define efoldings at which we want to evaluate spectral index at
+        # Prescribe Nstart and Nend as evaluation times for 2pf run
         Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
 
-        # Compute the two point function for each mode at evaluation times
+        # Call sigEvolve to compute power spectra
         twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False).T for NkBack in zip(
             Nevals, kExitrange, ICsEvos
         )]
 
-        # Log power spectra and Fourier modes
+        # Log power spectra and momenta
         logPz = [np.log(xx[1][-1]) for xx in twoPt]
         logkE = [np.log(kE) for kE in kExitrange]
 
-        # Compute spectral index and running for pivot scale at end of inflation
+        # Compute spectral index and running via spline derivatives of logged values
         ns = UnivariateSpline(
             logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExitrange[2])) + 4.
         alpha = UnivariateSpline(
             logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExitrange[2])) + 0.
         
-        print ns, alpha
         
-
-
     except (AssertionError, AttributeError) as e:
-        
-        print "-- ns Failure"
 
+        # Set None values for failed computation
         ns = None
         alpha = None
 
-    # End calculation timer
+    # End calculation timer and build results dictionary
     twoPt_dict = {'ns': ns, 'alpha': alpha, 'time': time.clock() - ti}
 
+    # Write binary file
     twoPt_file = open(twoPt_savepath, "wb")
-
     with twoPt_file:
         pk.dump(twoPt_dict, twoPt_file)
 
 
-# fNL calculation
 def fNL(modelnumber, which3pf):
-    # print "-- Begin fNL calculation: Model {m}".format(m = modelnumber)
 
-    # Begin by loading pickled sample
+    # Unload sample data
     sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
     assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
     s = open(sampler_path, "rb")
     with s:
         sample = pk.load(s)
 
-    # Cross check model numbers to ensure that we are reading and computing with the correct data
+    # Cross-check model number identifier
     assert sample.modelnumber == modelnumber, "Pickled model data does not match! {m1} != {m2}".format(
         m1=modelnumber, m2=sample.modelnumber
     )
 
-    # Unload core data for observable calculation
+    # Unpack background data
     back = sample.background
     Nend = sample.Nend
     assert Nend is not None, "Nend = None should not be a saved sample"
     kExit = sample.kExit
     pvals = np.asarray(sample.parameters)
 
-    # Unpack dictionary data
+    # Get dictionary items for bispectrum configuration
     name = which3pf['config_name']
     alpha = which3pf['alpha']
     beta = which3pf['beta']
 
-    # Define location and savepath for fNL computation
+    # Build savee path
     fNL_savepath = os.path.join(path_3pf, "{num}.{ext}".format(num=modelnumber, ext=name))
 
-    # Begin timing calculation
+    # Begin timer
     ti = time.clock()
 
-    # Apply parameterization to get triangle momenta
-    k1 = kExit / 2. - beta * kExit / 2.;
-    k2 = kExit * (1. + alpha + beta) / 4.;
+    # Build Fourier triangle via Fergusson Shellard convention
+    k1 = kExit / 2. - beta * kExit / 2.
+    k2 = kExit * (1. + alpha + beta) / 4.
     k3 = kExit * (1. - alpha + beta) / 4.
 
-    # Find ICs for largest scale as this will cross the Horizon first
+    # Find smallest momentum: Build ICs from largest scale mode
     kmin = np.min([k1, k2, k3])
-
+    
+    # Try and compute three-point function: Assert dtypes & catch attribute errors from failed calculations
     try:
 
+        # Compute initial conditions
         ICs = PyS.ICs(subevo, kmin, back, pvals, PyT)
         assert len(ICs) == 2, "Initial conditions incorrect length: model {m}, config {c}".format(
             m=modelnumber, c=name
@@ -535,31 +554,38 @@ def fNL(modelnumber, which3pf):
             m=modelnumber, c=name
         )
 
-        # Based on our configuration, we then calulate the 3pf
+        # Compute 3pt function
         threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True).T
 
-        # Get Bispectrum of zeta, and power spectra for modes at end of inflation
+        # Get power spectra and bispectrum for triangule
         Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
 
-        # Compute array of fNL values
+        # Compute fNL
         fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
 
     # Except TypeError, typically propagates from bad BackExitMinus, i.e. float rather than ndarray
     except (AssertionError,  AttributeError) as e:
         fNL = None
 
+    # Build result dictionary
     fNL_dict = {'{}'.format(name): fNL, 'time': time.clock() - ti}
 
+    # Save binary file
     fNL_file = open(fNL_savepath, "wb")
-
     with fNL_file:
         pk.dump(fNL_dict, fNL_file)
         
 
 def computations(mn_calc):
+    """ Simple handler for computations called from sampler """
+    
+    # Unpack model number and calculation type
     modelnumber, calculation = mn_calc
+    
+    # Get bispectrum information
     which3pf = cfg.which3pf
 
+    # Prevent computation fails from hanging via catch_warnings
     with warnings.catch_warnings(record=True) as w:
 
         if calculation == "Mij":

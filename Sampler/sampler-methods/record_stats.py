@@ -1,7 +1,7 @@
 import os
 import pickle as pk
 
-def log_stats(modelnumber, key, loc):
+def log_stats(modelnumber, key, loc, ttotal=None):
     
     # Build log path for pk file
     log_path = os.path.join(loc, "{}.stats".format(modelnumber))
@@ -33,10 +33,14 @@ def log_stats(modelnumber, key, loc):
     
     # If key corresponds to a sample being obtained
     elif key == "end":
+        
+        assert ttotal is not None, "Final time required"
+        
         # Add key values
         keys.remove("end")
         tot = sum([log[k] for k in keys])
         log["end"] = tot + 1 # Final number of iterations required to obtain successful sample
+        log["time"] = ttotal
         
     else: pass
     
