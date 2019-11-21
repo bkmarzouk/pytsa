@@ -96,7 +96,7 @@ def main(pool, use_existing_samples, rerun_samples):
         print "| -- 3pf: {}".format(compute_3pf)
         if compute_3pf:
             for item in which3pf:
-                print "|         fNL {}".format(item['config_name'])
+                print "| --------fNL {}".format(item['config_name'])
         print "| -- Mij: {}".format(compute_Mij)
 
     # Get number of fields and model parameters

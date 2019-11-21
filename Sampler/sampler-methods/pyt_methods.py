@@ -122,7 +122,7 @@ def Initialize(modelnumber, rerun_model=False):
         back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
 
         # If integration / background failure / eternal model is reported, return this information
-        if back_ext ["feoi", "back", "eternal"]:
+        if back_ext in ["feoi", "back", "eternal"]:
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1
@@ -275,8 +275,11 @@ def Initialize(modelnumber, rerun_model=False):
     return modelnumber
 
 
-def DemandSample(modelnumber, sample_stats_dir):
+def DemandSample(modelnumber):
     """ Repeat initialization until successful sample is found """
+    
+    # Get directory for sample stats log
+    sample_stats_dir = os.environ['PyTS_logpath']
     
     # Start timer
     tstart = time.clock()
@@ -302,6 +305,9 @@ def DemandSample(modelnumber, sample_stats_dir):
 
 def DemandSample_rerun(modelnumber, sample_stats_dir):
     """ Repeat initialization until successful sample is found """
+    
+    # Get directory for sample stats log
+    sample_stats_dir = os.environ['PyTS_logpath']
     
     # Start timer
     tstart = time.clock()

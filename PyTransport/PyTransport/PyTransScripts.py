@@ -632,8 +632,6 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         # Stack together into numpy ndarray, structured consistently with typical backEvolve
         stacked = np.vstack((bg for bg in extensions))
         
-        print "Extended background by N = {}".format(stacked.T[0][-1] - Nepsilon)
-        
         # return the background, as well as the efolding where slow-roll was violated
         return stacked, Nepsilon
 
@@ -675,7 +673,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
     fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
     
     # Get Christoffel symbols and Riemann tensor
-    # csyms = curv_obj.Csyms
+    # csyms = curv_obj.Csyms, Christoffel term already absorbed in dVV
     rsyms = curv_obj.Rsyms
     
     # Get field space metric and inverse

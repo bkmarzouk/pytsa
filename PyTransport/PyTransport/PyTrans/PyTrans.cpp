@@ -174,25 +174,6 @@ static PyObject* MT_paramNumber(PyObject* self,  PyObject *args)
 }
 
 // TODO: find end of inflation within adaptive search window
-//static PyObject* MT_EndOfInflation(PyObject* self, PyObject* args)
-//{
-//    PyArrayObject* initialCs;
-//    PyArrayObject* params;
-//    PyArrayObject* tols;
-//
-//    // Initial start time
-//    double Ninit = 0.0;
-//
-//    // Fiducial search window
-//    double Nwindow = 7500.0;
-//
-//    // parse arguments
-//    if(!PyArg_ParseTuple(args, "O!O!O!d", &PyArray_Type, &initialCs, &PyArray_Type,
-//                         &params, &PyArray_Type, &tols, &Ninit))
-//      return NULL;
-//
-//
-//}
 
 // detect end of inflation within a suitable search window
 static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
@@ -201,7 +182,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     PyArrayObject* params;
     PyArrayObject* tols;
     double Ninit = 0.0;         // value of N corresponding to initial conditions
-    double DeltaN = 3000.0;    // number of e-folds to search through
+    double DeltaN = 3000.0;     // defualt number of e-folds to search through
 
     // parse arguments; final argument is optional
     if(!PyArg_ParseTuple(args, "O!O!O!d|d", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
@@ -245,7 +226,6 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
       }
 
     // allocate working space for the stepper
-    // TODO: consider absorbing these allocations within a janitor object
     double* y = new double[2*nF];       // current values
     double* dy = new double[2*nF];      // derivatives
 
@@ -260,9 +240,9 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     const double Nstop = Ninit + DeltaN;
     evolveB(N, y, dy, Cparams);
 
-    // integrated background until we encounter the end-of-inflation, or the end of the search window
+    // integrate background until we encounter the end-of-inflation, or the end of the search window
     int flag = -1;      // '-1' puts the integrator into 'single-step' mode, so it returns after taking one stride
-    string eoi_fail = "failed";
+    string eoi_fail = "failed"; // string return to pytransport
     while(N < Nstop)
       {
         flag = r8_rkf45(evolveB, 2*nF, y, dy, &N, Nstop, &relerr, abserr, flag, Cparams);
@@ -270,8 +250,6 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
         // detect some error conditions
         if(flag == 50)
           {
-//            cout << "\n \n \n Integrator failed at time N = " <<N <<" \n \n \n";
-            //return Py_BuildValue("d", N);//CHANGED TO BELOW FOR STRING HANDLING
             return Py_BuildValue("s", eoi_fail);
           }
 
@@ -281,24 +259,22 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 
         double eps = mm.Ep(vecy, vecParams);
 
-        // break out of search if we have an unacceptable result, or if we are now past the end of inflation
+        // If we have an unacceptable result, or if we are now past the end of inflation
         if(eps < 0 || eps > 1)
           {
-            // TODO: consider absorbing in a janitor
             delete[] y;
             delete[] dy;
-            return Py_BuildValue("d", N);
-//            return Py_BuildValue("s", eoi_fail);
+            return Py_BuildValue("d", N); // Report final efolding
           }
 
         flag = -2;      // '-2' means continue as normal in 'single-step' mode
       }
 
     // deallocate workspace
-    // TODO: consider absorbing in a janitor
     delete[] y;
     delete[] dy;
 
+    // If unable to find end of inflation, return None
     Py_RETURN_NONE;
 }
 

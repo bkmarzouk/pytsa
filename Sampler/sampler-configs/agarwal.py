@@ -13,7 +13,7 @@ import sys
 """ Computation Configuration | CHANGE ME """
 
 
-sampler_name = "agarwal"
+sampler_name = "agarwal_test"
 save_location = "default" # If default: outputs will be written to sampler-build directory
 
 
@@ -34,8 +34,8 @@ system = {
 }
 
 computations = {
-    "2pf": False,  # Compute 2-point function observables
-    "3pf": False,  # Compute 3-point function observables
+    "2pf": True,  # Compute 2-point function observables
+    "3pf": True,  # Compute 3-point function observables
     "Mij": True   # Evaluate Mass-Matrix Eigenvalues @ ExitTime, (indirectly) required if testing adiabatic limit
 }
 
