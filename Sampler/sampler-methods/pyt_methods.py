@@ -44,6 +44,7 @@ else:
 
 from generator import gen_sample
 from realization import realization
+from record_stats import *
 
 """
 
@@ -118,7 +119,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         if back_ext is None:
             print "-- Integration failure, model: {}".format(modelnumber)
-            return "feoi_fail"
+            return "back_fail"
 
         back, Nepsilon = back_ext
 
@@ -164,7 +165,9 @@ def Initialize(modelnumber, rerun_model=False):
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
     if Nend in ["Violated", "NotFound"] or Nend < minN:
-        return None
+        if Nend < minN:
+            return "Short"
+        return Nend
 
     # If more than 70 eFolds to the end of inflation, adjust the initial conditions
     # such that we don't end up with exp large nums for momenta k

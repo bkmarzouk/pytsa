@@ -237,7 +237,7 @@ for item in sampler_files:
 
 
 
-# Construct ensemble of
+# Construct directories for observables
 build_dirs = ["samples", "outputs"]
 if config.computations['2pf'] is True: # 2-point function data
     build_dirs.append("2pf")
@@ -247,7 +247,9 @@ if config.computations['3pf'] is True: # 3-point function data
 
 if config.computations['Mij'] is True: # Mass-Matrix data, (at Horizon crossing)
     build_dirs.append("Mij")
-
+    
+# Construct additional directory for logging sampler statistics
+build_dirs.append("sampler_stats")
 
 for item in build_dirs:
 
