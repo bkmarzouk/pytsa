@@ -171,12 +171,14 @@ if __name__ == "__main__":
     # Build argument parser for cmd line
     parser = ArgumentParser(description="Configure PyTransport Sampler Routine")
     
-    # Build mutually exclusive group for Schwimmbad processes
+    # Build mutually exclusive group for schwimmbad processes
     sb_group = parser.add_mutually_exclusive_group()
 
+    # Number of cores to use
     sb_group.add_argument("--ncores", dest="n_cores", default=1, type=int,
                        help="Number of processes (uses multiprocessing).")
     
+    # Use mpi (required by schwimmbad routine)
     sb_group.add_argument("--mpi", dest="mpi", default=False,
                        action="store_true", help="Run with MPI.")
     
@@ -191,7 +193,27 @@ if __name__ == "__main__":
     pyt_group.add_argument("--rerun_samples", dest="rerun_samples", default=False,
                        action="store_true", help="Re-run with existing sample core data")
     
+    # Add group for timeout specs
+    tmax_group = parser.add_argument_group()
+    
+    # Max number of seconds that background tasks are allowed to run for (default 5 mins)
+    tmax_group.add_argument("--tmax_bg", dest="tmax_bg", default=300, type=int,
+                        help="Number of seconds background tasks may run for")
+
+    # Max number of seconds that background tasks are allowed to run for (default 10 mins)
+    tmax_group.add_argument("--tmax_2pf", dest="tmax_2pf", default=600, type=int,
+                        help="Number of seconds 2-point function tasks may run for")
+
+    # Max number of seconds that background tasks are allowed to run for (default 45 mins)
+    tmax_group.add_argument("--tmax_3pf", dest="tmax_3pf", default=2700, type=int,
+                        help="Number of seconds 3-point function tasks may run for")
+
     args = parser.parse_args()
+    
+    # Export max execution times as environment variables
+    os.environ["tmax_bg"] = str(args.tmax_bg)
+    os.environ["tmax_2pf"] = str(args.tmax_2pf)
+    os.environ["tmax_3pf"] = str(args.tmax_3pf)
     
     # Build pool via schwimmbad
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)

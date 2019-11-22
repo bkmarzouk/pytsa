@@ -576,7 +576,7 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     return KE
 
 
-def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, tols=np.array([1e-10, 1e-10])):
+def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3, tols=np.array([1e-10, 1e-10])):
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
     
@@ -605,6 +605,8 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
     tols = np.array([1e-12, 1e-12])  # Adapt to higher precision
     while c < n_iter:
         
+        print c
+        
         # Define new initial conditions to be the field data at the previous background segment
         N_init = extensions[-1][-1][0]
         bg_init = extensions[-1][-1][1:]
@@ -621,6 +623,8 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=1e-4, t
         extensions.append(bg_ext[1:])
         
         c += 1
+        
+    print extensions[-1].T[0][-1] - BG_epsilon.T[0][-1]
     
     if len(extensions) == 1:
         

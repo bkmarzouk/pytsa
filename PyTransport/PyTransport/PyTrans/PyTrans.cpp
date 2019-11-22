@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Thu Nov  7 12:18:54 2019
+// Package recompile attempted at: Fri Nov 22 17:37:06 2019
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -178,15 +178,22 @@ static PyObject* MT_paramNumber(PyObject* self,  PyObject *args)
 // detect end of inflation within a suitable search window
 static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 {
+    // TODO: Look at test.cpp for skeleton of how to timeout iterative procs. Implement here
     PyArrayObject* initialCs;
     PyArrayObject* params;
     PyArrayObject* tols;
     double Ninit = 0.0;         // value of N corresponding to initial conditions
-    double DeltaN = 3000.0;     // defualt number of e-folds to search through
+    double DeltaN = 3000.0;     // default number of e-folds to search through
+    double tmax_feoi = -1;      // interpret negative as no max integration time
 
     // parse arguments; final argument is optional
-    if(!PyArg_ParseTuple(args, "O!O!O!d|d", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
-                         &Ninit, &DeltaN))
+    // O! stores python object in c pointer, but is subsequently followed by address of the python type object
+    // then followed by the address of the C variable that is being utilized
+    // d stores float types
+    // | indicates that remaining args are optional
+    // Read the following docs: https://docs.python.org/3/c-api/arg.html
+    if(!PyArg_ParseTuple(args, "O!O!O!d|dd", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
+                         &Ninit, &DeltaN, &tmax_feoi))// Added tmax for find end of inflation iterative proc.
       return NULL;
 
     // convert requested tolerances to a C array and extract absolute & relative error targets
@@ -240,11 +247,43 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     const double Nstop = Ninit + DeltaN;
     evolveB(N, y, dy, Cparams);
 
+    // we now set up the integration timer
+
+    // Initialize time difference (will measure exec. time)
+    double deltat;
+
+    // Build time instances
+    time_t t_ini, t_fin;
+
+    // Record current time before proc.
+    time(&t_ini);
+
     // integrate background until we encounter the end-of-inflation, or the end of the search window
     int flag = -1;      // '-1' puts the integrator into 'single-step' mode, so it returns after taking one stride
     string eoi_fail = "failed"; // string return to pytransport
     while(N < Nstop)
       {
+
+        // clock time at start of loop
+        time(&t_fin);
+
+        // measure time elapsed since first time instance
+        deltat = difftime(t_fin,t_ini);
+
+        // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
+
+        // TIMEOUT SEEMS TO BE REPORTED IN STEPPER, need to flag integration fails better,
+        // todo: clean this up in general
+
+        if((deltat > tmax_feoi) && (tmax_feoi>0))
+            {
+                cout<< "\n \n \n TIMEOUT, DELTA T = "<< deltat << "\n \n \n";
+                delete[] y;
+                delete[] dy;
+                return Py_BuildValue("d", N); // Report final efolding
+
+            }
+
         flag = r8_rkf45(evolveB, 2*nF, y, dy, &N, Nstop, &relerr, abserr, flag, Cparams);
 
         // detect some error conditions
@@ -372,7 +411,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
             eps = mm.Ep(vecy,Vparams);
         ii = ii+1;
         }
-            cout << ii <<endl;
+            // cout << ii <<endl;
         npy_intp dims2[2];
         dims2[1]=1+2*nF; dims2[0]=ii;
         double * backOutC;
@@ -657,7 +696,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransagarwal_dmax_6pt0_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans5Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -669,7 +708,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransagarwal_dmax_6pt0(void)    {        Py_InitModule3("PyTransagarwal_dmax_6pt0", PyTransagarwal_dmax_6pt0_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans5Quad(void)    {        Py_InitModule3("PyTrans5Quad", PyTrans5Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

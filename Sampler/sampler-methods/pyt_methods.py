@@ -10,6 +10,12 @@ import pickle as pk
 import time
 import warnings
 
+# Import timeout function and relevent timeout limits for PyT tasks
+# TODO: IMPLEMENT THESE, e.g. parsed cmd line args
+# tmax_bg = os.environ['tmax_bg']
+# tmax_2pf = os.environ['tmax_2pf']
+# tmax_3pf = os.environ['tmax_3pf']
+
 rootpath = os.environ['PyTSamplerRoot']
 path_2pf = os.path.join(rootpath, "2pf")
 path_3pf = os.path.join(rootpath, "3pf")
@@ -56,6 +62,8 @@ For a given Sample and configuration module, we compute the end of inflation sub
 
 def Initialize(modelnumber, rerun_model=False):
     
+    tmax_bg = int(os.environ['tmax_bg'])
+    
     if rerun_model is False:
         # Generate new sample with parameter & field priori
         n, fvals, vvals, pvals = gen_sample(modelnumber)
@@ -96,11 +104,16 @@ def Initialize(modelnumber, rerun_model=False):
 
     # If we choose to end inflation with eps = 1
     if canonical is True:
-
-        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000)
+        
+        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, 0.001)
 
         # Integration failure
         if type(Nend) == type('S32'):
+            return "feoi"
+        
+        # Integration timeout
+        elif Nend == "timeout":
+            print "TIMEOUT"
             return "feoi"
         
         # If no end to inflation is found
@@ -120,6 +133,10 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Compute extended background evolution
         back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
+        
+        if back_ext == "timeout":
+            print "TIMEOUT"
+            return "feoi"
 
         # If integration / background failure / eternal model is reported, return this information
         if back_ext in ["feoi", "back", "eternal"]:
