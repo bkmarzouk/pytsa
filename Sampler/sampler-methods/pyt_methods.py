@@ -102,44 +102,44 @@ def Initialize(modelnumber, rerun_model=False):
     else:
         initial = np.concatenate((fvals, vvals))
 
+    """ Integration flags:
+    
+    int SHORT = -50;          // Inflation too short
+    int KEXIT = -49;          // Unable to find Fourier mode
+    int FEOI = -48;           // Integration failure in feoi
+    int BACK = -47;           // Integration failure in background
+    int VIOLATED = -46;       // Field space position violates model
+    int ETERNAL = -45;        // Unable to find end of inflation
+    int TIMEOUT = -44;        // Integration time exceeded
+    
+    """
+
     # If we choose to end inflation with eps = 1
     if canonical is True:
         
-        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, 0.001)
+        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg)
 
-        # Integration failure
-        if type(Nend) == type('S32'):
-            return "feoi"
-        
-        # Integration timeout
-        elif Nend == "timeout":
-            print "TIMEOUT"
-            return "feoi"
-        
-        # If no end to inflation is found
-        elif Nend is None:
-            return "eternal"
+        # Integration fails / eternal
+        if Nend in [-48, -45, -44]:
+            return Nend
         
         # Attempt computation of background
         else:
-            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False)
+            back = PyT.backEvolve(np.linspace(0, Nend, 1000),
+                                  initial, pvals, tols, False, tmax_bg)
             
             # If not numpy array, background computation failed
-            if type(back) != np.ndarray:
-                return "back"
+            if back in [-47, -44]:
+                return Nend
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
     else:
 
         # Compute extended background evolution
         back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
-        
-        if back_ext == "timeout":
-            print "TIMEOUT"
-            return "feoi"
 
         # If integration / background failure / eternal model is reported, return this information
-        if back_ext in ["feoi", "back", "eternal"]:
+        if back_ext in [-48, -47, -45, -44]:
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1
@@ -178,7 +178,7 @@ def Initialize(modelnumber, rerun_model=False):
                     
                 # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
                 elif successful is False:
-                    Nend = "violated"
+                    Nend = -46
                     
                 else:
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
@@ -188,7 +188,7 @@ def Initialize(modelnumber, rerun_model=False):
 
                 # If the condition corresponded to a successful end to the evolution, return "NotFound"
                 if successful is True:
-                    Nend = "eternal"
+                    Nend = -45
                 
                 # If the condition was supposed to terminate the evolution, pass (everything is OK)
                 elif successful is False:
@@ -198,9 +198,9 @@ def Initialize(modelnumber, rerun_model=False):
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if Nend in ["violated", "eternal"] or Nend < minN:
+    if Nend in [-46, -45] or Nend < minN:
         if Nend < minN:
-            return "short"
+            return -50
         return Nend
 
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
@@ -246,7 +246,7 @@ def Initialize(modelnumber, rerun_model=False):
     
     # Asses success by data type of momenta result
     if type(kExit) not in [float, np.float, np.float32, np.float64]:
-        return "kexit"
+        return -47
 
     # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
@@ -307,10 +307,9 @@ def DemandSample(modelnumber):
     while ii != modelnumber:
         ii = Initialize(modelnumber)
         
-        # If str type, ii is a key for stats records
-        if type(ii) == str:
-            key = ii
-            record_stats.log_stats(modelnumber, key, sample_stats_dir)
+        # If fail flag received: log statistic
+        if ii in [-50, -49, -48, -47, -46, -45, -44]:
+            record_stats.log_stats(modelnumber, ii, sample_stats_dir)
         
         # If model number, sum number of iterations
         elif ii == modelnumber:
@@ -322,31 +321,29 @@ def DemandSample(modelnumber):
 
 def DemandSample_rerun(modelnumber, sample_stats_dir):
     """ Repeat initialization until successful sample is found """
-    
+
     # Get directory for sample stats log
     sample_stats_dir = os.environ['PyTS_logpath']
-    
+
     # Start timer
     tstart = time.clock()
-    
+
     ii = -1
-    
+
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
         ii = Initialize(modelnumber, rerun_model=True)
-        
-        # If str type, ii is a key for stats records
-        if type(ii) == str:
-            key = ii
-            record_stats.log_stats(modelnumber, key, sample_stats_dir)
-        
+    
+        # If fail flag received: log statistic
+        if ii in [-50, -49, -48, -47, -46, -45, -44]:
+            record_stats.log_stats(modelnumber, ii, sample_stats_dir)
+    
         # If model number, sum number of iterations
         elif ii == modelnumber:
             key = "end"
             record_stats.log_stats(modelnumber, key, sample_stats_dir, time.clock() - tstart)
         else:
             raise KeyError, ii
-
 
 def Mij(modelnumber):
     

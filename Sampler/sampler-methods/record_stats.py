@@ -1,13 +1,27 @@
 import os
 import pickle as pk
 
-def log_stats(modelnumber, key, loc, ttotal=None):
+def log_stats(modelnumber, flag, loc, ttotal=None):
+    """ Integration flags:
+
+    int SHORT = -50;          // Inflation too short
+    int KEXIT = -49;          // Unable to find Fourier mode
+    int FEOI = -48;           // Integration failure in feoi
+    int BACK = -47;           // Integration failure in background
+    int VIOLATED = -46;       // Field space position violates model
+    int ETERNAL = -45;        // Unable to find end of inflation
+    int TIMEOUT = -44;        // Integration time exceeded
+
+    """
     
     # Build log path for pk file
     log_path = os.path.join(loc, "{}.stats".format(modelnumber))
     
-    # Define possible keys for dict
-    keys = ['short', 'kexit', 'feoi', 'back', "violated", "eternal", "end"]
+    
+    flags = [-50, -49, -48, -47, -46, -45, -44]
+    keys = ['short', 'kexit', 'feoi', 'back', "violated", "eternal", "timeout", "end"]
+    
+    key = keys[flags.index(flag)] # Get dict key from flag
     
     # Assert that key is valid option, i.e. custom keys should not be passed!
     assert key in keys, "Key not vailid for log file: {}".format(key)

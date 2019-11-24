@@ -112,13 +112,14 @@ def compileName(name, NC=False):
     location = os.path.join(dir, 'PyTrans')
     filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
 
-    # There should exist a temporary file fom the calling 'potential'
-    curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
-    assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
-
-    # Rename temporary curvature file with compilation name!
-    new_curv_path = curv_path.replace('TEMP', name)
-    os.rename(curv_path, new_curv_path)
+    if NC is True:
+        # There should exist a temporary file fom the calling 'potential'
+        curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
+        assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
+    
+        # Rename temporary curvature file with compilation name!
+        new_curv_path = curv_path.replace('TEMP', name)
+        os.rename(curv_path, new_curv_path)
 
     f = open(filename1, "r")
     lines = f.readlines()

@@ -576,25 +576,35 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
     return KE
 
 
-def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3, tols=np.array([1e-10, 1e-10])):
+def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
+                       tols=np.array([1e-10, 1e-10]), tmax_bg=-1):
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
+
+    """
+    Integrator flag defs.
+
+    int SHORT = -50;          // Inflation too short
+    int KEXIT = -49;          // Unable to find Fourier mode
+    int FEOI = -48;           // Integration failure in feoi
+    int BACK = -47;           // Integration failure in background
+    int VIOLATED = -46;       // Field space position violates model
+    int ETERNAL = -45;        // Unable to find end of inflation
+    int TIMEOUT = -44;        // Integration time exceeded
+    """
     
     # Get fiducial end of inflation, i.e. when epsilon=1
-    Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000)
+    Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000, tmax_bg)
     
-    # If integration failure, return None
-    if type(Nepsilon) == type('S32'):
-        return "feoi"
-    elif Nepsilon is None:
-        return "eternal"
-    else: pass
+    if Nepsilon in [-48, -45, -44]:
+        return Nepsilon
     
     # Define initial efolding range and compute background
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
-    BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True)
-    if type(BG_epsilon) != np.ndarray:
-        return "back"
+    BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
+    
+    if BG_epsilon in [-47, -44]:
+        return BG_epsilon
     
     idx_epsilon = len(BG_epsilon)
     
@@ -605,8 +615,6 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3, t
     tols = np.array([1e-12, 1e-12])  # Adapt to higher precision
     while c < n_iter:
         
-        print c
-        
         # Define new initial conditions to be the field data at the previous background segment
         N_init = extensions[-1][-1][0]
         bg_init = extensions[-1][-1][1:]
@@ -616,20 +624,15 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3, t
         bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False)
         
         # If we fail to compute the backgroud, break out of iterative cycle
-        if type(bg_ext) != np.ndarray:
+        if bg_ext in [-47, -44]:
             break
         
         # Otherwise add segment to the list of background data
         extensions.append(bg_ext[1:])
         
         c += 1
-        
-    print extensions[-1].T[0][-1] - BG_epsilon.T[0][-1]
     
     if len(extensions) == 1:
-        
-        # print "No Extension", BG_epsilon[-1][0]
-        
         return BG_epsilon, Nepsilon
     
     else:
