@@ -59,8 +59,6 @@ def log_stats(modelnumber, flag, loc, ttotal=None):
         log["end"] = tot + 1 # Final number of iterations required to obtain successful sample
         log["time"] = ttotal
         
-        print log
-        
     else: pass
     
     # Write new dictionary

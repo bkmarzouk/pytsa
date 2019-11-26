@@ -17,6 +17,55 @@ def load_obs(pk_path):
     with f: obs = pk.load(f)
     return obs
 
+def bg_summary():
+    
+    # Get log directory
+    sample_stats_dir = os.environ['PyTS_logpath']
+    
+    # Build paths to pickled minor stats
+    stat_paths = [os.path.join(sample_stats_dir, item) for item in os.listdir(sample_stats_dir)]
+    
+    # Set counters dictionary (will sum minor stats)
+    counters = {'short': 0, 'kexit': 0, 'feoi': 0, 'back': 0,
+                "violated": 0, "eternal": 0, "timeout": 0, "time": 0, "end": 0, "samples": len(stat_paths)}
+    
+    print "\n-- Writing background statistics\n"
+    
+    for sp in stat_paths:
+    
+        # unload binary file
+        f = open(sp, "rb")
+        with f:
+            stats = pk.load(f)
+        
+        # add corresponding dictionary keys
+        for key in stats:
+            counters[key] += stats[key]
+            
+    stats_file = open(os.path.join(sample_stats_dir, "summary.txt"), "w")
+    
+    error    = "-- Rejections summary:\n"
+    short    = "Insufficient inflation:                {}\n".format(counters['short'])
+    kexit    = "Failed to compute kExit:               {}\n".format(counters['kexit'])
+    feoi     = "Integration error, findEndOfInflation: {}\n".format(counters['feoi'])
+    back     = "Integration error, backEvolve:         {}\n".format(counters['back'])
+    violated = "Model violation:                       {}\n".format(counters['violated'])
+    timeout  = "Integration timout:                    {}\n".format(counters['timeout'])
+    rejects  = "Total rejected samples:                {}\n\n".format(counters['end'] - counters['samples'])
+    
+    success  = "-- Ensemble overview:\n"
+    p_N      = "Probability of inflation:              {}\n".format(float(counters['samples']) / float(counters['end']))
+    ttotal   = "Total time to build ensemble:          {} seconds\n".format(float(counters['time']))
+    taverage = "Av. time to obtain successful sample:  {}\n".format(float(counters['time']/ float(counters['samples'])))
+    
+    lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, p_N, ttotal, taverage]
+    
+    with stats_file as f:
+        for line in lines:
+            f.write(line)
+    
+    
+
 def update_samples(modelnumber):
 
     # Load sample

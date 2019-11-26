@@ -10,12 +10,6 @@ import pickle as pk
 import time
 import warnings
 
-# Import timeout function and relevent timeout limits for PyT tasks
-# TODO: IMPLEMENT THESE, e.g. parsed cmd line args
-# tmax_bg = os.environ['tmax_bg']
-# tmax_2pf = os.environ['tmax_2pf']
-# tmax_3pf = os.environ['tmax_3pf']
-
 rootpath = os.environ['PyTSamplerRoot']
 path_2pf = os.path.join(rootpath, "2pf")
 path_3pf = os.path.join(rootpath, "3pf")
@@ -121,7 +115,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Integration fails / eternal
         if type(Nend) is int and Nend in [-48, -45, -44]:
-            print "LINE 124"
+            print "line 118", Nend
             return Nend
         
         # Attempt computation of background
@@ -131,7 +125,7 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) is int and back in [-47, -44]:
-                print "LINE 134"
+                print "line 128", Nend
                 return Nend
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
@@ -200,10 +194,11 @@ def Initialize(modelnumber, rerun_model=False):
                     raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if Nend in [-46, -45] or Nend < minN:
-        if Nend < minN:
-            return -50
+    if Nend in [-46, -45]:
         return Nend
+    
+    if Nend < minN:
+        return -50
 
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
@@ -265,6 +260,8 @@ def Initialize(modelnumber, rerun_model=False):
         
         # Compute mass-matrix evolution from this point
         Mij_end = PyS.MijEvolve(back[Nadiabatic_start:], pvals, PyT)
+
+        print Mij_end
 
         # For each mass-matrix evolution step
         for item in Mij_end:
@@ -403,17 +400,23 @@ def Mij(modelnumber):
 
         # Define efold range to "smooth" over
         Nsmooth = [Nevo[idx] for idx in Nstar_idx]
+        
+        # BY default, we choose a cubic spline, but if this is not possible, we reduce the order
+        if len(Nstar_idx) <= 3:
+            k = len(Nstar_idx) - 1
+        else:
+            k = 3
 
         # Construct splines for the field evolution over Nsmooth
         fsplines = [
             UnivariateSpline(
-                Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1, 1 + nF)
+                Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=k) for i in range(1, 1 + nF)
         ]
         
         # Construct splines for the velocity evolution over Nsmooth
         vsplines = [
             UnivariateSpline(
-                Nsmooth, [backT[i][idx] for idx in Nstar_idx]) for i in range(1 + nF, 1 + 2 * nF)
+                Nsmooth, [backT[i][idx] for idx in Nstar_idx], k=k) for i in range(1 + nF, 1 + 2 * nF)
         ]
 
         # Evaluate the background at N_star = Nend - Nexit

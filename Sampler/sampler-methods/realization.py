@@ -66,8 +66,6 @@ class realization:
     def save_init(self, overwrite=False):
         """"""
         
-        print "Overwrite: ", overwrite
-        
         """ If overwrite is True, we remove the existing model data and rewrite the file """
         if overwrite is True:
             assert os.path.exists(self.savepath), "Sample does not exist: {}".format(self.savepath)

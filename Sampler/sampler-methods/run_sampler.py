@@ -125,6 +125,9 @@ def main(pool, use_existing_samples, rerun_samples):
         sample_range = range(nsamples)
         pool.map(pytm.DemandSample, sample_range)
 
+    # write summary stats for background
+    w.bg_summary()
+
     # Generate task pool from specs. in configuration file
     taskpool = []
     
@@ -155,8 +158,9 @@ def main(pool, use_existing_samples, rerun_samples):
     pool.close()
 
     # Write results file(s)
-    print "\n-- Writing result files\n"
-    w.write_results(nF)
+    if sum([compute_2pf, compute_3pf, compute_Mij])!=0:
+        print "\n-- Writing result files\n"
+        w.write_results(nF)
     print "\n-- All Complete.\n"
 
 
