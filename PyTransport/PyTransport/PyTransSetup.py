@@ -33,6 +33,7 @@ import pickle as pk
 # import PyNStein
 import gravtools_pyt
 
+
 def directory(NC):
     dir = os.path.dirname(__file__)
     filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
@@ -40,17 +41,17 @@ def directory(NC):
     lines = f.readlines()
     f.close()
     f = open(filename, "w")
-
+    
     # Create directory to hold records of curvature objects;
     # We will compute inverse metrics in sympy notation which then can
     # quickly generate christoffel symbols and riemann tensors relevant for mass matrix computations
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-
+    
     if not os.path.exists(curv_dir):
         print "Building curvature directory"
         os.makedirs(curv_dir)
-
-    if NC == False:
+    
+    if NC is False:
         for line in lines:
             if not line.endswith("//evolve\n") and not line.endswith("//moments\n") and not line.endswith(
                     "//model\n") and not line.endswith("//stepper\n"):
@@ -90,7 +91,7 @@ def directory(NC):
 def pathSet():
     dir = os.path.dirname(__file__)
     site.addsitedir(dir)
-
+    
     p = platform.system()
     if p is 'Windows':
         site.addsitedir(os.path.join(dir, 'PyTrans', 'Python', 'site-packages'))
@@ -102,7 +103,7 @@ def pathSet():
         site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'python', 'site-packages'))
         site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'python' + sys.version[:3], 'site-packages'))
         site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'site-python'))
-
+    
     site.addsitedir(os.path.join(dir, 'PyTransScripts'))
 
 
@@ -111,16 +112,16 @@ def compileName(name, NC=False):
     dir = os.path.dirname(__file__)
     location = os.path.join(dir, 'PyTrans')
     filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
-
+    
     if NC is True:
         # There should exist a temporary file fom the calling 'potential'
         curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
         assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
-    
+        
         # Rename temporary curvature file with compilation name!
         new_curv_path = curv_path.replace('TEMP', name)
         os.rename(curv_path, new_curv_path)
-
+    
     f = open(filename1, "r")
     lines = f.readlines()
     f.close()
@@ -148,17 +149,17 @@ def compileName(name, NC=False):
         if line.endswith("//initFunc\n"):
             f.write(
                 'void initPyTrans' + name + '(void)    {        Py_InitModule3("PyTrans' + name + '", PyTrans' + name + '_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc\n')
-
+    
     f.close()
-
+    
     my_env = os.environ.copy()
     my_env["PYTHONUSERBASE"] = location
     p = subprocess.Popen(["python", filename1, "install", "--user"], cwd=location, stdin=subprocess.PIPE,
                          stderr=subprocess.PIPE, env=my_env)
     stdout, stderr = p.communicate()
-
+    
     pathSet()
-
+    
     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
 
 
@@ -178,7 +179,7 @@ def compileName3(name, NC=False):
             f.write(
                 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup\n')
     f.close()
-
+    
     filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
     f = open(filename, "r")
     lines = f.readlines()
@@ -190,24 +191,24 @@ def compileName3(name, NC=False):
         if line.endswith("//FuncDef\n"):
             f.write(
                 'static PyMethodDef PyTrans' + name + '_methods[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs},  {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},   {NULL, NULL, 0, NULL}};//FuncDef\n')
-
+        
         if line.endswith("//modDef\n"):
             f.write(
                 'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTrans' + name + '", PyTrans_docs, -1, PyTrans' + name + '_methods}; //modDef\n')
-
+        
         if line.endswith("//initFunc\n"):
             f.write(
                 'PyMODINIT_FUNC PyInit_PyTrans' + name + '(void)    {    PyObject *m = PyModule_Create(&PyTransModule); import_array(); return m;} //initFunc\n')
     f.close()
-
+    
     my_env = os.environ.copy()
     my_env["PYTHONUSERBASE"] = location
     p = subprocess.Popen(["python", filename1, "install", "--user"], cwd=location, stdin=subprocess.PIPE,
                          stderr=subprocess.PIPE, env=my_env)
     stdout, stderr = p.communicate()
-
+    
     pathSet()
-
+    
     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
 
 
@@ -229,50 +230,50 @@ def tol(rtol, atol):
 def potential(V, nF, nP, simple=False, G="canonical", silent=True):
     f = sym.symarray('f', nF)
     p = sym.symarray('p', nP)
-
+    
     vd = sym.symarray('vd', nF)
     vdd = sym.symarray('vdd', nF * nF)
     vddd = sym.symarray('vddd', nF * nF * nF)
-
+    
     # Ensure directory for symbolic curvature files exists
     dir = os.path.dirname(__file__)
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
     if not os.path.exists(curv_dir):
         os.makedirs(curv_dir)
-
+    
     # Make a temporary name for the curvature file (will be renamed by in compile process)
     curv_tmp = os.path.join(curv_dir, "TEMP.curvature")
     if not silent:
         timer = time.clock()
         print '[{time}] constructing curvature class instance'.format(time=time.ctime())
-
+    
     # curv_instance = curvature.Curvature(G, f, p, precompute=True)
     curv_instance = gravtools_pyt.Curvature(G, f, p, precompute=True)
     if not silent:
-        print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock()-timer)
-
+        print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
+    
     curv_file = open(curv_tmp, 'w')
     with curv_file as cf:
         pk.dump(curv_instance, cf)
-
+    
     if not silent:
         timer = time.clock()
         print '[{time}] computing symbolic potential derivatives'.format(time=time.ctime())
-
+    
     if G != 0 and G != "canonical":
-
+        
         if not silent:
             timer2 = time.clock()
             print '[{time}] computing curvature quantities'.format(time=time.ctime())
-
+        
         # dir = os.path.dirname(__file__)
         # curv_name = os.path.join(dir, 'PyTrans', '{}.curv'.format(name))
-
+        
         g, Ga, Ri, Rm = fieldmetric(G, nF, nP, simple=simple, silent=silent)
-
+        
         if not silent:
             print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer2)
-
+        
         FMP = 0
         for i in range(nF):
             if simple == True:
@@ -288,7 +289,7 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
                 else:
                     vdd[i + j * nF] = V.diff(f[i]).diff(f[j]) - FMP
                 FMP = 0
-
+        
         for i in range(nF):
             for j in range(nF):
                 for k in range(nF):
@@ -318,32 +319,32 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
                         vddd[i + j * nF + k * nF * nF] = sym.simplify(V.diff(f[i]).diff(f[j]).diff(f[k]))
                     else:
                         vddd[i + j * nF + k * nF * nF] = V.diff(f[i]).diff(f[j]).diff(f[k])
-
+    
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
-
+    
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'potentialProto.h')
     filename2 = os.path.join(dir, 'CppTrans', 'potential.h')
     f = open(filename1, 'r')
     g = open(filename2, 'w')
-
+    
     if not silent:
         timer = time.clock()
         print '[{time}] writing to potential.h'.format(time=time.ctime())
-
+    
     for line in f:
-
+        
         g.write(line)
-
+        
         if line == "// #Rewrite\n":
             g.write('// Potential file rewriten at' + ' ' + time.strftime("%c") + '\n')
-
+        
         if line == "// #FP\n":
             g.write('nF=' + str(nF) + ';\n' + 'nP=' + str(nP) + ';\n')
-
+        
         if line == "// Pot\n":
-
+            
             # extract common subexpressions from V
             if not silent:
                 timer_cse = time.clock()
@@ -351,72 +352,72 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
             decls, new_expr = sym.cse(V, order='none')
             if not silent:
                 print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
-
+            
             # emit main expression
             emit_expr = sym.printing.cxxcode(new_expr[0])
             rw_expr = rewrite_indices(emit_expr, nF, nP)
             g.write('  sum=' + str(rw_expr) + ';\n')
-
+        
         if line == "// dPot\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '[{time}] performing CSE for dV'.format(time=time.ctime())
             decls, new_exprs = sym.cse(vd, order='none')
             if not silent:
                 print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
-
+            
             for i in range(nF):
                 emit_expr = sym.printing.cxxcode(new_exprs[i])
                 rw_expr = rewrite_indices(emit_expr, nF, nP)
                 g.write('\n sum[' + str(i) + ']=' + str(rw_expr) + ';\n')
-
+        
         if line == "// ddPot\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '[{time}] performing CSE for ddV'.format(time=time.ctime())
             decls, new_exprs = sym.cse(vdd, order='none')
             if not silent:
                 print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
-
+            
             for i in range(nF):
                 for j in range(nF):
                     emit_expr = sym.printing.cxxcode(new_exprs[i + nF * j])
                     rw_expr = rewrite_indices(emit_expr, nF, nP)
                     g.write('\n sum[' + str(i + nF * j) + ']=' + str(rw_expr) + ';\n')
-
+        
         if line == "// dddPot\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '[{time}] performing CSE for dddV'.format(time=time.ctime())
             decls, new_exprs = sym.cse(vddd, order='none')
             if not silent:
                 print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
-
+            
             for i in range(nF):
                 for j in range(nF):
                     for k in range(nF):
                         emit_expr = sym.printing.cxxcode(new_exprs[i + nF * j + nF * nF * k])
                         rw_expr = rewrite_indices(emit_expr, nF, nP)
                         g.write('\n sum[' + str(i + nF * j + nF * nF * k) + ']=' + str(rw_expr) + ';\n')
-
+    
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
-
+    
     g.close()
     f.close()
 
@@ -432,37 +433,37 @@ def write_cse_decls(decls, g, nF, nP):
 
 def rewrite_indices(expr, nF, nP):
     new_expr = expr
-
+    
     for l in range(max(nP, nF)):
         l = max(nP, nF) - 1 - l
         new_expr = new_expr.replace("_" + str(l), "[" + str(l) + "]")
-
+    
     return new_expr
 
 
 def fieldmetric(G, nF, nP, simple=False, silent=True):
     f = sym.symarray('f', nF)
     p = sym.symarray('p', nP)
-
+    
     COR = Coordinates('\chi', f)
     g = MetricTensor('g', COR, G)
     Ga = Christoffel('Ga', g)
     Ri = Ricci('Ri', g)
     Rm = Riemann('Rm', g)
-
+    
     import os
-
+    
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'fieldmetricProto.h')
     filename2 = os.path.join(dir, 'CppTrans', 'fieldmetric.h')
     e = open(filename1, 'r')
     h = open(filename2, 'w')
-
+    
     G_array = sym.symarray('G', 2 * nF * 2 * nF)
     Gamma_array = sym.symarray('Gamma', 2 * nF * 2 * nF * 2 * nF)
     R_array = sym.symarray('Riemann', nF * nF * nF * nF)
     gradR_array = sym.symarray('gradRiemann', nF * nF * nF * nF * nF)
-
+    
     # populate Riemann matrix
     for i in range(2 * nF):
         for j in range(2 * nF):
@@ -474,12 +475,12 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                 jj = -j - 1
             else:
                 jj = j - (nF - 1)
-
+            
             if simple is True:
                 G_array[(2 * nF) * i + j] = sym.simplify(g(ii, jj))
             else:
                 G_array[(2 * nF) * i + j] = g(ii, jj)
-
+    
     # populate connexion matrix
     for i in range(2 * nF):
         for j in range(2 * nF):
@@ -496,7 +497,7 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                     kk = -k - 1
                 else:
                     kk = k - (nF - 1)
-
+                
                 if kk < 0 or jj < 0 or ii > 0:
                     Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
                 else:
@@ -504,7 +505,7 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                         Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(Ga(ii, jj, kk))
                     else:
                         Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(ii, jj, kk)
-
+    
     # populate Riemann matrix
     for i in range(nF):
         for j in range(nF):
@@ -514,13 +515,13 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                     jj = j + 1
                     kk = k + 1
                     ll = l + 1
-
+                    
                     if simple is True:
                         R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = sym.simplify(
                             Rm(ii, jj, kk, ll))
                     else:
                         R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm(ii, jj, kk, ll)
-
+    
     # populate covariant-derivative of Riemann matrix
     for i in range(nF):
         for j in range(nF):
@@ -532,51 +533,51 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                         kk = k + 1
                         ll = l + 1
                         mm = m + 1
-
+                        
                         if simple is True:
                             gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
                                 nF) * l + m] = sym.simplify(Rm.covariantD(ii, jj, kk, ll, mm))
                         else:
                             gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
                                 nF) * l + m] = Rm.covariantD(ii, jj, kk, ll, mm)
-
+    
     for line in e:
         h.write(line)
         if line == "// #FP\n":
             # h.write('nF='+str(nF)+';\n')
             h.write('nF=' + str(nF) + ';\n' + 'nP=' + str(nP) + ';\n')
-
+        
         if line == "// metric\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '    [{time}] performing CSE for field metric'.format(time=time.ctime())
             decls, new_expr = sym.cse(G_array, order='none')
             if not silent:
                 print '    [{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
-
+            
             for i in range(2 * nF):
                 for j in range(2 * nF):
                     # emit main expression
                     emit_expr = sym.printing.cxxcode(new_expr[(2 * nF) * i + j])
                     rw_expr = rewrite_indices(emit_expr, nF, nP)
                     h.write('\n FM[' + str((2 * nF) * i + j) + ']=' + str(rw_expr) + ';\n')
-
+        
         if line == "// Christoffel\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '    [{time}] performing CSE for Christoffel symbols'.format(time=time.ctime())
             decls, new_expr = sym.cse(Gamma_array, order='none')
             if not silent:
                 print '    [{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
-
+            
             for i in range(2 * nF):
                 for j in range(2 * nF):
                     for k in range(2 * nF):
@@ -585,19 +586,19 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                         rw_expr = rewrite_indices(emit_expr, nF, nP)
                         h.write(
                             '\n CS[' + str((2 * nF) * (2 * nF) * i + (2 * nF) * j + k) + ']=' + str(rw_expr) + ';\n')
-
+        
         if line == "// Riemann\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '    [{time}] performing CSE for Riemann tensor'.format(time=time.ctime())
             decls, new_expr = sym.cse(R_array, order='none')
             if not silent:
                 print '    [{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
-
+            
             for i in range(nF):
                 for j in range(nF):
                     for k in range(nF):
@@ -609,19 +610,19 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                             h.write(
                                 '\n RM[' + str((nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l) + ']=' + str(
                                     rw_expr) + ';\n')
-
+        
         if line == "// Riemanncd\n":
-
+            
             if not silent:
                 timer_cse = time.clock()
                 print '    [{time}] performing CSE for Riemann tensor'.format(time=time.ctime())
             decls, new_expr = sym.cse(gradR_array, order='none')
             if not silent:
                 print '    [{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer_cse)
-
+            
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
-
+            
             for i in range(nF):
                 for j in range(nF):
                     for k in range(nF):
@@ -635,8 +636,8 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                                 h.write('\n RMcd[' + str(
                                     (nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
                                         nF) * l + m) + ']=' + str(rw_expr) + ';\n')
-
+    
     h.close()
     e.close()
-
+    
     return g, Ga, Ri, Rm

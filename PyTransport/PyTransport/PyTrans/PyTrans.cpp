@@ -20,9 +20,9 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/evolve.h"//evolve
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/moments.h"//moments
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/model.h"//model
+#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/evolve.h"//evolve
+#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/moments.h"//moments
+#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/model.h"//model
 #include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Sun Nov 24 12:59:06 2019
+// Package recompile attempted at: Tue Nov 26 14:10:01 2019
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -173,45 +173,38 @@ static PyObject* MT_paramNumber(PyObject* self,  PyObject *args)
     return Py_BuildValue("i",mm.getnP());
 }
 
-// TODO: find end of inflation within adaptive search window
-
 // detect end of inflation within a suitable search window
 static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 {
-    // TODO: Look at test.cpp for skeleton of how to timeout iterative procs. Implement here
+    // initialize python array objects: initial conditions, parameters & tols
     PyArrayObject* initialCs;
     PyArrayObject* params;
     PyArrayObject* tols;
+
+    // Set Nstart, max number of efoldings for search window and max integration times
     double Ninit = 0.0;         // value of N corresponding to initial conditions
     double DeltaN = 3000.0;     // default number of e-folds to search through
-    double tmax_feoi = -1;      // interpret negative as no max integration time
+    double tmax_feoi = -1;      // max integration time, tmax_feoi < 0 => no limit
 
-    // Flag return + data value without communicating array? - > Negate efold value, -1=flag, abs(val)=val
 
     // Setup integration flags
-    // int SHORT = -50;       // Inflation too short
-    // int KEXIT = -49;       // Unable to find Fourier mode
-    int FEOI = -48;           // Integration failure in feoi
-    // int BACK = -47;        // Integration failure in background
-    // int VIOLATED = -46;    // Field space position violates model
+    int FEOI    = -48;        // Integration failure in feoi
     int ETERNAL = -45;        // Unable to find end of inflation
     int TIMEOUT = -44;        // Integration time exceeded
 
-    // parse arguments; final argument is optional
-    // O! stores python object in c pointer, but is subsequently followed by address of the python type object
-    // then followed by the address of the C variable that is being utilized
-    // d stores float types
-    // | indicates that remaining args are optional
-    // Read the following docs: https://docs.python.org/3/c-api/arg.html
+    // parse arguments; args after | are optional (https://docs.python.org/3/c-api/arg.html)
     if(!PyArg_ParseTuple(args, "O!O!O!d|dd", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
-                         &Ninit, &DeltaN, &tmax_feoi))// Added tmax for find end of inflation iterative proc.
-      return NULL;
+                         &Ninit, &DeltaN, &tmax_feoi))
+                         {
+                            return NULL;
+                         }
 
     // convert requested tolerances to a C array and extract absolute & relative error targets
     double* tolsC = pyvector_to_Carray(tols);
-
     double abserr = 1E-8;
     double relerr = 1E-8;
+
+    // check input tols are formatted correctly, revert to default if required
     if(size_pyvector(tols) != 2)
       {
         cout << "\n \n \n incorrect tolerances input, using defaults \n \n \n";
@@ -328,24 +321,13 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 // function to calculate background evolution
 static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 {
-
-    // Setup integration flags
-    // int SHORT = -50;          // Inflation too short
-    // int KEXIT = -49;          // Unable to find Fourier mode
-    // int FEOI = -48;              // Integration failure in feoi
-    // int BACK = -47;           // Integration failure in background
-    // int VIOLATED = -46;       // Field space position violates model
-    // int ETERNAL = -45;           // Unable to find end of inflation
-    // int TIMEOUT = -44;        // Integration time exceeded
-
     PyArrayObject *initialCs, *t, *backOut,*backOutT, *params, *tols;
     double *CinitialCs, *tc, *Cparams, *tolsC ;
     bool exit;
     double tmax_back = -1;
+    int TIMEOUT = -44;        // Integration time exceeded
 
-    // Add additional optional arg s.t. we can time out background computations
-    if (!PyArg_ParseTuple(args, "O!O!O!O!b|dd",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
-            &PyArray_Type, &tols, &exit, &tmax_back)) {
+    if (!PyArg_ParseTuple(args, "O!O!O!O!b|d",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols, &exit, &tmax_back)) {
         return NULL;}
 
     tolsC = pyvector_to_Carray(tols);
@@ -359,24 +341,19 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     CinitialCs = pyvector_to_Carray(initialCs);
     tc = pyvector_to_Carray(t);
     model mm;
-    int nF=mm.getnF()
-    if (2*nF!=size_pyvector(initialCs)){
-        cout<< "\n \n \n field space array not of correct length \n \n \n";
-        Py_RETURN_NONE;
+    int nF=mm.getnF(); if (2*nF!=size_pyvector(initialCs)){cout<< "\n \n \n field space array not of correct length \n \n \n";    Py_RETURN_NONE;
     }
+
+
 
     double N=tc[0];
     vector<double> vectIn;
     vectIn = vector<double>(CinitialCs, CinitialCs + 2*nF);
     back b(nF, vectIn);
 
-    int nP = mm.getnP();
-    if (nP!=size_pyvector(params)){
-        cout<< "\n \n \n parameters array not of correct length \n \n \n";
-        Py_RETURN_NONE;
-    }
-
+       int nP = mm.getnP(); if (nP!=size_pyvector(params)){cout<< "\n \n \n parameters array not of correct length \n \n \n";  Py_RETURN_NONE;}
     Cparams = pyvector_to_Carray(params);
+
 
     int flag=-1;
     double *y; y = new double[2*nF];
@@ -384,9 +361,14 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 
     for (int i=0;i<2*nF;i++){y[i] = CinitialCs[i];}
 
+    // define time objects
+    double deltat;
+    time_t t_ini, t_fin;
+
+    // record start time
+    time(&t_ini);
 
     if (exit == false){
-
         int nt = t->dimensions[0];
 
         npy_intp dims[2];
@@ -396,55 +378,34 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
         backOutC = (double *) PyArray_DATA(backOut);
         evolveB(N, y, yp, Cparams);
 
-
-        // Initialize time difference (will measure exec. time)
-        double deltat;
-
-        // Build time instances
-        time_t t_ini, t_fin;
-
-        // Record current time before proc.
-        time(&t_ini);
-
-        // Run background
+        // run background *********************
         for(int ii=0; ii<nt; ii++ ){
-
-            // clock time at start of loop
-            time(&t_fin);
-
-            // measure time elapsed since first time instance
-            deltat = difftime(t_fin,t_ini);
-
-            // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
-
-            if((deltat > tmax_back) && (tmax_back>0)){
-
-                // Flag timeout
-                cout << "\nIntegrator timeout (back): " << deltat << "\n";
-                delete[] y;
-                delete[] dy;
-                return Py_BuildValue("i", TIMEOUT); // Report final efolding
-            }
-
             while (N<tc[ii]){
+
+                // record time at start of integration step
+                time(&t_fin);
+
+                // measure time elapsed since first time instance
+                deltat = difftime(t_fin,t_ini);
+
+                // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
+                if((deltat > tmax_back) && (tmax_back>0))
+                    {
+                        cout << "\nIntegrator timeout (back): " << deltat << "\n";
+                        delete[] y;
+                        delete[] yp;
+                        return Py_BuildValue("i", TIMEOUT);
+                    }
+
                 flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
-
-                // If flag 50: Integration failure, return efolding at failure.
-                if (flag== 50){
-                    return Py_BuildValue("i", BACK); // integration failure
-                }
-
+                if (flag== 50){return Py_BuildValue("d", N);}
                 flag=-2;
             }
-
             backOutC[ii*(2*nF+1)]=N;
             for(int i=0;i< 2*nF;i++){
                 backOutC[ii*(2*nF+1)+i+1]=y[i];} // output array
         }
     }
-
-    // Record current time before proc.
-    time(&t_ini);
 
     if (exit == true){
         int nt = t->dimensions[0];
@@ -456,40 +417,30 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
         backOutT = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
         backOutCT = (double *) PyArray_DATA(backOutT);
         evolveB(N, y, yp, Cparams);
-
-        // clock time at start of loop
-        time(&t_fin);
-
-        // measure time elapsed since first time instance
-        deltat = difftime(t_fin,t_ini);
-
-        // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
-        if((deltat > tmax_back) && (tmax_back>0))
-            {
-                // Negate efold at timout, acts as flag for timeout error
-                cout << "\nIntegrator timeout (back): " << deltat << "\n";
-                delete[] y;
-                delete[] dy;
-                return Py_BuildValue("i", TIMEOUT); // Return back background fail flag
-            }
-
-        // Run background
+        // run background *********************
         {int ii =0;double eps=0.0;
-        while (eps<1 && ii<nt){ // While epsilon < 1 and ii < iteration count
-            while (N<tc[ii]){  // While current efolding is less than background Nmax target
+        while (eps<1 && ii<nt){
+            while (N<tc[ii]){
 
-                // evolve and check integrator flag
+                // record time at start of integration step
+                time(&t_fin);
+
+                // measure time elapsed since first time instance
+                deltat = difftime(t_fin,t_ini);
+
+                // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
+                if((deltat > tmax_back) && (tmax_back>0))
+                    {
+                        cout << "\nIntegrator timeout (back): " << deltat << "\n";
+                        delete[] y;
+                        delete[] yp;
+                        return Py_BuildValue("i", TIMEOUT);
+                    }
+
                 flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
-
-                // if flag 50: integration failure, return current efolding at termination
-                if (flag== 50){
-                    return Py_BuildValue("i", BACK); // Integrator failure
-                }
-
+                if (flag== 50){return Py_BuildValue("d", N);}
                 flag=-2;
             }
-
-            // Update background (N, fields, dot fields) at current step
             backOutCT[ii*(2*nF+1)]=N;
             for(int i=0;i< 2*nF;i++){
                 backOutCT[ii*(2*nF+1)+i+1]=y[i];} // outputs to file at each step
@@ -499,7 +450,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
             eps = mm.Ep(vecy,Vparams);
         ii = ii+1;
         }
-            // cout << ii <<endl;
+            cout << ii <<endl;
         npy_intp dims2[2];
         dims2[1]=1+2*nF; dims2[0]=ii;
         double * backOutC;
