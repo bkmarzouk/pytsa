@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Tue Nov 26 14:10:01 2019
+// Package recompile attempted at: Tue Nov 26 14:54:56 2019
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -290,6 +290,8 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
         // detect some error conditions
         if(flag == 50)
           {
+            delete[] y;
+            delete[] dy;
             return Py_BuildValue("i", FEOI); // FEOI FLAG
           }
 
@@ -325,7 +327,8 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     double *CinitialCs, *tc, *Cparams, *tolsC ;
     bool exit;
     double tmax_back = -1;
-    int TIMEOUT = -44;        // Integration time exceeded
+    int TIMEOUT = -44;        // integration timeout flag
+    int BACK = -47; // backgroudn integration fail flag
 
     if (!PyArg_ParseTuple(args, "O!O!O!O!b|d",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols, &exit, &tmax_back)) {
         return NULL;}
@@ -398,7 +401,11 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                     }
 
                 flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
-                if (flag== 50){return Py_BuildValue("d", N);}
+                if (flag== 50){
+                    delete[] y;
+                    delete[] yp;
+                    return Py_BuildValue("i", BACK);
+                    }
                 flag=-2;
             }
             backOutC[ii*(2*nF+1)]=N;
@@ -438,7 +445,11 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                     }
 
                 flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
-                if (flag== 50){return Py_BuildValue("d", N);}
+                if (flag== 50){
+                    delete[] y;
+                    delete[] yp;
+                    return Py_BuildValue("i", BACK);
+                    }
                 flag=-2;
             }
             backOutCT[ii*(2*nF+1)]=N;
@@ -735,7 +746,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTrans3Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans5Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -747,7 +758,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTrans3Quad(void)    {        Py_InitModule3("PyTrans3Quad", PyTrans3Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans5Quad(void)    {        Py_InitModule3("PyTrans5Quad", PyTrans5Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

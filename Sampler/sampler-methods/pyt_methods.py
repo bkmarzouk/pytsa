@@ -120,7 +120,8 @@ def Initialize(modelnumber, rerun_model=False):
         Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg)
 
         # Integration fails / eternal
-        if Nend in [-48, -45, -44]:
+        if type(Nend) is int and Nend in [-48, -45, -44]:
+            print "LINE 124"
             return Nend
         
         # Attempt computation of background
@@ -129,7 +130,8 @@ def Initialize(modelnumber, rerun_model=False):
                                   initial, pvals, tols, False, tmax_bg)
             
             # If not numpy array, background computation failed
-            if back in [-47, -44]:
+            if type(back) is int and back in [-47, -44]:
+                print "LINE 134"
                 return Nend
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
@@ -287,6 +289,8 @@ def Initialize(modelnumber, rerun_model=False):
                 back, adiabatic, Nend, kExit, smp_path, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
+    
+    assert type(modelnumber) == int, modelnumber
 
     # Return model number, acts as flag to confirm successful sample
     return modelnumber
