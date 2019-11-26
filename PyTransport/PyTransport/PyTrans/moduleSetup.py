@@ -38,5 +38,5 @@ filename2 = os.path.join(dir, '../CppTrans/stepper/rkf45.cpp')
 dirs = os.path.join(dir, '../CppTrans/')
 
 # don't edit the comment at the end of the setup line below #######################################
-setup(name="PyTrans5Quad", version="1.0", ext_modules=[Extension("PyTrans5Quad", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup
+setup(name="PyTransagarwal_dmax_6pt0", version="1.0", ext_modules=[Extension("PyTransagarwal_dmax_6pt0", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup
 ###################################################################################################

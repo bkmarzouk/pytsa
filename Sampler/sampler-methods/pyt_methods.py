@@ -138,10 +138,10 @@ def Initialize(modelnumber, rerun_model=False):
     else:
 
         # Compute extended background evolution
-        back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT)
+        back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
 
         # If integration / background failure / eternal model is reported, return this information
-        if back_ext in [-48, -47, -45, -44]:
+        if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1

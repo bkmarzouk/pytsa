@@ -596,14 +596,14 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     # Get fiducial end of inflation, i.e. when epsilon=1
     Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000, tmax_bg)
     
-    if Nepsilon in [-48, -45, -44]:
+    if type(Nepsilon) is int and Nepsilon in [-48, -45, -44]:
         return Nepsilon
     
     # Define initial efolding range and compute background
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
     
-    if BG_epsilon in [-47, -44]:
+    if type(BG_epsilon) is int and BG_epsilon in [-47, -44]:
         return BG_epsilon
     
     idx_epsilon = len(BG_epsilon)
@@ -621,10 +621,10 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         
         # define new efolding range and compute extension to background
         N_space = np.linspace(N_init, N_init + adpt_step, 100)
-        bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False)
+        bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False, tmax_bg)
         
         # If we fail to compute the backgroud, break out of iterative cycle
-        if bg_ext in [-47, -44]:
+        if type(bg_ext) is int and bg_ext in [-47, -44]:
             break
         
         # Otherwise add segment to the list of background data
