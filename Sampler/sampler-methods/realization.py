@@ -54,8 +54,9 @@ class realization:
         for p in pinfo:
             if p['LaTeX'] is not None:
                 pn = p['ParameterNumber']    # Get parameter number
-                pv = self.parameters[pn]     # Get parameter value
-                line['p{}'.format(pn)] = pv  # Add parameter to dictionary
+                if pn != "ALL":
+                    pv = self.parameters[pn]     # Get parameter value
+                    line['p{}'.format(pn)] = pv  # Add parameter to dictionary
 
         """ Add results for observables """
         for o in self.observables:

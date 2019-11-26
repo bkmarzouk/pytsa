@@ -496,7 +496,7 @@ def SpectralIndex(modelnumber):
 
         # Prescribe Nstart and Nend as evaluation times for 2pf run
         Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
-
+        
         # Call sigEvolve to compute power spectra
         twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False).T for NkBack in zip(
             Nevals, kExitrange, ICsEvos
