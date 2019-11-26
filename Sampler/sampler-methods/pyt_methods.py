@@ -115,7 +115,6 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Integration fails / eternal
         if type(Nend) is int and Nend in [-48, -45, -44]:
-            print "line 118", Nend
             return Nend
         
         # Attempt computation of background
@@ -125,8 +124,7 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) is int and back in [-47, -44]:
-                print "line 128", Nend
-                return Nend
+                return back
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
     else:
@@ -394,9 +392,14 @@ def Mij(modelnumber):
     else:
         
         # Get background index values +/- 1 efold around the prescribed exit time
-        idx_above = np.where(np.logical_and(Nevo>Nstar, Nevo<Nstar+1.))[0]
-        idx_below = np.where(np.logical_and(Nevo < Nstar, Nevo > Nstar-1.))[0]
-        Nstar_idx = list(np.concatenate([idx_below, idx_above]))
+        Nfit = 0
+        dN = 0.5
+        while Nfit < 3:
+            dN += 0.5
+            idx_above = np.where(np.logical_and(Nevo>Nstar, Nevo<Nstar+dN))[0]
+            idx_below = np.where(np.logical_and(Nevo < Nstar, Nevo > Nstar-dN))[0]
+            Nstar_idx = list(np.concatenate([idx_below, idx_above]))
+            Nfit = len(Nstar_idx)
 
         # Define efold range to "smooth" over
         Nsmooth = [Nevo[idx] for idx in Nstar_idx]

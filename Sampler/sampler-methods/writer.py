@@ -41,6 +41,9 @@ def bg_summary():
         # add corresponding dictionary keys
         for key in stats:
             counters[key] += stats[key]
+        
+        # remove minor stats data
+        os.remove(sp)
             
     stats_file = open(os.path.join(sample_stats_dir, "summary.txt"), "w")
     
@@ -54,11 +57,13 @@ def bg_summary():
     rejects  = "Total rejected samples:                {}\n\n".format(counters['end'] - counters['samples'])
     
     success  = "-- Ensemble overview:\n"
+    tsa      = "Total number of attempted samples:     {}\n".format(counters['end'])
+    tss      = "Total number of successful samples:    {}\n".format(counters['samples'])
     p_N      = "Probability of inflation:              {}\n".format(float(counters['samples']) / float(counters['end']))
     ttotal   = "Total time to build ensemble:          {} seconds\n".format(float(counters['time']))
     taverage = "Av. time to obtain successful sample:  {}\n".format(float(counters['time']/ float(counters['samples'])))
     
-    lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, p_N, ttotal, taverage]
+    lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, tsa, tss, p_N, ttotal, taverage]
     
     with stats_file as f:
         for line in lines:
@@ -168,8 +173,6 @@ def write_results(nF):
         with f:
             s = pk.load(f)
             d = s.line_dict()
-
-            print s.observables
 
             if len(d) == ncols:
                 if s.adiabatic is True:
