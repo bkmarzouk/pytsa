@@ -31,6 +31,8 @@ def bg_summary():
     
     print "\n-- Writing background statistics\n"
     
+    rej_tot = 0
+    
     for sp in stat_paths:
     
         # unload binary file
@@ -41,6 +43,8 @@ def bg_summary():
         # add corresponding dictionary keys
         for key in stats:
             counters[key] += stats[key]
+            if key not in ["end", "time"]:
+                rej_tot += stats[key]
         
         # remove minor stats data
         os.remove(sp)
@@ -54,7 +58,7 @@ def bg_summary():
     back     = "Integration error, backEvolve:         {}\n".format(counters['back'])
     violated = "Model violation:                       {}\n".format(counters['violated'])
     timeout  = "Integration timout:                    {}\n".format(counters['timeout'])
-    rejects  = "Total rejected samples:                {}\n\n".format(counters['end'] - counters['samples'])
+    rejects  = "Total rejected samples:                {}\n\n".format(rej_tot)
     
     success  = "-- Ensemble overview:\n"
     tsa      = "Total number of attempted samples:     {}\n".format(counters['end'])

@@ -20,7 +20,7 @@ save_location = "default" # If default: outputs will be written to sampler-build
 sampler = {
     "SamplerName": sampler_name,          # Sampler name, should be unique from other sampler installations
     "PyTransportModule": "PyTransagarwal_dmax_6pt0",  # Installed module, e.g. PyTrans2Quad
-    "NSamples": 3,                      # Compute N samples that support minimum number of efolds (see accept crit.)
+    "NSamples": 1,                      # Compute N samples that support minimum number of efolds (see accept crit.)
     "ExitTime": 55,                       # Assign number of efoldings before end of inflation that scales exit horizon
     "SubEvolution": 6,                    # Duration (efoldings) of sub-horizon evolution
     "tols": [1e-8, 1e-8]                  # Integration tolerance
@@ -34,9 +34,9 @@ system = {
 }
 
 computations = {
-    "2pf": True,  # Compute 2-point function observables
-    "3pf": True,  # Compute 3-point function observables
-    "Mij": True   # Evaluate Mass-Matrix Eigenvalues @ ExitTime, (indirectly) required if testing adiabatic limit
+    "2pf": False,  # Compute 2-point function observables
+    "3pf": False,  # Compute 3-point function observables
+    "Mij": False   # Evaluate Mass-Matrix Eigenvalues @ ExitTime, (indirectly) required if testing adiabatic limit
 }
 
 
@@ -47,7 +47,7 @@ which3pf = [
 
 accept_criteria = { # Accepts trajectories subject to...
     "MinimumEfolds": 60,       # Required: Minimum amount of inflation for successful sampler
-    "TestAdiabaticLimit": True # Not Required: Infers adiabatic limit from background evolution
+    "TestAdiabaticLimit": False # Not Required: Infers adiabatic limit from background evolution
 }
 
 
