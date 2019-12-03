@@ -80,7 +80,9 @@ def update_samples(modelnumber):
     # Load sample
     save_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
     f=open(save_path, "rb")
-    with f: sample = pk.load(f); assert sample.modelnumber == modelnumber
+    with f:
+        sample = pk.load(f)
+    assert sample.modelnumber == modelnumber
 
     # Get information about observables
     observables = cfg.computations

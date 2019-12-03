@@ -73,6 +73,8 @@ def Initialize(modelnumber, rerun_model=False):
             fvals = model.fields
             vvals = model.velocities
             pvals = model.parameters
+        # del model_file
+        # del model_path
 
     # Cross-check the number of fields needed for the potential
     nF = PyT.nF()
@@ -115,6 +117,8 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Integration fails / eternal
         if type(Nend) is int and Nend in [-48, -45, -44]:
+            # del V, dV, initial, pvals, fvals, vvals
+            # gc.collect()
             return Nend
         
         # Attempt computation of background
@@ -124,6 +128,8 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) is int and back in [-47, -44]:
+                # del V, dV, initial, pvals, fvals, vvals, Nend
+                # gc.collect()
                 return back
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
@@ -134,10 +140,13 @@ def Initialize(modelnumber, rerun_model=False):
 
         # If integration / background failure / eternal model is reported, return this information
         if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
+            # del V, initial, pvals, fvals, vvals
+            # gc.collect()
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1
         back, Nepsilon = back_ext
+        # del back_ext
 
         # Iterate over conditions list
         for item in conditions:
@@ -151,7 +160,7 @@ def Initialize(modelnumber, rerun_model=False):
             # Transpose evolution to extract independent evolution for field in question
             Nevo = back.T[0]
             Fevo = back.T[1 + field_number]
-            Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
+            # Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
 
             # Try to find instances of field conditions within background evolution
             try:
@@ -193,10 +202,16 @@ def Initialize(modelnumber, rerun_model=False):
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
     if Nend in [-46, -45]:
+        # del V, initial, pvals, fvals, vvals, Nevo, Fevo, Nloc
+        # gc.collect()
         return Nend
     
     if Nend < minN:
+        # del V, initial, pvals, fvals, vvals, Nend, Nevo, Fevo, Nloc
+        # gc.collect()
         return -50
+    
+    print back
 
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
@@ -230,7 +245,7 @@ def Initialize(modelnumber, rerun_model=False):
     else:
         back_adj = back
 
-    # If rescaling procedure fails: Revert to initial background compution
+    # If rescaling procedure fails: Revert to initial background computation
     if type(back_adj) == np.ndarray:
         pass
     else:
@@ -258,8 +273,6 @@ def Initialize(modelnumber, rerun_model=False):
         
         # Compute mass-matrix evolution from this point
         Mij_end = PyS.MijEvolve(back[Nadiabatic_start:], pvals, PyT)
-
-        print Mij_end
 
         # For each mass-matrix evolution step
         for item in Mij_end:
@@ -302,47 +315,100 @@ def DemandSample(modelnumber):
     
     ii = -1
     
+    flags = [-50, -49, -48, -47, -46, -45, -44]
+    flag_counts = [0 for flag in flags]
+    
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
+        
         ii = Initialize(modelnumber)
         
+        print modelnumber, ii
+            
         # If fail flag received: log statistic
-        if ii in [-50, -49, -48, -47, -46, -45, -44]:
-            record_stats.log_stats(modelnumber, ii, sample_stats_dir)
+        if ii in flags:
+            flag_counts[flags.index(ii)] += 1
         
         # If model number, sum number of iterations
         elif ii == modelnumber:
-            key = "end"
-            record_stats.log_stats(modelnumber, key, sample_stats_dir, time.clock() - tstart)
+            tfinal = time.clock() - tstart
+            fail_total = sum(flag_counts)
+            total = fail_total + 1
+            
+            log = {
+                'short':    flag_counts[0],
+                'kexit':    flag_counts[1],
+                'feoi':     flag_counts[2],
+                'back':     flag_counts[3],
+                'violated': flag_counts[4],
+                'eternal':  flag_counts[5],
+                'timeout':  flag_counts[6],
+                'end':      total,
+                'time':     tfinal
+            }
+
+            log_path = os.path.join(sample_stats_dir, "{}.stats".format(modelnumber))
+            
+            f = open(log_path, "wb")
+            
+            with f:
+                pk.dump(log, f)
+                
         else:
             raise KeyError, ii
+        
 
-
-def DemandSample_rerun(modelnumber, sample_stats_dir):
+def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found """
-
+    
     # Get directory for sample stats log
     sample_stats_dir = os.environ['PyTS_logpath']
-
+    
     # Start timer
     tstart = time.clock()
-
+    
     ii = -1
-
+    
+    flags = [-50, -49, -48, -47, -46, -45, -44]
+    flag_counts = [0 for flag in flags]
+    
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
+        
         ii = Initialize(modelnumber, rerun_model=True)
-    
+        
         # If fail flag received: log statistic
-        if ii in [-50, -49, -48, -47, -46, -45, -44]:
-            record_stats.log_stats(modelnumber, ii, sample_stats_dir)
-    
+        if ii in flags:
+            flag_counts[flags.index(ii)] += 1
+        
         # If model number, sum number of iterations
         elif ii == modelnumber:
-            key = "end"
-            record_stats.log_stats(modelnumber, key, sample_stats_dir, time.clock() - tstart)
+            tfinal = time.clock() - tstart
+            fail_total = sum(flag_counts)
+            total = fail_total + 1
+            
+            log = {
+                'short'   : flag_counts[0],
+                'kexit'   : flag_counts[1],
+                'feoi'    : flag_counts[2],
+                'back'    : flag_counts[3],
+                'violated': flag_counts[4],
+                'eternal' : flag_counts[5],
+                'timeout' : flag_counts[6],
+                'end'     : total,
+                'time'    : tfinal
+            }
+            
+            log_path = os.path.join(sample_stats_dir, "{}.stats".format(modelnumber))
+            
+            f = open(log_path, "wb")
+            
+            with f:
+                pk.dump(log, f)
+        
         else:
             raise KeyError, ii
+
 
 def Mij(modelnumber):
     

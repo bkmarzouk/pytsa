@@ -102,9 +102,7 @@ def main(pool, use_existing_samples, rerun_samples):
     # Get number of fields and model parameters
     nF, nP = PyT.nF(), PyT.nP()
 
-
     print "\n-- Initializing ensemble"
-    
     
     # Run samples with their associated background (and params)
     if use_existing_samples is True and rerun_samples is False:
@@ -126,7 +124,8 @@ def main(pool, use_existing_samples, rerun_samples):
         pool.map(pytm.DemandSample, sample_range)
 
     # write summary stats for background
-    w.bg_summary()
+    if use_existing_samples is False: # Sampler stats will be in summary file
+        w.bg_summary()
 
     # Generate task pool from specs. in configuration file
     taskpool = []

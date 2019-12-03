@@ -23,8 +23,10 @@ class Curvature:
         # If canonical, assume Kronecker-delta, i.e. identity matrix representation for the metric
         if metric == "canonical":
             self.metric = Matrix.diag(np.ones(len(coords)))  # G_{IJ} = \delta_{IJ}
+            self.canonical = True
         else:
             self.metric = metric
+            self.canonical = False
         
         # Distinguish coordinates from other symbols which may be in the metric, e.g. mass parameters
         self.coords = list(coords)
@@ -75,7 +77,9 @@ class Curvature:
         
         # If precompute is True, compute all curvature quantities and change status
         if precompute is True:
-            self.precompute()
+            if self.canonical is False:
+                print "-- Canonical model will return 0 for all curvature quantities"
+                self.precompute()
             self.computed = True
         
         print "-- Curvature object constructed"
@@ -87,6 +91,8 @@ class Curvature:
         a, b, c can correspond to index elements of the initialized coordinates or
         a, b, c can be symbolic, the same as those prescribed in initialization
         """
+        
+        if self.canonical is True: return 0
         
         if symbolic_args is True:
             # If symbolic items are given, retrieve indices from coords array
@@ -126,6 +132,8 @@ class Curvature:
     
     def RiemannUp(self, f, c, a, b, symbolic_args=True, simplify=False):
         """ We define the Riemann Curvature tensor, R^{f}_{cab} """
+
+        if self.canonical is True: return 0
         
         if symbolic_args is False:
             (f, c, a, b) = (self.coords[i] for i in [f, c, a, b])
@@ -144,6 +152,8 @@ class Curvature:
     
     def Riemann(self, d, c, a, b, symbolic_args=True, simplify=False):
         """ We define the Riemann Curvature tensor in full contravariant form, R_{dcab} """
+        
+        if self.canonical is True: return 0
         
         if symbolic_args is True:
             (d_idx, c_idx, a_idx, b_idx) = (self.coords.index(s) for s in [d, c, a, b])

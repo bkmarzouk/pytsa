@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Tue Dec  3 15:58:34 2019
+// Package recompile attempted at: Fri Nov 29 14:23:31 2019
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -182,8 +182,8 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     PyArrayObject* tols;
 
     // Set Nstart, max number of efoldings for search window and max integration times
-    double Ninit     = 0.0;     // value of N corresponding to initial conditions
-    double DeltaN    = 3000.0;  // default number of e-folds to search through
+    double Ninit = 0.0;         // value of N corresponding to initial conditions
+    double DeltaN = 3000.0;     // default number of e-folds to search through
     double tmax_feoi = -1;      // max integration time, tmax_feoi < 0 => no limit
 
 
@@ -205,10 +205,12 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     double relerr = 1E-8;
 
     // check input tols are formatted correctly, revert to default if required
-    if(size_pyvector(tols) != 2) {
+    if(size_pyvector(tols) != 2)
+      {
         cout << "\n \n \n incorrect tolerances input, using defaults \n \n \n";
       }
-    else {
+    else
+      {
         abserr = tolsC[0];
         relerr = tolsC[1];
       }
@@ -321,7 +323,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 {
     // Initialize python (array) objects; these should be parsed from the python side
-    PyArrayObject *initialCs, *t, *backOut, *backOutT, *params, *tols;
+    PyArrayObject *initialCs, *t, *backOut,*backOutT, *params, *tols;
 
     // Initialize corresponding ctype arrays
     double *CinitialCs, *tc, *Cparams, *tolsC ;
@@ -355,7 +357,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 
     // Convert initial conditions & parameters to c array
     CinitialCs = pyvector_to_Carray(initialCs);
-    Cparams    = pyvector_to_Carray(params);
+    Cparams = pyvector_to_Carray(params);
 
     // Cross check number of ICs and params against model
     model mm;
@@ -401,141 +403,154 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     // Record start time
     time(&t_ini);
 
-    // Get number of integration steps
-    int nt = t->dimensions[0];
-
-    // Create 2 dimensional array to populate with background calculation
-    double backC[nt][1+2*nF];
-
-    // Start counter for integration step
-    int ii =0;
-
-    // Evolve background
-    evolveB(N, y, yp, Cparams);
-
     // If exit routine is false integrate target number of background steps as far as possible
     if (exit == false){
 
-        // While N < Nend
-        while (ii < nt){
+        // Get number of integration steps
+        int nt = t->dimensions[0];
 
-            // Record current time
-            time(&t_fin);
+        // Get dimensions of numpy output array
+        npy_intp dims[2];
+        dims[1]=1+2*nF;
+        dims[0]=nt;
 
-            // Measure time difference since start
-            deltat = difftime(t_fin,t_ini);
+        // Initialize pointer for c background output
+        double * backOutC;
 
-            // If time exceeds max integration time
-            if((deltat > tmax_back) && (tmax_back>0)) {
-                    // Deallocate integrator work space and return timeout flag
+        // Define python output array, new object to be returned
+        backOut = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
+
+        // Populate c background output with python background output
+        backOutC = (double *) PyArray_DATA(backOut);
+
+        // Evolve background step
+        evolveB(N, y, yp, Cparams);
+
+        // Iterate over number of background steps
+        for(int ii=0; ii<nt; ii++ ){
+            while (N<tc[ii]){ // while N != Nend
+
+                // Record current time
+                time(&t_fin);
+
+                // Measure time difference since start
+                deltat = difftime(t_fin,t_ini);
+
+                // If time exceeds max integration time
+                if((deltat > tmax_back) && (tmax_back>0)) {
+                        // Deallocate integrator work space and return timeout flag
+                        delete[] y;
+                        delete[] yp;
+                        return Py_BuildValue("i", TIMEOUT);
+                    }
+
+                // Otherwise compute background step and get (flag for) integrator status
+                flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
+
+                // If integrator error is raised
+                if (flag== 50){
+                    // Deallocate integrator work space and return integration failure flag for background
                     delete[] y;
                     delete[] yp;
-                    return Py_BuildValue("i", TIMEOUT);
-                }
+                    return Py_BuildValue("i", BACK);
+                    }
 
-            // Otherwise compute background step and get (flag for) integrator status
-            flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams);
-
-            // If integrator error is raised
-            if (flag== 50){
-                // Deallocate integrator work space and return integration failure flag for background
-                delete[] y;
-                delete[] yp;
-                return Py_BuildValue("i", BACK);
-                }
-
-            // Otherwise continue in single step mode
-            flag=-2;
-
-            // Populate background C array for current step (row) value
-            backC[ii][0]=N;
-            for (int i = 0; i < 2*nF; i++){
-                backC[ii][1+i] = y[i];
+                // Otherwise continue in single step mode
+                flag=-2;
             }
 
-            // Increment counter
-            ii += 1;
-
+            // Write time step to c array for background
+            backOutC[ii*(2*nF+1)]=N;
+            for(int i=0;i< 2*nF;i++) {
+                backOutC[ii*(2*nF+1)+i+1]=y[i];
+            }
         }
     }
 
-    // If exit is true, integrate up until \epsilon = 1 or N = Nend, whichever first
+    // If exit is true, integrate up until \epsilon = 1
     if (exit == true){
 
-        // Define vector values for step values and model params (used for computing epsilon)
+        // Get number of target steps for integrator
+        int nt = t->dimensions[0];
+
+        // Define vector values for step values and model params
         vector<double> vecy;
         vector<double> Vparams;
 
-        // Initialize \epsilon value
-        double eps=0.0;
+        // Get number of dimensions for array:
+        // cols = (1 + 2*nF): e-fold, field vals, field velocities.
+        // rows = nt: number of background steps
+        npy_intp dims[2];
+        dims[1]=1+2*nF; dims[0]=nt;
 
-        // While \epsilon < 1 and N < Nmax
-        while (eps<1 && ii < nt){
+        // Initialize pointer for c array output of background evolution
+        double * backOutCT;
 
-            // Record current time
-            time(&t_fin);
+        // Create new python array object for output to python
+        backOutT = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
 
-            // Measure time difference since start of integration
-            deltat = difftime(t_fin,t_ini);
+        // Get c array to point to same space as python array for output
+        backOutCT = (double *) PyArray_DATA(backOutT);
 
-            // If time difference is greater than maximum integration time
-            if((deltat > tmax_back) && (tmax_back>0)){
-                // Deallocate integrator workspace and return timeout flag
-                delete[] y;
-                delete[] yp;
-                return Py_BuildValue("i", TIMEOUT);
+        // Evolve background
+        evolveB(N, y, yp, Cparams);
+
+        // Iterate over integrator steps
+        {int ii =0; double eps=0.0;
+        while (eps<1 && ii<nt){ // While \epsilon < 1 and N < Nmax
+            while (N<tc[ii]){
+
+                // Record current time
+                time(&t_fin);
+
+                // Measure time difference since start of integration
+                deltat = difftime(t_fin,t_ini);
+
+                // If time difference is greater than maximum integration time
+                if((deltat > tmax_back) && (tmax_back>0)){
+                        // Deallocate integrator workspace and return timeout flag
+                        delete[] y;
+                        delete[] yp;
+                        return Py_BuildValue("i", TIMEOUT);
+                    }
+
+                // Compute integration step and get (flag for) integrator status
+                flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
+
+                // If (flag 50) an integration error has occured
+                if (flag== 50){
+                    // deallocate integrator workspace and return background integration failure flag
+                    delete[] y;
+                    delete[] yp;
+                    return Py_BuildValue("i", BACK);
+                    }
+                flag=-2;
             }
 
-            // Compute integration step and get (flag for) integrator status
-            flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
+            // Populate c output array with current step values
+            backOutCT[ii*(2*nF+1)]=N;
+            for(int i=0;i< 2*nF;i++){
+                backOutCT[ii*(2*nF+1)+i+1]=y[i];} // outputs to file at each step
 
-            // If (flag 50) an integration error has occured
-            if (flag== 50){
-                // deallocate integrator workspace and return background integration failure flag
-                delete[] y;
-                delete[] yp;
-                return Py_BuildValue("i", BACK);
-                }
-            flag=-2;
-
-            // Populate background C array for current step (row) value
-            backC[ii][0]=N;
-            for (int i = 0; i < 2*nF; i++){
-                backC[ii][1+i] = y[i];
-            }
-
-            // Compute \epsilon and increment counter
-            vecy = vector<double>(y, y + 2*nF);
-            Vparams = vector<double>(Cparams, Cparams +  nP);
-            eps = mm.Ep(vecy,Vparams);
-            ii = ii+1;
-
-            }
-    }
-
-    // Now create python array object with background computation
-
-    // Build appropriate dimensions for numpy array
-    npy_intp dims[2];
-    dims[1]=1+2*nF;
-    dims[0]=ii;
-
-    // Create python array object
-    backOut = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
-
-    // Create c++ pointer to python array
-    double * backOutC;
-    backOutC = (double *) PyArray_DATA(backOut);
-
-    // Populate python memory values with precomputed background data
-    for (int jj = 0; jj < ii; jj++){
-        backOutC[jj*(2*nF+1)]=backC[jj][0];
-        for (int kk = 0; kk < 2*nF; kk++){
-             backOutC[jj*(2*nF+1)+kk+1]=backC[jj][1+kk];
+        // Create vector of field values and params and compute \epsilon
+        vecy = vector<double>(y, y + 2*nF);
+        Vparams = vector<double>(Cparams, Cparams +  nP);
+        eps = mm.Ep(vecy,Vparams);
+        ii = ii+1;
         }
-    }
 
-    // Deallocate integrator workspace and return python array for background evolution
+        npy_intp dims2[2];
+        dims2[1]=1+2*nF; dims2[0]=ii;
+        double * backOutC;
+        backOut = (PyArrayObject*) PyArray_SimpleNew(2,dims2,NPY_DOUBLE);
+        backOutC = (double *) PyArray_DATA(backOut);
+
+        for(int jj = 0; jj<ii; jj++){backOutC[jj*(2*nF+1)]=tc[jj];
+        for(int i=0;i< 2*nF;i++){
+            backOutC[jj*(2*nF+1)+i+1]=backOutCT[jj*(2*nF+1)+i+1] ;}}
+        }
+        }
+
     delete[] y; delete[] yp;
     return PyArray_Return(backOut);
 }
@@ -806,7 +821,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransagarwal_dmax_6pt0_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans5Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -818,7 +833,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransagarwal_dmax_6pt0(void)    {        Py_InitModule3("PyTransagarwal_dmax_6pt0", PyTransagarwal_dmax_6pt0_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans5Quad(void)    {        Py_InitModule3("PyTrans5Quad", PyTrans5Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

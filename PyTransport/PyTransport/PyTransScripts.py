@@ -23,6 +23,7 @@ import sys
 from gravtools_pyt import Curvature
 import os
 import pickle as pk
+import gc
 
 from scipy.interpolate import UnivariateSpline as US
 import sympy as sym
@@ -413,35 +414,9 @@ def kexitPhi(PhiExit, n, back, params, MTE):
     return k
 
 
-def derivative(x, y, k=3, s=0, M=100):
-    y_spl = interpolate.UnivariateSpline(x, y, k=k, s=s)
-    
-    x_fine = np.linspace(x[0], x[-1], M * len(x));
-    s = x_fine[1] - x_fine[0]
-    y_fine = y_spl(x_fine)
-    
-    dy = [(y_fine[i + 1] - y_fine[i]) / s for i in range(len(y_fine) - 1)]
-    
-    dy_spl = interpolate.UnivariateSpline(x_fine[:-1], dy, k=k, s=s)
-    return y_spl, y_spl.derivative()
-
 
 def dotdotfields(back, MTE, params):
     """ Computes second time derivatives of the fields. Uses analytic form of background evolution equations. """
-    
-    # backT = back.T
-    # nF = MTE.nF()
-    #
-    # # Get Hubble values to transform N derivatives to t derivatives
-    # Hseries = np.asarray([MTE.H(np.array([step[1:]][0]), params) for step in back])
-    #
-    # dV = [MTE.dV(fvals[1:1 + nF], params) for fvals in back]
-    #
-    # phidotdot = np.vstack(
-    #     (-3. * Hseries * backT[1 + nF + i] - np.asarray(dV).T[i] for i in range(nF))
-    # ).T
-    #
-    # return phidotdot
     
     """ Returns second time derivatives of the fields using analytic form of the background equations of motion
         as a contravariant object"""
@@ -578,8 +553,11 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
                        tols=np.array([1e-10, 1e-10]), tmax_bg=-1):
+    
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
+
+    # TODO: Del * ALL * Local variables, assert that None should exist and garbage collect
 
     """
     Integrator flag defs.
@@ -604,9 +582,9 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
     
     if type(BG_epsilon) is int and BG_epsilon in [-47, -44]:
+        # del Nspace_init, n_iter
+        # gc.collect()
         return BG_epsilon
-    
-    idx_epsilon = len(BG_epsilon)
     
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]
@@ -616,7 +594,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     while c < n_iter:
         
         # Define new initial conditions to be the field data at the previous background segment
-        N_init = extensions[-1][-1][0]
+        N_init  = extensions[-1][-1][0]
         bg_init = extensions[-1][-1][1:]
         
         # define new efolding range and compute extension to background
@@ -631,14 +609,26 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         extensions.append(bg_ext[1:])
         
         c += 1
+
+    # # Remove efold defs
+    # del N_init, Nspace_init
+    # # Remove background defs
+    # del bg_init
+    # # Remove model defs
+    # del params
+    # # Remove extension params
+    # del n_iter, c, tols
     
     if len(extensions) == 1:
+        
+        # del extensions
         return BG_epsilon, Nepsilon
     
     else:
         # Stack together into numpy ndarray, structured consistently with typical backEvolve
         stacked = np.vstack((bg for bg in extensions))
         
+        # del extensions
         # return the background, as well as the efolding where slow-roll was violated
         return stacked, Nepsilon
 
