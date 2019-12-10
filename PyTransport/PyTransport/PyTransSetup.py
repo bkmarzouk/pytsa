@@ -260,20 +260,56 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
         timer = time.clock()
         print '[{time}] computing symbolic potential derivatives'.format(time=time.ctime())
     
+    """ TODO: Update fieldspace operations if we want to fully integrate gravtools """
+    # # Get symbolic cooords & christoffel symbols from curvature instance
+    # coords = curv_instance.coords
+    # chr    = curv_instance.Csyms
+    # rc     = range(len(coords))   # Coordainte range for iterations
+    #
+    # # Compute first V derivatives
+    # for I in rc:
+    #     vd_idx = I
+    #     vd[vd_idx] = sym.diff(V, coords[I])
+    #
+    #     if simple is True:
+    #         vd[vd_idx] = sym.simplify(vd[vd_idx])
+    #
+    # # Compute second V derivatives
+    # for I in rc:
+    #     for J in rc:
+    #         vdd_idx = I + J*nF
+    #         vdd[vdd_idx] = sum([sym.diff(sym.diff(V, coords[I]), coords[J]) - chr[K, I, J]*vd[K] for K in rc])
+    #
+    #         if simple is True:
+    #             vdd[vdd_idx] = sym.simplify(vdd[vdd_idx])
+    #
+    # # Compute third V derivatives
+    # for I in rc:
+    #     for J in rc:
+    #         for K in rc:
+    #             vddd_idx = I + J*nF + K*nF*nF
+    #             vddd[vddd_idx] = sym.diff(vdd[I + J*nF], coords[K])
+    #             vddd[vddd_idx] += -sum([chr[L, I, K]*vdd[L + nF*J] for L in rc])
+    #             vddd[vddd_idx] += -sum([chr[L, J, K]*vdd[L + nF*I] for L in rc])
+    #
+    #             if simple is True:
+    #                 vddd[vddd_idx] = sym.simplify(vddd[vddd_idx])
+
+
     if G != 0 and G != "canonical":
-        
+
         if not silent:
             timer2 = time.clock()
             print '[{time}] computing curvature quantities'.format(time=time.ctime())
-        
+
         # dir = os.path.dirname(__file__)
         # curv_name = os.path.join(dir, 'PyTrans', '{}.curv'.format(name))
-        
+
         g, Ga, Ri, Rm = fieldmetric(G, nF, nP, simple=simple, silent=silent)
-        
+
         if not silent:
             print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer2)
-        
+
         FMP = 0
         for i in range(nF):
             if simple == True:
@@ -289,15 +325,14 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
                 else:
                     vdd[i + j * nF] = V.diff(f[i]).diff(f[j]) - FMP
                 FMP = 0
-        
+
         for i in range(nF):
             for j in range(nF):
                 for k in range(nF):
                     for l in range(nF):
                         FMP = FMP + Ga(-(l + 1), i + 1, k + 1) * vdd[l + j * nF] + Ga(-(l + 1), j + 1, k + 1) * vdd[
                             i + l * nF] + sym.expand(Ga(-(1 + l), 1 + i, 1 + j)).diff(f[k]) * vd[l] + sym.expand(
-                            Ga(-(1 + l), 1 + i, j + 1)) * vd[l].diff(f[
-                                                                         k])  # +sym.expand(Ga(-(l+1),i+1,j+1)).diff(f[k]) * vd[l] +Ga(-(l+1),i+1,j+1)* (sym.expand(vd[l]).diff(f[k]))
+                            Ga(-(1 + l), 1 + i, j + 1)) * vd[l].diff(f[k])  # +sym.expand(Ga(-(l+1),i+1,j+1)).diff(f[k]) * vd[l] +Ga(-(l+1),i+1,j+1)* (sym.expand(vd[l]).diff(f[k]))
                     if simple == True:
                         vddd[i + j * nF + k * nF * nF] = sym.simplify(V.diff(f[i]).diff(f[j]).diff(f[k]) - FMP)
                     else:

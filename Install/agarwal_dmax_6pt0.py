@@ -57,5 +57,5 @@ G = sym.Matrix(
 	]
 )
 G *= p[3]**2*f[0]**2
-PyTransSetup.potential(V,6,32,False,G,silent=False)
-PyTransSetup.compileName('agarwal_dmax_6pt0',True)
+PyTransSetup.potential(V,6,32,True,G,silent=False)
+PyTransSetup.compileName('agarwal_dmax_6pt0_simple',True)

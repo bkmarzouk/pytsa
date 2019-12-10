@@ -552,7 +552,7 @@ def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
 
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
-                       tols=np.array([1e-10, 1e-10]), tmax_bg=-1):
+                       tols=np.array([1e-12, 1e-12]), tmax_bg=-1):
     
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
@@ -609,15 +609,6 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         extensions.append(bg_ext[1:])
         
         c += 1
-
-    # # Remove efold defs
-    # del N_init, Nspace_init
-    # # Remove background defs
-    # del bg_init
-    # # Remove model defs
-    # del params
-    # # Remove extension params
-    # del n_iter, c, tols
     
     if len(extensions) == 1:
         
@@ -633,7 +624,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         return stacked, Nepsilon
 
 
-def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbose=False):
+def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_approx=False, verbose=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
     
     # Find curvature records directory and create file instance to lead curvature class obj.
@@ -670,7 +661,8 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
     fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
     
     # Get Christoffel symbols and Riemann tensor
-    # csyms = curv_obj.Csyms, Christoffel term already absorbed in dVV
+    if hess_approx:
+        csyms = curv_obj.Csyms # Christoffel term already absorbed in dVV
     rsyms = curv_obj.Rsyms
     
     # Get field space metric and inverse
@@ -680,7 +672,8 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
     # Build array and populate with field space lambda functions
     Glambdas = np.empty(np.shape(G), dtype=object)
     Ginvlambdas = np.empty(np.shape(Ginv), dtype=object)
-    # clambdas = np.empty(np.shape(csyms), dtype=object)
+    if hess_approx:
+        clambdas = np.empty(np.shape(csyms), dtype=object)
     rlambdas = np.empty(np.shape(rsyms), dtype=object)
 
     # Define coordinate index range to iterate over
@@ -695,7 +688,8 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
             Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
             Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
             for c in rnf:
-            #     clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
+                if hess_approx:
+                    clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
                 for d in rnf:
                     rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
 
@@ -711,7 +705,7 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
     for s in range(lb):
         
         if verbose is True:
-            print s+1, "/", lb
+            print "Computing Mij step:", s+1, "/", lb
         
         # Background step
         step = back[s]
@@ -745,22 +739,26 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
         def dtphi_down(idx):
             return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
         
-        # Hdot = V - 3.*H**2
+        # Get epsilon (dot H / H^2) from std. bg eom
+        epsilon = -3. + V / H / H
         
         for a in rnf:
             for b in rnf:
                 
                 covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
-                                      for k in rnf])
+                                        for k in rnf])
                 
-                # covhess[a, b] += -sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
-                #                        for k in rnf for l in rnf])
-                #
-                riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
-                                        for k in rnf for l in rnf for m in rnf])
-
-                kinetic[a, b] += -(V/H/H)*dtphi[a]*dtphi_down(b) - (dtphi[a]*covdt_dtphi_down(b) +
-                                                                            covdt_dtphi_up(a)*dtphi_down(b))/H
+                if not (chess_approx or hess_approx):
+                
+                    riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
+                                            for k in rnf for l in rnf for m in rnf])
+    
+                    kinetic[a, b] +=  - (dtphi[a]*covdt_dtphi_down(b) + covdt_dtphi_up(a)*dtphi_down(b))/H - \
+                                        (3 - epsilon)*dtphi[a]*dtphi_down(b)
+                    
+                if hess_approx:
+                    covhess[a, b] += sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
+                                            for l in rnf for k in rnf])
 
         # Combine terms to produce mass-squared-matrix
         MIj = covhess + riemann + kinetic
@@ -786,9 +784,12 @@ def MijEvolve(back, params, MTE, DropKineticTerms=False, scale_eigs=False, verbo
     eigstack_raw = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_raw])
     eigstack_hub = np.vstack([np.asarray(eig) for eig in eig_evo_hub])
     eigstack_hub = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_hub])
-
+    
     # Return matrix in typical PyTransport format
     if scale_eigs is True:
         return eigstack_hub
     else:
-        return np.sign(eigstack_hub)*eigstack_hub**2
+        sq = np.sign(eigstack_hub)*eigstack_hub**2
+        for i in range(len(back)):
+            sq[i][0] = eigstack_hub[i][0]
+        return sq
