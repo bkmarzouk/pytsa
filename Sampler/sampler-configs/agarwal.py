@@ -13,7 +13,7 @@ import sys
 """ Computation Configuration | CHANGE ME """
 
 
-sampler_name = "agarwal_test"
+sampler_name = "simple_agarwal_new"
 save_location = "default" # If default: outputs will be written to sampler-build directory
 
 
@@ -110,13 +110,13 @@ parameter_values = [ # If None is given for latex, parameter will *not* be logge
     
     {
         "ParameterNumber": 0,
-        "Command": 1e-2,
+        "Command": "np.random.normal(1e-2, 1e-3)",
         "LaTeX": "T_3"
     },
     
     {
         "ParameterNumber": 1,
-        "Command": 1e-3,
+        "Command": "np.random.normal(1e-3, 1e-4)",
         "LaTeX": "a_0"
     },
     
@@ -128,13 +128,13 @@ parameter_values = [ # If None is given for latex, parameter will *not* be logge
     
     {
         "ParameterNumber": 3,
-        "Command"        : 1e-1,
+        "Command"        : "np.random.normal(1e-1, 1e-2)",
         "LaTeX"          : "\phi_{uv}"
     },
     
     {
         "ParameterNumber": 4,
-        "Command"        : "np.random.normal(0, 1e-12)",
+        "Command"        : "np.random.normal(0, 1e-14)",
         "LaTeX"          : "V_0"
     },
 ]

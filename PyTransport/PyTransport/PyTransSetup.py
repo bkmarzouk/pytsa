@@ -228,14 +228,12 @@ def tol(rtol, atol):
 
 
 def potential(V, nF, nP, simple=False, G="canonical", silent=True):
+    
+    # Define symbols for fields and parameters
     f = sym.symarray('f', nF)
     p = sym.symarray('p', nP)
     
-    vd = sym.symarray('vd', nF)
-    vdd = sym.symarray('vdd', nF * nF)
-    vddd = sym.symarray('vddd', nF * nF * nF)
-    
-    # Ensure directory for symbolic curvature files exists
+    # build curvature records directory if not found
     dir = os.path.dirname(__file__)
     curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
     if not os.path.exists(curv_dir):
@@ -247,113 +245,39 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
         timer = time.clock()
         print '[{time}] constructing curvature class instance'.format(time=time.ctime())
     
-    # curv_instance = curvature.Curvature(G, f, p, precompute=True)
-    curv_instance = gravtools_pyt.Curvature(G, f, p, precompute=True)
+    # Initialize curvature class instance: This will handle all symbolic computations requried
+    curv_instance = gravtools_pyt.Curvature(G, f, V, params=p)
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
     
+    # Save record of curvature class (this can then be callable from PyTransScripts)
     curv_file = open(curv_tmp, 'w')
     with curv_file as cf:
         pk.dump(curv_instance, cf)
     
     if not silent:
         timer = time.clock()
-        print '[{time}] computing symbolic potential derivatives'.format(time=time.ctime())
+        print '[{time}] writing curvature expressions'.format(time=time.ctime())
+
+    # Pass curvature instance to fieldmetric function: Will write PyTrans files
+    fieldmetric(G, nF, nP, simple=simple, silent=silent, curv_obj=curv_instance)
     
-    """ TODO: Update fieldspace operations if we want to fully integrate gravtools """
-    # # Get symbolic cooords & christoffel symbols from curvature instance
-    # coords = curv_instance.coords
-    # chr    = curv_instance.Csyms
-    # rc     = range(len(coords))   # Coordainte range for iterations
-    #
-    # # Compute first V derivatives
-    # for I in rc:
-    #     vd_idx = I
-    #     vd[vd_idx] = sym.diff(V, coords[I])
-    #
-    #     if simple is True:
-    #         vd[vd_idx] = sym.simplify(vd[vd_idx])
-    #
-    # # Compute second V derivatives
-    # for I in rc:
-    #     for J in rc:
-    #         vdd_idx = I + J*nF
-    #         vdd[vdd_idx] = sum([sym.diff(sym.diff(V, coords[I]), coords[J]) - chr[K, I, J]*vd[K] for K in rc])
-    #
-    #         if simple is True:
-    #             vdd[vdd_idx] = sym.simplify(vdd[vdd_idx])
-    #
-    # # Compute third V derivatives
-    # for I in rc:
-    #     for J in rc:
-    #         for K in rc:
-    #             vddd_idx = I + J*nF + K*nF*nF
-    #             vddd[vddd_idx] = sym.diff(vdd[I + J*nF], coords[K])
-    #             vddd[vddd_idx] += -sum([chr[L, I, K]*vdd[L + nF*J] for L in rc])
-    #             vddd[vddd_idx] += -sum([chr[L, J, K]*vdd[L + nF*I] for L in rc])
-    #
-    #             if simple is True:
-    #                 vddd[vddd_idx] = sym.simplify(vddd[vddd_idx])
-
-
-    if G != 0 and G != "canonical":
-
-        if not silent:
-            timer2 = time.clock()
-            print '[{time}] computing curvature quantities'.format(time=time.ctime())
-
-        # dir = os.path.dirname(__file__)
-        # curv_name = os.path.join(dir, 'PyTrans', '{}.curv'.format(name))
-
-        g, Ga, Ri, Rm = fieldmetric(G, nF, nP, simple=simple, silent=silent)
-
-        if not silent:
-            print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer2)
-
-        FMP = 0
-        for i in range(nF):
-            if simple == True:
-                vd[i] = sym.simplify(V.diff(f[i]))
-            else:
-                vd[i] = V.diff(f[i])
-        for i in range(nF):
-            for j in range(nF):
-                for l in range(nF):
-                    FMP = FMP + Ga(-(l + 1), i + 1, j + 1) * vd[l]
-                if simple == True:
-                    vdd[i + j * nF] = sym.simplify(V.diff(f[i]).diff(f[j]) - FMP)
-                else:
-                    vdd[i + j * nF] = V.diff(f[i]).diff(f[j]) - FMP
-                FMP = 0
-
-        for i in range(nF):
-            for j in range(nF):
-                for k in range(nF):
-                    for l in range(nF):
-                        FMP = FMP + Ga(-(l + 1), i + 1, k + 1) * vdd[l + j * nF] + Ga(-(l + 1), j + 1, k + 1) * vdd[
-                            i + l * nF] + sym.expand(Ga(-(1 + l), 1 + i, 1 + j)).diff(f[k]) * vd[l] + sym.expand(
-                            Ga(-(1 + l), 1 + i, j + 1)) * vd[l].diff(f[k])  # +sym.expand(Ga(-(l+1),i+1,j+1)).diff(f[k]) * vd[l] +Ga(-(l+1),i+1,j+1)* (sym.expand(vd[l]).diff(f[k]))
-                    if simple == True:
-                        vddd[i + j * nF + k * nF * nF] = sym.simplify(V.diff(f[i]).diff(f[j]).diff(f[k]) - FMP)
-                    else:
-                        vddd[i + j * nF + k * nF * nF] = V.diff(f[i]).diff(f[j]).diff(f[k]) - FMP
-                    FMP = 0
-    else:
-        for i in range(nF):
-            if simple == True:
-                vd[i] = sym.simplify(V.diff(f[i]))
-            else:
-                vd[i] = V.diff(f[i])
-            for j in range(nF):
-                if simple == True:
-                    vdd[i + j * nF] = sym.simplify(V.diff(f[i]).diff(f[j]))
-                else:
-                    vdd[i + j * nF] = V.diff(f[i]).diff(f[j])
-                for k in range(nF):
-                    if simple == True:
-                        vddd[i + j * nF + k * nF * nF] = sym.simplify(V.diff(f[i]).diff(f[j]).diff(f[k]))
-                    else:
-                        vddd[i + j * nF + k * nF * nF] = V.diff(f[i]).diff(f[j]).diff(f[k])
+    # Construct (flattened) symbolic arrays to hold 2st, 2nd and 3rd order derivatives
+    vd = sym.symarray('vd', nF)
+    vdd = sym.symarray('vdd', nF * nF)
+    vddd = sym.symarray('vddd', nF * nF * nF)
+    
+    # Load precomputed arrays and remap to flattened configuration
+    dV_arr = curv_instance.dV
+    ddV_arr = curv_instance.ddV
+    dddV_arr = curv_instance.dddV
+    
+    for i in range(nF):
+        vd[i] = dV_arr[i]
+        for j in range(nF):
+            vdd[i + j * nF] = ddV_arr[i, j]
+            for k in range(nF):
+                vddd[i + j * nF + k * nF * nF] = dddV_arr[i, j, k]
     
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
@@ -476,15 +400,29 @@ def rewrite_indices(expr, nF, nP):
     return new_expr
 
 
-def fieldmetric(G, nF, nP, simple=False, silent=True):
+def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
     f = sym.symarray('f', nF)
     p = sym.symarray('p', nP)
     
-    COR = Coordinates('\chi', f)
-    g = MetricTensor('g', COR, G)
-    Ga = Christoffel('Ga', g)
-    Ri = Ricci('Ri', g)
-    Rm = Riemann('Rm', g)
+    if curv_obj is None:
+        # If no curvature object instance is passed, compute curvature objects via Gravipy
+        COR = Coordinates('\chi', f)
+        g  = MetricTensor('g', COR, G)
+        Ga = Christoffel('Ga', g)
+        Ri = Ricci('Ri', g)
+        Rm = Riemann('Rm', g)
+    
+    else:
+        # If curvature instance is passed, utilize precomputed objects
+        gab = curv_obj.metric           # Get metric with covariant indices
+        gAB = curv_obj.metric_inverse   # Get metric with contravariant indices
+        gAb = curv_obj.metric_updown    # Get metric with mixed indices
+        
+        Ga  = curv_obj.Csyms
+        Ri  = 0 # This isn't actually used...
+        Rm  = curv_obj.Rsyms
+        covDRm = curv_obj.covDRsyms
+        
     
     import os
     
@@ -494,12 +432,13 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
     e = open(filename1, 'r')
     h = open(filename2, 'w')
     
+    # Build symbolic arrays to hold quantities: These will be converted into cpp expressions later
     G_array = sym.symarray('G', 2 * nF * 2 * nF)
     Gamma_array = sym.symarray('Gamma', 2 * nF * 2 * nF * 2 * nF)
     R_array = sym.symarray('Riemann', nF * nF * nF * nF)
     gradR_array = sym.symarray('gradRiemann', nF * nF * nF * nF * nF)
     
-    # populate Riemann matrix
+    # populate metric matrix
     for i in range(2 * nF):
         for j in range(2 * nF):
             if i < nF:
@@ -511,10 +450,20 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
             else:
                 jj = j - (nF - 1)
             
-            if simple is True:
-                G_array[(2 * nF) * i + j] = sym.simplify(g(ii, jj))
+            if curv_obj is None:
+                if simple is True:
+                    G_array[(2 * nF) * i + j] = sym.simplify(g(ii, jj))
+                else:
+                    G_array[(2 * nF) * i + j] = g(ii, jj)
             else:
-                G_array[(2 * nF) * i + j] = g(ii, jj)
+                if np.sign(ii) == np.sign(jj):
+                    if np.sign(ii) == 1:
+                        G_array[(2 * nF) * i + j] = gab[abs(ii)-1, abs(jj)-1]
+                    else:
+                        G_array[(2 * nF) * i + j] = gAB[abs(ii)-1, abs(jj)-1]
+                else:
+                    G_array[(2 * nF) * i + j] = gAb[abs(ii)-1, abs(jj)-1]
+                
     
     # populate connexion matrix
     for i in range(2 * nF):
@@ -533,13 +482,16 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                 else:
                     kk = k - (nF - 1)
                 
-                if kk < 0 or jj < 0 or ii > 0:
-                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
-                else:
-                    if simple is True:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(Ga(ii, jj, kk))
+                if curv_obj is None:
+                    if kk < 0 or jj < 0 or ii > 0:
+                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
                     else:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(ii, jj, kk)
+                        if simple is True:
+                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(Ga(ii, jj, kk))
+                        else:
+                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(ii, jj, kk)
+                else:
+                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga[abs(ii)-1, abs(jj)-1, abs(kk)-1]
     
     # populate Riemann matrix
     for i in range(nF):
@@ -551,11 +503,14 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                     kk = k + 1
                     ll = l + 1
                     
-                    if simple is True:
-                        R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = sym.simplify(
-                            Rm(ii, jj, kk, ll))
+                    if curv_obj is None:
+                        if simple is True:
+                            R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = sym.simplify(
+                                Rm(ii, jj, kk, ll))
+                        else:
+                            R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm(ii, jj, kk, ll)
                     else:
-                        R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm(ii, jj, kk, ll)
+                        R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm[ii-1, jj-1, kk-1, ll-1]
     
     # populate covariant-derivative of Riemann matrix
     for i in range(nF):
@@ -569,12 +524,17 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
                         ll = l + 1
                         mm = m + 1
                         
-                        if simple is True:
-                            gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
-                                nF) * l + m] = sym.simplify(Rm.covariantD(ii, jj, kk, ll, mm))
+                        if curv_obj is None:
+                            if simple is True:
+                                    gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
+                                        nF) * l + m] = sym.simplify(Rm.covariantD(ii, jj, kk, ll, mm))
+                            else:
+                                gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
+                                    nF) * l + m] = Rm.covariantD(ii, jj, kk, ll, mm)
+                        
                         else:
                             gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
-                                nF) * l + m] = Rm.covariantD(ii, jj, kk, ll, mm)
+                                nF) * l + m] = covDRm[ii-1, jj-1, kk-1, ll-1, mm-1]
     
     for line in e:
         h.write(line)
@@ -675,4 +635,4 @@ def fieldmetric(G, nF, nP, simple=False, silent=True):
     h.close()
     e.close()
     
-    return g, Ga, Ri, Rm
+    # return g, Ga, Ri, Rm

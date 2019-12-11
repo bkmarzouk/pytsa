@@ -23,25 +23,25 @@ from sympy import Rational as rat
 p = sym.symarray('p',32)
 f = sym.symarray('f',6)
 s = [
-	2*p[0]*p[1]**4*(-0.0854897486982225*p[0]*p[1]**4/(p[3]**4*f[0]**4) + 1),
-	0.333333333333333*p[3]**2*f[0]**2*(2*p[0]*p[1]**4 + p[4]),
-	0.404071024781625*p[5]*p[2]*p[3]**2*f[0]**2.0*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[2]),
-	p[6]*p[2]*p[3]**2*f[0]**4.32455532033676*(2*p[0]*p[1]**4 + p[4])*(0.782480174832099*sym.cos(f[2])**2 - 0.260826724944033),
-	0.404071024781625*p[7]*p[2]*p[3]**2*f[0]**2.0*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[1]),
-	0.699871544788197*p[8]*p[2]*p[3]**2*f[0]**3.29150262212918*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[1])*sym.cos(f[2]),
-	0.451765139574858*p[9]*p[2]*p[3]**2*f[0]**5.21110255092798*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[2])**2 - 1)*sym.cos(f[1]),
-	p[10]*p[2]*p[3]**2*f[0]**4.32455532033676*(2*p[0]*p[1]**4 + p[4])*(0.782480174832099*sym.cos(f[1])**2 - 0.260826724944033),
-	1.0*p[11]*p[2]*p[3]**2*f[0]**5.21110255092798*(2*p[0]*p[1]**4 + p[4])*(1.35529541872457*sym.cos(f[1])**2 - 0.451765139574858)*sym.cos(f[2]),
-	0.349935772394099*p[2]*p[3]**2*f[0]**3.0*(-p[22]*sym.sin(1.0*f[3] - 1.0*f[4] + 1.0*f[5]) + p[12]*sym.cos(1.0*f[3] - 1.0*f[4] + 1.0*f[5]))*(2*p[0]*p[1]**4 + p[4])*sym.sin(f[1])*sym.sin(f[2])*sym.tan(f[2]/2)/sym.tan(f[1]/2),
-	0.451765139574858*p[2]*p[3]**2*f[0]**5.0*(-p[23]*sym.sin(1.0*f[3] - 1.0*f[4] + 1.0*f[5]) + p[13]*sym.cos(1.0*f[3] - 1.0*f[4] + 1.0*f[5]))*(2*p[0]*p[1]**4 + p[4])*(sym.sin(f[2]) + sym.sin(2*f[2]))*sym.sin(f[1])*sym.tan(f[2]/2)/sym.tan(f[1]/2),
-	0.451765139574858*p[2]*p[3]**2*f[0]**5.0*(p[24]*sym.sin(1.0*f[3] - 1.0*f[4] + 1.0*f[5]) - p[14]*sym.cos(1.0*f[3] - 1.0*f[4] + 1.0*f[5]))*(2*p[0]*p[1]**4 + p[4])*(sym.sin(f[1]) - sym.sin(2*f[1]))*sym.sin(f[2])*sym.tan(f[2]/2)/sym.tan(f[1]/2),
-	0.466581029858798*p[2]*p[3]**2*f[0]**1.5*(-p[25]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) + p[15]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
-	0.329922610186159*p[2]*p[3]**2*f[0]**3.5*(-p[26]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) + p[16]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[2]) + 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
-	0.404071024781625*p[2]*p[3]**2*f[0]**5.76208734813001*(-p[27]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) + p[17]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*(-5*sym.sin(f[2])**2 + 2*sym.cos(f[2]) + 4)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
-	0.329922610186159*p[2]*p[3]**2*f[0]**3.5*(-p[28]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) + p[18]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1]) - 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
-	0.233290514929399*p[2]*p[3]**2*f[0]**4.9462219947249*(-p[29]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) + p[19]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1]) - 1)*(3*sym.cos(f[2]) + 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
-	0.233290514929399*p[2]*p[3]**2*f[0]**4.5*(-p[30]*sym.sin(1.5*f[3] - 1.5*f[4] + 1.5*f[5]) + p[20]*sym.cos(1.5*f[3] - 1.5*f[4] + 1.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*sym.sin(f[1])**(3/2)*sym.sin(f[2])**(3/2)*sym.tan(f[2]/2)**(3/2)/sym.tan(f[1]/2)**(3/2),
-	0.404071024781625*p[2]*p[3]**2*f[0]**5.76208734813001*(p[31]*sym.sin(0.5*f[3] - 0.5*f[4] + 0.5*f[5]) - p[21]*sym.cos(0.5*f[3] - 0.5*f[4] + 0.5*f[5]))*(2*p[0]*p[1]**4 + p[4])*(5*sym.sin(f[1])**2 + 2*sym.cos(f[1]) - 4)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/sym.sqrt(sym.tan(f[1]/2)),
+	2*p[0]*p[1]**4*(-27*p[0]*p[1]**4/(32*sym.pi**2*p[3]**4*f[0]**4) + 1),
+	p[3]**2*f[0]**2*(2*p[0]*p[1]**4 + p[4])/3,
+	9*p[5]*p[2]*p[3]**2*f[0]**2*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[2])/(4*sym.pi**(3/2)),
+	3*sym.sqrt(15)*p[6]*p[2]*p[3]**2*f[0]**(-2 + 2*sym.sqrt(10))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[2])**2 - 1)/(8*sym.pi**(3/2)),
+	9*p[7]*p[2]*p[3]**2*f[0]**2*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[1])/(4*sym.pi**(3/2)),
+	9*sym.sqrt(3)*p[8]*p[2]*p[3]**2*f[0]**(-2 + 2*sym.sqrt(7))*(2*p[0]*p[1]**4 + p[4])*sym.cos(f[1])*sym.cos(f[2])/(4*sym.pi**(3/2)),
+	9*sym.sqrt(5)*p[9]*p[2]*p[3]**2*f[0]**(-2 + 2*sym.sqrt(13))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[2])**2 - 1)*sym.cos(f[1])/(8*sym.pi**(3/2)),
+	3*sym.sqrt(15)*p[10]*p[2]*p[3]**2*f[0]**(-2 + 2*sym.sqrt(10))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1])**2 - 1)/(8*sym.pi**(3/2)),
+	9*sym.sqrt(5)*p[11]*p[2]*p[3]**2*f[0]**(-2 + 2*sym.sqrt(13))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1])**2 - 1)*sym.cos(f[2])/(8*sym.pi**(3/2)),
+	9*sym.sqrt(3)*p[2]*p[3]**2*f[0]**3*(-p[22]*sym.sin(f[3] - f[4] + f[5]) + p[12]*sym.cos(f[3] - f[4] + f[5]))*(2*p[0]*p[1]**4 + p[4])*sym.sin(f[1])*sym.sin(f[2])*sym.tan(f[2]/2)/(8*sym.pi**(3/2)*sym.tan(f[1]/2)),
+	9*sym.sqrt(5)*p[2]*p[3]**2*f[0]**5*(-p[23]*sym.sin(f[3] - f[4] + f[5]) + p[13]*sym.cos(f[3] - f[4] + f[5]))*(2*p[0]*p[1]**4 + p[4])*(sym.sin(f[2]) + sym.sin(2*f[2]))*sym.sin(f[1])*sym.tan(f[2]/2)/(8*sym.pi**(3/2)*sym.tan(f[1]/2)),
+	9*sym.sqrt(5)*p[2]*p[3]**2*f[0]**5*(p[24]*sym.sin(f[3] - f[4] + f[5]) - p[14]*sym.cos(f[3] - f[4] + f[5]))*(2*p[0]*p[1]**4 + p[4])*(sym.sin(f[1]) - sym.sin(2*f[1]))*sym.sin(f[2])*sym.tan(f[2]/2)/(8*sym.pi**(3/2)*sym.tan(f[1]/2)),
+	3*sym.sqrt(3)*p[2]*p[3]**2*f[0]**(3/2)*(-p[25]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) + p[15]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(2*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
+	3*sym.sqrt(6)*p[2]*p[3]**2*f[0]**(7/2)*(-p[26]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) + p[16]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[2]) + 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(4*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
+	9*p[2]*p[3]**2*f[0]**(-2 + sym.sqrt(241)/2)*(-p[27]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) + p[17]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*(-5*sym.sin(f[2])**2 + 2*sym.cos(f[2]) + 4)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(4*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
+	3*sym.sqrt(6)*p[2]*p[3]**2*f[0]**(7/2)*(-p[28]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) + p[18]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1]) - 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(4*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
+	3*sym.sqrt(3)*p[2]*p[3]**2*f[0]**(-2 + sym.sqrt(193)/2)*(-p[29]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) + p[19]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*(3*sym.cos(f[1]) - 1)*(3*sym.cos(f[2]) + 1)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(4*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
+	3*sym.sqrt(3)*p[2]*p[3]**2*f[0]**(9/2)*(-p[30]*sym.sin(sym.Rational(3, 2)*f[3] - sym.Rational(3, 2)*f[4] + 3*f[5]/2) + p[20]*sym.cos(sym.Rational(3, 2)*f[3] - sym.Rational(3, 2)*f[4] + 3*f[5]/2))*(2*p[0]*p[1]**4 + p[4])*sym.sin(f[1])**(3/2)*sym.sin(f[2])**(3/2)*sym.tan(f[2]/2)**(3/2)/(4*sym.pi**(3/2)*sym.tan(f[1]/2)**(3/2)),
+	9*p[2]*p[3]**2*f[0]**(-2 + sym.sqrt(241)/2)*(p[31]*sym.sin(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2) - p[21]*sym.cos(f[3]/2 - sym.Rational(1, 2)*f[4] + f[5]/2))*(2*p[0]*p[1]**4 + p[4])*(5*sym.sin(f[1])**2 + 2*sym.cos(f[1]) - 4)*sym.sqrt(sym.sin(f[1]))*sym.sqrt(sym.sin(f[2]))*sym.sqrt(sym.tan(f[2]/2))/(4*sym.pi**(3/2)*sym.sqrt(sym.tan(f[1]/2))),
 	0
 ]
 V = sum(s)
@@ -58,4 +58,4 @@ G = sym.Matrix(
 )
 G *= p[3]**2*f[0]**2
 PyTransSetup.potential(V,6,32,True,G,silent=False)
-PyTransSetup.compileName('agarwal_dmax_6pt0_simple',True)
+PyTransSetup.compileName('agarwal_6pt0_HALFSIMPLE',True)

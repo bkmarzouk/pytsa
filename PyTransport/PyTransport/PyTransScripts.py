@@ -557,8 +557,6 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
 
-    # TODO: Del * ALL * Local variables, assert that None should exist and garbage collect
-
     """
     Integrator flag defs.
 
@@ -611,15 +609,12 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         c += 1
     
     if len(extensions) == 1:
-        
-        # del extensions
         return BG_epsilon, Nepsilon
     
     else:
         # Stack together into numpy ndarray, structured consistently with typical backEvolve
         stacked = np.vstack((bg for bg in extensions))
         
-        # del extensions
         # return the background, as well as the efolding where slow-roll was violated
         return stacked, Nepsilon
 

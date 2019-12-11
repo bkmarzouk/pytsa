@@ -117,6 +117,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         # Integration fails / eternal
         if type(Nend) is int and Nend in [-48, -45, -44]:
+            
             # del V, dV, initial, pvals, fvals, vvals
             # gc.collect()
             return Nend
@@ -128,8 +129,6 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) is int and back in [-47, -44]:
-                # del V, dV, initial, pvals, fvals, vvals, Nend
-                # gc.collect()
                 return back
 
     # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
@@ -140,13 +139,12 @@ def Initialize(modelnumber, rerun_model=False):
 
         # If integration / background failure / eternal model is reported, return this information
         if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
-            # del V, initial, pvals, fvals, vvals
-            # gc.collect()
             return back_ext
 
         # Otherwise unpack background and efolding where epsilon = 1
         back, Nepsilon = back_ext
-        # del back_ext
+        
+        print back.T[0][-1], back.T[1][-1]
 
         # Iterate over conditions list
         for item in conditions:
@@ -202,8 +200,6 @@ def Initialize(modelnumber, rerun_model=False):
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
     if Nend in [-46, -45]:
-        # del V, initial, pvals, fvals, vvals, Nevo, Fevo, Nloc
-        # gc.collect()
         return Nend
     
     if Nend < minN:
