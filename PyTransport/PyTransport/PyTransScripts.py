@@ -655,10 +655,12 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
     p_syms = curv_obj.params        # parameters
     fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
     
-    # Get Christoffel symbols and Riemann tensor
-    if hess_approx:
-        csyms = curv_obj.Csyms # Christoffel term already absorbed in dVV
-    rsyms = curv_obj.Rsyms
+    # Flag full mass-matrix calculation
+    full_mij = not(hess_approx) and not(chess_approx)
+    
+    # Riemann tensor
+    if full_mij:
+        rsyms = curv_obj.Rsyms
     
     # Get field space metric and inverse
     G = curv_obj.metric
@@ -667,12 +669,16 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
     # Build array and populate with field space lambda functions
     Glambdas = np.empty(np.shape(G), dtype=object)
     Ginvlambdas = np.empty(np.shape(Ginv), dtype=object)
-    if hess_approx:
-        clambdas = np.empty(np.shape(csyms), dtype=object)
-    rlambdas = np.empty(np.shape(rsyms), dtype=object)
+    if full_mij is True:
+        rlambdas = np.empty(np.shape(rsyms), dtype=object)
 
     # Define coordinate index range to iterate over
     rnf = range(nF)
+    
+    # If using purely Hessian approximation, load partial derivative expressions
+    if hess_approx is True:
+        pdpdV = curv_obj.pdpdV
+        pdpdV_lambdas = np.empty(np.shape(pdpdV), dtype=object)
 
     if verbose is True:
         print "-- lambdifying"
@@ -682,11 +688,12 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
         for b in rnf:
             Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
             Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
-            for c in rnf:
-                if hess_approx:
-                    clambdas[a, b, c] = sym.lambdify(fp_syms, csyms[a, b, c], "numpy")
-                for d in rnf:
-                    rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
+            if hess_approx is True:
+                pdpdV_lambdas[a, b] = sym.lambdify(fp_syms, pdpdV[a, b], "numpy")
+            if full_mij:
+                for c in rnf:
+                    for d in rnf:
+                        rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
 
     if verbose is True:
         print "-- done"
@@ -722,41 +729,51 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
         
         # Initialize covariant Hessian, Riemann and Kinetic term
         covhess = np.zeros((nF, nF), dtype=float)
-        riemann = np.zeros((nF, nF), dtype=float)
-        kinetic = np.zeros((nF, nF), dtype=float)
+        if full_mij:
+            riemann = np.zeros((nF, nF), dtype=float)
+            kinetic = np.zeros((nF, nF), dtype=float)
         
-        def covdt_dtphi_up(idx):
+        # Compute covariant time derivatives of \phi from background equations of motion
+        def covdt_dtphi_up(idx): # \Dt\dot\phi^a
             return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx](*sym_subs)*dV[k] for k in rnf])
         
-        def covdt_dtphi_down(idx):
+        def covdt_dtphi_down(idx): # \Dt\dot\phi_a
             return sum([-3.*H*Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf]) - dV[idx]
         
+        # Lower index of field time derivative \dot\phi_a = G_{ab}\dot\phi^b
         def dtphi_down(idx):
             return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
         
         # Get epsilon (dot H / H^2) from std. bg eom
-        epsilon = -3. + V / H / H
+        if full_mij:
+            epsilon = -3. + V / H / H
         
         for a in rnf:
             for b in rnf:
                 
-                covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
-                                        for k in rnf])
-                
-                if not (chess_approx or hess_approx):
-                
-                    riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
-                                            for k in rnf for l in rnf for m in rnf])
-    
-                    kinetic[a, b] +=  - (dtphi[a]*covdt_dtphi_down(b) + covdt_dtphi_up(a)*dtphi_down(b))/H - \
-                                        (3 - epsilon)*dtphi[a]*dtphi_down(b)
-                    
+                # In the Hessian approximation, we simply eval. partial derivatives along backgroudn values
                 if hess_approx:
-                    covhess[a, b] += sum([Ginvlambdas[a, l](*sym_subs)*clambdas[k, l, b](*sym_subs)*dV[k]
-                                            for l in rnf for k in rnf])
+                    covhess[a, b] = sum([Ginvlambdas[k, a](*sym_subs)*pdpdV_lambdas[k, b](*sym_subs)
+                                        for k in rnf])
+                else:
+                    
+                    # Otherwise we want the full covariant Hessian
+                    covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
+                                            for k in rnf])
+                    
+                    # If we want the full mass-matrix, we add the Riemann and Kinetic terms
+                    if not chess_approx:
+                    
+                        riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
+                                                for k in rnf for l in rnf for m in rnf])
+        
+                        kinetic[a, b] +=  - (dtphi[a]*covdt_dtphi_down(b) + covdt_dtphi_up(a)*dtphi_down(b))/H - \
+                                            (3 - epsilon)*dtphi[a]*dtphi_down(b)
 
         # Combine terms to produce mass-squared-matrix
-        MIj = covhess + riemann + kinetic
+        MIj = covhess
+        if full_mij:
+            MIj += riemann + kinetic
 
         # Compute eigenvalues
         eig, eigv = np.linalg.eig(MIj)
