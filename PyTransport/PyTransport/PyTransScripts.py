@@ -619,7 +619,8 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         return stacked, Nepsilon
 
 
-def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_approx=False, verbose=False):
+def MijEvolve(back, params, MTE,
+              scale_eigs=False, hess_approx=False, chess_approx=False, verbose=False, covariant=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
     
     # Find curvature records directory and create file instance to lead curvature class obj.
@@ -697,6 +698,22 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
 
     if verbose is True:
         print "-- done"
+        
+    """ We can lambdify a symbolic matrix as follows, but this is slow... """
+    # Mij = sym.symarray("M", shape=(6,6))
+    #
+    # for a in rnf:
+    #     for b in rnf:
+    #         Mij[a, b] = curv_obj.pdpdV[a, b]
+    #
+    # MIj = sym.symarray("M", shape=(6,6))
+    #
+    # for a in rnf:
+    #     for b in rnf:
+    #         MIj[a, b] = sum([Ginv[a, c]*Mij[c, b] for c in rnf])
+    #
+    # print "-- lambdifying MIj"
+    # MIj_lambda = sym.lambdify(fp_syms, MIj, "numpy")
     
     eig_evo_raw = [] # Record raw eigenvalues of mass-matrix
     eig_evo_hub = [] # Record Hubble normalized eigenvalues of mass-matrix
@@ -722,58 +739,74 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
         # Hubble rate at current step
         H = hubble[s]
         
+        MIj = np.asarray(MIj_lambda(*sym_subs))
+        
         # Get values for potential and derivatives
         V = V_evo[s]
         dV = dV_evo[s]
         ddV = ddV_evo[s]
-        
+
         # Initialize covariant Hessian, Riemann and Kinetic term
         covhess = np.zeros((nF, nF), dtype=float)
         if full_mij:
             riemann = np.zeros((nF, nF), dtype=float)
             kinetic = np.zeros((nF, nF), dtype=float)
-        
+
         # Compute covariant time derivatives of \phi from background equations of motion
         def covdt_dtphi_up(idx): # \Dt\dot\phi^a
             return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx](*sym_subs)*dV[k] for k in rnf])
-        
+
         def covdt_dtphi_down(idx): # \Dt\dot\phi_a
             return sum([-3.*H*Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf]) - dV[idx]
-        
+
         # Lower index of field time derivative \dot\phi_a = G_{ab}\dot\phi^b
         def dtphi_down(idx):
             return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
-        
+
         # Get epsilon (dot H / H^2) from std. bg eom
         if full_mij:
             epsilon = -3. + V / H / H
-        
+
+        # Iterate over range of coordinate indices
         for a in rnf:
             for b in rnf:
-                
+
                 # In the Hessian approximation, we simply eval. partial derivatives along backgroudn values
                 if hess_approx:
-                    covhess[a, b] = sum([Ginvlambdas[k, a](*sym_subs)*pdpdV_lambdas[k, b](*sym_subs)
-                                        for k in rnf])
+
+                    covhess[a, b] = pdpdV_lambdas[a, b](*sym_subs)
+
                 else:
-                    
-                    # Otherwise we want the full covariant Hessian
-                    covhess[a, b] +=  sum([Ginvlambdas[k, a](*sym_subs)*ddV[k, b]
-                                            for k in rnf])
-                    
+
+                    covhess[a, b] = ddV[a, b]
+
                     # If we want the full mass-matrix, we add the Riemann and Kinetic terms
                     if not chess_approx:
-                    
-                        riemann[a, b] += -sum([Ginvlambdas[a, m](*sym_subs)*rlambdas[m, k, l, b](*sym_subs)*dtphi[k]*dtphi[l]
-                                                for k in rnf for l in rnf for m in rnf])
-        
-                        kinetic[a, b] +=  - (dtphi[a]*covdt_dtphi_down(b) + covdt_dtphi_up(a)*dtphi_down(b))/H - \
-                                            (3 - epsilon)*dtphi[a]*dtphi_down(b)
+
+                        riemann[a, b] = -sum([rlambdas[a, k, l, b](*sym_subs) * dtphi[k] * dtphi[l]
+                                               for k in rnf for l in rnf])
+
+                        kinetic[a, b] = -(dtphi_down(a) * covdt_dtphi_down(b) +
+                                           dtphi_down(b) * covdt_dtphi_down(a)) / H \
+                                         - (3 - epsilon) * dtphi_down(a) * dtphi_down(b)
+
 
         # Combine terms to produce mass-squared-matrix
-        MIj = covhess
+        Mij = covhess
         if full_mij:
-            MIj += riemann + kinetic
+            Mij += riemann + kinetic
+
+        if not covariant:
+
+            MIj = np.empty(shape=np.shape(Mij), dtype=float)
+
+            for a in rnf:
+                for b in rnf:
+                    MIj[a, b] = sum([Ginvlambdas[a, k](*sym_subs)*Mij[k, b] for k in rnf])
+
+        else:
+            MIj = Mij
+            
 
         # Compute eigenvalues
         eig, eigv = np.linalg.eig(MIj)
@@ -805,3 +838,19 @@ def MijEvolve(back, params, MTE, scale_eigs=False, hess_approx=False, chess_appr
         for i in range(len(back)):
             sq[i][0] = eigstack_hub[i][0]
         return sq
+
+
+def GetCurvatureObject(MTE):
+    """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
+    
+    # Find curvature records directory and create file instance to lead curvature class obj.
+    dir = os.path.dirname(__file__)
+    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
+    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
+    curv_path = os.path.join(curv_dir, curv_name)
+    curv_file = open(curv_path, 'rb')
+    
+    with curv_file:
+        curv_obj = pk.load(curv_file)
+    
+    return curv_obj

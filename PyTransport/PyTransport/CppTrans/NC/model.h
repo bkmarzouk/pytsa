@@ -128,8 +128,115 @@ public:
 		
   		return mdotH/(Hi*Hi);
 	}
-    
-    
+
+    // function returns mass-squared-matrix in index-up-down representation
+    vector mij(vector<double> f, vector<double> v, , vector<double> p)
+    {
+
+        // --- Initialize variables and get curvature quantities
+
+        // Potential derivatives
+        vector<double> ddVi;
+        vector<double> dVi;
+        dVVi = pot.dVV(f,p);
+		dVi =  pot.dV(f,p);
+
+        // Hubble rate
+        vector<double> Hinv;
+        Hinv = 1./H(f,p);
+
+        // Get epsilon
+        double eps;
+        eps = Ep(f, p);
+
+        // Field metric
+		vector<double> FMi;
+        FMi = fmet.fmetric(f,p);
+
+		// Riemann tensor
+		vector<double> FMi;
+		RMi = fmet.Riemn(f,p);
+
+		// Christoffel symbols
+		vector<double> CHR;
+		CHR = fmet.Chroff(f,p);
+
+		// Lower index on field-space velocities
+		vector<double> phidot_d;
+		for (int ii = 0; ii < nF; ii++)
+		{
+		    phidot_d[ii] = 0.;
+		    for (int jj = 0; jj < nF; jj++)
+		    {
+		        phidot_d[ii] += FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
+		    }
+		}
+
+		// Covariant time derivatives of lowered-index field-space velocities
+		vector<double> cdt_phidot_d;
+		for (int ii = 0; ii < nF; ii++)
+		{
+		    cdt_phidot_d[ii] = -dVi[ii];
+		    for (int jj = 0; jj < nF; jj++)
+		    {
+		        cdt_phidot_d[ii] += -3.*Hi*FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
+		    }
+		}
+
+        // Output
+        vector<double> _mijout(nF*nF); // Covariant expression
+        vector<double> mijout(nF*nF);  // Up-down expression
+
+
+		for (int ii=0; ii < nF; ii++)
+		{
+		    double hij_sum = 0.0;
+		    double rij_sum = 0.0;
+		    double kij_sum = 0.0;
+
+		    for (int jj=0; jj < nF; jj++)
+		    {
+		        hij_sum += dVVi[ii*nF + jj];
+
+                kij_sum -= (v_d[ii] * cdt_phidot_d[jj] + v_d[jj] * cdt_phidot_d[ii]) * Hinv;
+                kij_sum -= (3. - eps) * v_d[ii] * v_d[jj];
+
+		        for (int kk=0; kk < nF; jj++)
+		        {
+		            for (int ll=0; ll < nF; ll++)
+		            {
+                        rij_sum -= RMi[nF*nF*nF*ii + nF*nF*kk + nF*ll + jj]*v[k]*v[l];
+
+		            }
+		        }
+
+		        _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
+
+		    }
+		}
+
+		for (int ii=0; ii < nF; ii++)
+		{
+		    for (int jj=0; jj < nF; jj++)
+		    {
+		        int mij_idx = ii*nF + jj;
+		        mijout[mij_idx] = 0.;
+
+		        for (int kk=0; kk < nF; kk++)
+		        {
+		            int gik_idx = ii*nF + kk;
+		            int mkj_idx = kk*nF + jj;
+
+		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
+		        }
+
+		        mijout[mij_idx] *= Hinv;
+		    }
+		}
+
+        return mijout
+    }
+
     // function returns number of fields
     int getnF()
     {

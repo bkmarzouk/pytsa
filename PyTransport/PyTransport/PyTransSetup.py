@@ -491,7 +491,10 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
                         else:
                             Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(ii, jj, kk)
                 else:
-                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga[abs(ii)-1, abs(jj)-1, abs(kk)-1]
+                    if kk < 0 or jj < 0 or ii > 0:
+                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
+                    else:
+                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga[abs(ii)-1, abs(jj)-1, abs(kk)-1]
     
     # populate Riemann matrix
     for i in range(nF):
