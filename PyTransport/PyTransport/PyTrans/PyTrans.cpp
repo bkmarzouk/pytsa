@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Fri Dec 13 09:39:31 2019
+// Package recompile attempted at: Fri Jan 17 12:36:58 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -177,7 +177,82 @@ static PyObject* MT_paramNumber(PyObject* self,  PyObject *args)
 static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
 {
     // Initialize python objects
-    PyArrayObject *fields, *dotfields,
+    PyArrayObject *fieldsdotfields;
+    PyArrayObject *params;
+
+    // Initialize corresponding cpp objects
+    double *Cfieldsdotfields, *Cparams;
+
+    // Demand python array objects for fields, dotfields and params
+    if(!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &fieldsdotfields, &PyArray_Type, &params))
+    {
+        return NULL;
+    }
+
+    // Check input arrays are the correct length
+    model mm;
+    int nF = mm.getnF();
+
+    if(size_pyvector(fieldsdotfields) != 2*nF)
+      {
+        cout << "\n \n \n fieldsdotfields array not of correct length \n \n \n";
+        Py_RETURN_NONE;
+      }
+
+    // convert parameter list to a C array
+    Cparams = pyvector_to_Carray(params);
+    int nP = mm.getnP();
+
+    if(size_pyvector(params) != nP)
+      {
+        cout << "\n \n \n parameters array not of correct length \n \n \n";
+        Py_RETURN_NONE;
+      }
+
+    // convert fieldsdotfields to Cvectors
+
+    // First convert python object to c array
+    Cfieldsdotfields = pyvector_to_Carray(fieldsdotfields);
+
+    // Create vectors from c arrays
+    vector<double> Cvec_fieldsdotfields;
+    vector<double> Cvec_params;
+    Cvec_fieldsdotfields = vector<double>(Cfieldsdotfields, Cfieldsdotfields + 2*nF);
+    Cvec_params = vector<double>(Cparams, Cparams + nP);
+
+    // Computing mass matrix C vector
+    vector<double> Cmij = mm.Mij(Cvec_fieldsdotfields, Cvec_params);
+
+
+//    // New function build works: e.g. if we call the following line we get the expected return
+    return Py_BuildValue("i",mm.getnP());
+
+
+
+//    double test = mm.Mij(Cvec_fieldsdotfields, Cvec_params);
+//    Cmij = mm.Mij(test, test);
+//
+//    // Define dimensions of output array (nF*nF)
+//    npy_intp dims[2];
+//    dims[0] = nF;
+//    dims[1] = nF;
+//    mij_out = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
+//
+//    // Create cpp pointer to pyarray obj
+//    double * Cmij_out;
+//    Cmij_out = (double *) PyArray_DATA(mij_out);
+//
+//    for (int ii = 0; ii < nF; ii++)
+//    {
+//        for (int jj = 0; jj < nF; jj++)
+//        {
+//            Cmij_out[ii*nF + jj] = Cmij[ii*nF + jj];
+//        }
+//    }
+//
+//    // Return populated python object
+//    PyArray_Return(mij_out);
+
 }
 
 // detect end of inflation within a suitable search window
@@ -534,7 +609,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     double * backOutC;
     backOutC = (double *) PyArray_DATA(backOut);
 
-    // Populate python memory values with precomputed background data
+    // Populate python memory values with background data
     for (int jj = 0; jj < ii; jj++){
         backOutC[jj*(2*nF+1)]=backC[jj][0];
         for (int kk = 0; kk < 2*nF; kk++){
@@ -813,7 +888,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransagarwal_6pt0_rational_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans2Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -825,7 +900,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransagarwal_6pt0_rational(void)    {        Py_InitModule3("PyTransagarwal_6pt0_rational", PyTransagarwal_6pt0_rational_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans2Quad(void)    {        Py_InitModule3("PyTrans2Quad", PyTrans2Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

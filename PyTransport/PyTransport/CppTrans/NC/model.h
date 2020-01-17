@@ -40,11 +40,10 @@ public:
 	// constructor
 	model()
 	{
-	   potential pot;
-	   fieldmetric fmet;
+        potential pot;
+        fieldmetric fmet;
         nP=pot.getnP();
         nF=pot.getnF();
-
     }
     
     // function returns Hubble rate
@@ -129,21 +128,37 @@ public:
   		return mdotH/(Hi*Hi);
 	}
 
-    // function returns mass-squared-matrix in index-up-down representation
-    vector mij(vector<double> f, vector<double> v, , vector<double> p)
-    {
 
-        // --- Initialize variables and get curvature quantities
+    // function returns mass-squared-matrix in index-up-down representation
+    vector<double> Mij(vector<double> fdf, vector<double> p)
+    {
+         //--- Initialize variables and get curvature quantities
+
+        // While testing, simply return fdf
+        bool testing;
+        testing = true;
+
+        // Unpack fieldsdotfields
+        vector<double> f;
+        vector<double> v;
+
+        for(int ii = 0; ii < nF; ii++)
+        {
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
 
         // Potential derivatives
         vector<double> ddVi;
         vector<double> dVi;
-        dVVi = pot.dVV(f,p);
+        ddVi = pot.dVV(f,p);
 		dVi =  pot.dV(f,p);
 
-        // Hubble rate
-        vector<double> Hinv;
-        Hinv = 1./H(f,p);
+        // Hubble rate & inverse hubble rate
+        double Hi;
+        double Hinv;
+        Hi = H(f,p);
+        Hinv = 1./Hi;
 
         // Get epsilon
         double eps;
@@ -154,12 +169,8 @@ public:
         FMi = fmet.fmetric(f,p);
 
 		// Riemann tensor
-		vector<double> FMi;
+		vector<double> RMi;
 		RMi = fmet.Riemn(f,p);
-
-		// Christoffel symbols
-		vector<double> CHR;
-		CHR = fmet.Chroff(f,p);
 
 		// Lower index on field-space velocities
 		vector<double> phidot_d;
@@ -188,6 +199,8 @@ public:
         vector<double> mijout(nF*nF);  // Up-down expression
 
 
+        // **************** DEBUG THIS BLOCK
+
 		for (int ii=0; ii < nF; ii++)
 		{
 		    double hij_sum = 0.0;
@@ -215,26 +228,30 @@ public:
 		    }
 		}
 
-		for (int ii=0; ii < nF; ii++)
-		{
-		    for (int jj=0; jj < nF; jj++)
-		    {
-		        int mij_idx = ii*nF + jj;
-		        mijout[mij_idx] = 0.;
-
-		        for (int kk=0; kk < nF; kk++)
-		        {
-		            int gik_idx = ii*nF + kk;
-		            int mkj_idx = kk*nF + jj;
-
-		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
-		        }
-
-		        mijout[mij_idx] *= Hinv;
-		    }
-		}
-
-        return mijout
+        // ****************
+//
+//        // Build up-down index representation of mij
+//		for (int ii=0; ii < nF; ii++)
+//		{
+//		    for (int jj=0; jj < nF; jj++)
+//		    {
+//		        int mij_idx = ii*nF + jj;
+//		        mijout[mij_idx] = 0.;
+//
+//		        for (int kk=0; kk < nF; kk++)
+//		        {
+//		            int gik_idx = ii*nF + kk;
+//		            int mkj_idx = kk*nF + jj;
+//
+//		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
+//		        }
+//
+//		        mijout[mij_idx] *= Hinv;
+//		    }
+//		}
+//
+//        return mijout;
+    if (testing == true){return fdf;}
     }
 
     // function returns number of fields
