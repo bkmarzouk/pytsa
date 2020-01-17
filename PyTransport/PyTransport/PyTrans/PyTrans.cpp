@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Fri Jan 17 12:36:58 2020
+// Package recompile attempted at: Fri Jan 17 14:49:10 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -179,6 +179,7 @@ static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
     // Initialize python objects
     PyArrayObject *fieldsdotfields;
     PyArrayObject *params;
+    PyArrayObject *mij_out;
 
     // Initialize corresponding cpp objects
     double *Cfieldsdotfields, *Cparams;
@@ -221,38 +222,42 @@ static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
     Cvec_params = vector<double>(Cparams, Cparams + nP);
 
     // Computing mass matrix C vector
-    vector<double> Cmij = mm.Mij(Cvec_fieldsdotfields, Cvec_params);
+    vector<double> Cmij_flat = mm.Mij(Cvec_fieldsdotfields, Cvec_params);
 
+    // Build 2 d array
+    double Cmij[nF][nF];
 
-//    // New function build works: e.g. if we call the following line we get the expected return
-    return Py_BuildValue("i",mm.getnP());
+    for (int ii = 0; ii < nF; ii++)
+    {
+        for (int jj = 0; jj < nF; jj++)
+        {
+            Cmij[ii][jj] = Cmij_flat[ii*nF + jj];
+        }
+    }
 
+    cout << "Generated Mass Matrix" << endl;
 
+    // Define dimensions of output array (nF*nF)
+    npy_intp dims[2];
+    dims[0] = nF;
+    dims[1] = nF;
+    mij_out = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
 
-//    double test = mm.Mij(Cvec_fieldsdotfields, Cvec_params);
-//    Cmij = mm.Mij(test, test);
-//
-//    // Define dimensions of output array (nF*nF)
-//    npy_intp dims[2];
-//    dims[0] = nF;
-//    dims[1] = nF;
-//    mij_out = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
-//
-//    // Create cpp pointer to pyarray obj
-//    double * Cmij_out;
-//    Cmij_out = (double *) PyArray_DATA(mij_out);
-//
-//    for (int ii = 0; ii < nF; ii++)
-//    {
-//        for (int jj = 0; jj < nF; jj++)
-//        {
-//            Cmij_out[ii*nF + jj] = Cmij[ii*nF + jj];
-//        }
-//    }
-//
-//    // Return populated python object
-//    PyArray_Return(mij_out);
+    // Create cpp pointer to pyarray obj
+    double * Cmij_out;
+    Cmij_out = (double *) PyArray_DATA(mij_out);
 
+    for (int ii = 0; ii < nF; ii++)
+    {
+        for (int jj = 0; jj < nF; jj++)
+        {
+            Cmij_out[ii*nF + jj] = Cmij[ii][jj];
+        }
+    }
+
+    cout << "C poitned" << endl;
+
+    return PyArray_Return(mij_out);
 }
 
 // detect end of inflation within a suitable search window
@@ -267,7 +272,6 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     double Ninit     = 0.0;     // value of N corresponding to initial conditions
     double DeltaN    = 3000.0;  // default number of e-folds to search through
     double tmax_feoi = -1;      // max integration time, tmax_feoi < 0 => no limit
-
 
     // Setup integration flags
     int FEOI    = -48;        // Integration failure in feoi

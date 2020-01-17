@@ -132,21 +132,30 @@ public:
     // function returns mass-squared-matrix in index-up-down representation
     vector<double> Mij(vector<double> fdf, vector<double> p)
     {
+
+        cout << "Start Mij" << endl;
+
          //--- Initialize variables and get curvature quantities
 
         // While testing, simply return fdf
         bool testing;
-        testing = true;
+        testing = false;
 
         // Unpack fieldsdotfields
-        vector<double> f;
-        vector<double> v;
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        cout << "Initialized f v vectors" << endl;
 
         for(int ii = 0; ii < nF; ii++)
         {
+            cout << "fdf[ii]" << fdf[ii] << endl;
+            cout << "fdf[ii+nF]" << fdf[ii+nF] << endl;
             f[ii] = fdf[ii];
             v[ii] = fdf[ii + nF];
         }
+
+        cout << "Constructed f v vectors" << endl;
 
         // Potential derivatives
         vector<double> ddVi;
@@ -154,26 +163,50 @@ public:
         ddVi = pot.dVV(f,p);
 		dVi =  pot.dV(f,p);
 
+		cout << "Got dpots" << endl;
+		for (int ii = 0; ii < nF; ii++)
+		{
+		    cout << dVi[ii] << endl;
+		    for (int jj = 0; jj < nF; jj++)
+		    {
+		        cout << ddVi[ii*nF + jj] << endl;
+		    }
+		}
+
         // Hubble rate & inverse hubble rate
         double Hi;
         double Hinv;
         Hi = H(f,p);
         Hinv = 1./Hi;
 
+        cout << "contstruct H " << Hi << " Hinv " << Hinv << endl;
+
         // Get epsilon
         double eps;
         eps = Ep(f, p);
 
+        // WHY IS EPSILON 0 ?????
+        cout << "constructed eps " << eps << endl;
+
         // Field metric
 		vector<double> FMi;
         FMi = fmet.fmetric(f,p);
+        cout << "constructed fmet" << endl;
+
+        for (int ii = 0; ii < nF; ii++)
+        {
+            for (int jj = 0; jj < nF; jj++)
+                {cout << FMi[nF*ii + jj] << endl;}
+        }
 
 		// Riemann tensor
 		vector<double> RMi;
 		RMi = fmet.Riemn(f,p);
 
+		cout << "constructed Riemn" << endl;
+
 		// Lower index on field-space velocities
-		vector<double> phidot_d;
+		vector<double> phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
 		{
 		    phidot_d[ii] = 0.;
@@ -183,8 +216,10 @@ public:
 		    }
 		}
 
+		cout << "constructed phidot_d" << endl;
+
 		// Covariant time derivatives of lowered-index field-space velocities
-		vector<double> cdt_phidot_d;
+		vector<double> cdt_phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
 		{
 		    cdt_phidot_d[ii] = -dVi[ii];
@@ -194,12 +229,12 @@ public:
 		    }
 		}
 
+		cout << "constructed cdt_phidot_d" << endl;
+
         // Output
         vector<double> _mijout(nF*nF); // Covariant expression
         vector<double> mijout(nF*nF);  // Up-down expression
 
-
-        // **************** DEBUG THIS BLOCK
 
 		for (int ii=0; ii < nF; ii++)
 		{
@@ -209,49 +244,58 @@ public:
 
 		    for (int jj=0; jj < nF; jj++)
 		    {
-		        hij_sum += dVVi[ii*nF + jj];
+		        hij_sum += ddVi[ii*nF + jj];
 
-                kij_sum -= (v_d[ii] * cdt_phidot_d[jj] + v_d[jj] * cdt_phidot_d[ii]) * Hinv;
-                kij_sum -= (3. - eps) * v_d[ii] * v_d[jj];
+                kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]) * Hinv;
+                kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
 
-		        for (int kk=0; kk < nF; jj++)
+		        for (int kk=0; kk < nF; kk++)
 		        {
 		            for (int ll=0; ll < nF; ll++)
 		            {
-                        rij_sum -= RMi[nF*nF*nF*ii + nF*nF*kk + nF*ll + jj]*v[k]*v[l];
+                        rij_sum -= RMi[nF*nF*nF*ii + nF*nF*kk + nF*ll + jj]*v[kk]*v[ll];
 
 		            }
 		        }
 
 		        _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
 
+		        cout << "Mij " << _mijout[ii*nF + jj] << endl;
+
 		    }
 		}
 
-        // ****************
-//
-//        // Build up-down index representation of mij
-//		for (int ii=0; ii < nF; ii++)
-//		{
-//		    for (int jj=0; jj < nF; jj++)
-//		    {
-//		        int mij_idx = ii*nF + jj;
-//		        mijout[mij_idx] = 0.;
-//
-//		        for (int kk=0; kk < nF; kk++)
-//		        {
-//		            int gik_idx = ii*nF + kk;
-//		            int mkj_idx = kk*nF + jj;
-//
-//		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
-//		        }
-//
-//		        mijout[mij_idx] *= Hinv;
-//		    }
-//		}
-//
-//        return mijout;
-    if (testing == true){return fdf;}
+        // Build up-down index representation of mij
+		for (int ii=0; ii < nF; ii++)
+		{
+		    for (int jj=0; jj < nF; jj++)
+		    {
+		        int mij_idx = ii*nF + jj;
+		        mijout[mij_idx] = 0.;
+
+		        for (int kk=0; kk < nF; kk++)
+		        {
+		            int gik_idx = ii*2*nF + kk;
+		            int mkj_idx = kk*nF + jj;
+
+		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
+		        }
+
+		        mijout[mij_idx] *= Hinv;
+
+		        cout << "MIj/H " << mijout[mij_idx] << endl;
+		    }
+		}
+
+    if (testing == true)
+    {
+        return fdf;
+    }
+    else
+    {
+        return mijout;
+    }
+
     }
 
     // function returns number of fields
