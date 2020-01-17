@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Fri Jan 17 14:49:10 2020
+// Package recompile attempted at: Fri Jan 17 15:55:53 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -235,8 +235,6 @@ static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
         }
     }
 
-    cout << "Generated Mass Matrix" << endl;
-
     // Define dimensions of output array (nF*nF)
     npy_intp dims[2];
     dims[0] = nF;
@@ -254,8 +252,6 @@ static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
             Cmij_out[ii*nF + jj] = Cmij[ii][jj];
         }
     }
-
-    cout << "C poitned" << endl;
 
     return PyArray_Return(mij_out);
 }

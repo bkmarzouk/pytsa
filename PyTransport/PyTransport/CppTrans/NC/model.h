@@ -120,20 +120,18 @@ public:
 		for(int i=0; i<nF; i++)
 		{for(int j=0; j<nF; j++)
 			{
-			mdotH= mdotH + 1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);// should this be a minus?
+			mdotH += FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j];// should this be a minus? <- Don't think so
 			}
 
 		}
-		
-  		return mdotH/(Hi*Hi);
+
+  		return 0.5*mdotH/(Hi*Hi);
 	}
 
 
     // function returns mass-squared-matrix in index-up-down representation
     vector<double> Mij(vector<double> fdf, vector<double> p)
     {
-
-        cout << "Start Mij" << endl;
 
          //--- Initialize variables and get curvature quantities
 
@@ -145,17 +143,11 @@ public:
         vector<double> f(nF);
         vector<double> v(nF);
 
-        cout << "Initialized f v vectors" << endl;
-
         for(int ii = 0; ii < nF; ii++)
         {
-            cout << "fdf[ii]" << fdf[ii] << endl;
-            cout << "fdf[ii+nF]" << fdf[ii+nF] << endl;
             f[ii] = fdf[ii];
             v[ii] = fdf[ii + nF];
         }
-
-        cout << "Constructed f v vectors" << endl;
 
         // Potential derivatives
         vector<double> ddVi;
@@ -163,47 +155,26 @@ public:
         ddVi = pot.dVV(f,p);
 		dVi =  pot.dV(f,p);
 
-		cout << "Got dpots" << endl;
-		for (int ii = 0; ii < nF; ii++)
-		{
-		    cout << dVi[ii] << endl;
-		    for (int jj = 0; jj < nF; jj++)
-		    {
-		        cout << ddVi[ii*nF + jj] << endl;
-		    }
-		}
-
         // Hubble rate & inverse hubble rate
         double Hi;
         double Hinv;
         Hi = H(f,p);
         Hinv = 1./Hi;
 
-        cout << "contstruct H " << Hi << " Hinv " << Hinv << endl;
-
         // Get epsilon
         double eps;
         eps = Ep(f, p);
 
-        // WHY IS EPSILON 0 ?????
-        cout << "constructed eps " << eps << endl;
+        // NOTE: Epsilon is incredibly small...
+//        cout << "constructed eps " << eps << endl;
 
         // Field metric
 		vector<double> FMi;
         FMi = fmet.fmetric(f,p);
-        cout << "constructed fmet" << endl;
-
-        for (int ii = 0; ii < nF; ii++)
-        {
-            for (int jj = 0; jj < nF; jj++)
-                {cout << FMi[nF*ii + jj] << endl;}
-        }
 
 		// Riemann tensor
 		vector<double> RMi;
 		RMi = fmet.Riemn(f,p);
-
-		cout << "constructed Riemn" << endl;
 
 		// Lower index on field-space velocities
 		vector<double> phidot_d(nF);
@@ -216,8 +187,6 @@ public:
 		    }
 		}
 
-		cout << "constructed phidot_d" << endl;
-
 		// Covariant time derivatives of lowered-index field-space velocities
 		vector<double> cdt_phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
@@ -228,8 +197,6 @@ public:
 		        cdt_phidot_d[ii] += -3.*Hi*FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
 		    }
 		}
-
-		cout << "constructed cdt_phidot_d" << endl;
 
         // Output
         vector<double> _mijout(nF*nF); // Covariant expression
@@ -260,7 +227,6 @@ public:
 
 		        _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
 
-		        cout << "Mij " << _mijout[ii*nF + jj] << endl;
 
 		    }
 		}
@@ -282,8 +248,6 @@ public:
 		        }
 
 		        mijout[mij_idx] *= Hinv;
-
-		        cout << "MIj/H " << mijout[mij_idx] << endl;
 		    }
 		}
 
