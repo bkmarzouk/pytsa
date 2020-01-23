@@ -50,18 +50,42 @@ class curvatureObject:
                     self.metric_inverse[a, b] = self.metric_inverse[b, a]
 
         print "-- Computing remaining metric index combinations"
-        self.metric_updown = Matrix.zeros(len(self.coords))
+        self.metric_Ud = Matrix.zeros(len(self.coords)) # Up down
+        self.metric_dU = Matrix.zeros(len(self.coords)) # down Up
         for a in self.nCr:
             for b in self.nCr:
-                self.metric_updown[a, b] = sym.simplify(
+                self.metric_Ud[a, b] = sym.simplify(
                     sum([self.metric_inverse[a, c] * self.metric[c, b] for c in self.nCr]))
-                
-        assert self.metric_updown.is_symmetric(), 0
+                self.metric_dU[a, b] = sym.simplify(
+                    sum([self.metric[a, c] * self.metric_inverse[c, b] for c in self.nCr]))
+        
+        assert self.metric_Ud.is_symmetric(), 0
+        assert self.metric_dU.is_symmetric(), 0
 
         # Consistency check: Product of G * G^-1 = Identity
         identity_matrix = self.metric * self.metric_inverse
         identity_matrix = sym.simplify(identity_matrix)
         assert identity_matrix == sym.Matrix.diag([1 for c in self.coords]), "G * G^-1 != I: {}".format(identity_matrix)
+
+        # We now generate the matrix format that is ready by PyTransport backend
+
+        # Construct half of combined matrix
+        hg1 = np.empty((self.nC, 2 * self.nC), dtype=object)
+        hg2 = np.empty((self.nC, 2 * self.nC), dtype=object)
+        for i in self.nCr:
+            for j in self.nCr:
+                hg1[i, j] = self.metric_inverse[i, j]
+                hg1[i, self.nC + j] = self.metric_Ud[i, j]
+                hg2[i, j] = self.metric_dU[i, j]
+                hg2[i, self.nC + j] = self.metric[i, j]
+                
+        combined_matrix_flattened = np.vstack((hg1, hg2)).flatten()
+        sympy_matrix_flattened = sym.symarray("G", 2 * self.nC * 2 * self.nC)
+        
+        for ii in range(2 * self.nC * 2 * self.nC):
+            sympy_matrix_flattened[ii] = sym.simplify(combined_matrix_flattened[ii])
+            
+        self.G_array = sympy_matrix_flattened
         
         # Indicate whether to simplify further symbolic expressions (though we always demand the metric identity)
         self.simpleG = simpleGeometric

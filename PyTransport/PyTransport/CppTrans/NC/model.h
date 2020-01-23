@@ -49,26 +49,34 @@ public:
     // function returns Hubble rate
 	double H(vector<double> f, vector<double> p   )
 	{
-		double Hi2;
+//		double Hi2;
+//		Hi2=0.;
+
 		double Vi;
+		Vi=pot.V(f,p);
+
 		vector<double> FMi;
 		FMi = fmet.fmetric(f,p);
-		
-		Vi=pot.V(f,p);
-		Hi2=0.;
 
+		double hubble = 0.;
+		double dotsigma = 0.;
         
 		for(int i=0; i<nF; i++)
 		{	for(int j=0; j<nF; j++)
 			{
-				Hi2=Hi2+1./3.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i]/2.);
+//				Hi2=Hi2+1./3.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i]/2.);
+                dotsigma += FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i];
 			}
 	
 		}
 
-		Hi2=Hi2 + 1./3.*Vi;
-				
-        return sqrt(Hi2);
+		hubble = sqrt((dotsigma/2. + Vi)/3.);
+
+		return hubble;
+
+//		Hi2=Hi2 + 1./3.*Vi;
+//
+//        return sqrt(Hi2);
 	}
 
     // function returns H dot
@@ -130,14 +138,10 @@ public:
 
 
     // function returns mass-squared-matrix in index-up-down representation
-    vector<double> Mij(vector<double> fdf, vector<double> p)
+    vector<double> Mij(vector<double> fdf, vector<double> p, bool hessianApprox, bool covariantExpression)
     {
 
          //--- Initialize variables and get curvature quantities
-
-        // While testing, simply return fdf
-        bool testing;
-        testing = false;
 
         // Unpack fieldsdotfields
         vector<double> f(nF);
@@ -165,9 +169,6 @@ public:
         double eps;
         eps = Ep(f, p);
 
-        // NOTE: Epsilon is incredibly small...
-//        cout << "constructed eps " << eps << endl;
-
         // Field metric
 		vector<double> FMi;
         FMi = fmet.fmetric(f,p);
@@ -191,11 +192,12 @@ public:
 		vector<double> cdt_phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
 		{
-		    cdt_phidot_d[ii] = -dVi[ii];
-		    for (int jj = 0; jj < nF; jj++)
-		    {
-		        cdt_phidot_d[ii] += -3.*Hi*FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
-		    }
+//		    cdt_phidot_d[ii] = -dVi[ii];
+//		    for (int jj = 0; jj < nF; jj++)
+//		    {
+//		        cdt_phidot_d[ii] += -3.*Hi*FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
+//		    }
+            cdt_phidot_d[ii] = -3.*Hi*phidot_d[ii] - dVi[ii];
 		}
 
         // Output
@@ -205,61 +207,69 @@ public:
 
 		for (int ii=0; ii < nF; ii++)
 		{
-		    double hij_sum = 0.0;
-		    double rij_sum = 0.0;
-		    double kij_sum = 0.0;
 
 		    for (int jj=0; jj < nF; jj++)
 		    {
+
+                double hij_sum = 0.0;
+                double rij_sum = 0.0;
+                double kij_sum = 0.0;
+
 		        hij_sum += ddVi[ii*nF + jj];
 
-                kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]) * Hinv;
-                kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
-
-		        for (int kk=0; kk < nF; kk++)
+		        if (hessianApprox == 0)
 		        {
-		            for (int ll=0; ll < nF; ll++)
-		            {
-                        rij_sum -= RMi[nF*nF*nF*ii + nF*nF*kk + nF*ll + jj]*v[kk]*v[ll];
 
-		            }
-		        }
+                    kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]) * Hinv;
+                    kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
 
-		        _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
+                    for (int kk=0; kk < nF; kk++)
+                    {
+                        for (int ll=0; ll < nF; ll++)
+                        {
+                            rij_sum -= RMi[nF*nF*nF*ii + nF*nF*kk + nF*ll + jj]*v[kk]*v[ll];
 
+                        }
+                    }
+                }
+
+                _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
 
 		    }
 		}
+
 
         // Build up-down index representation of mij
-		for (int ii=0; ii < nF; ii++)
-		{
-		    for (int jj=0; jj < nF; jj++)
-		    {
-		        int mij_idx = ii*nF + jj;
-		        mijout[mij_idx] = 0.;
+        for (int ii=0; ii < nF; ii++)
+        {
+            for (int jj=0; jj < nF; jj++)
+            {
+                int mij_idx = ii*nF + jj;
 
-		        for (int kk=0; kk < nF; kk++)
-		        {
-		            int gik_idx = ii*2*nF + kk;
-		            int mkj_idx = kk*nF + jj;
+                if (covariantExpression == 0)
+                {
 
-		            mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
-		        }
+                    mijout[mij_idx] = 0.;
 
-		        mijout[mij_idx] *= Hinv;
-		    }
-		}
+                    for (int kk=0; kk < nF; kk++)
+                    {
+                        int gik_idx = ii*2*nF + kk;
+                        int mkj_idx = kk*nF + jj;
 
-    if (testing == true)
-    {
-        return fdf;
-    }
-    else
-    {
+                        mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
+                    }
+
+                 }
+                 else
+                 { // pass index raising if covariantExpression is true
+                    mijout[mij_idx] = _mijout[mij_idx];
+                 }
+
+                mijout[mij_idx] *= Hinv*Hinv;
+            }
+        }
+
         return mijout;
-    }
-
     }
 
     // function returns number of fields

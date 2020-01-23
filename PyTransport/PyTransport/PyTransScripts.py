@@ -20,7 +20,7 @@ import numpy as np
 from scipy import interpolate
 import timeit
 import sys
-from gravtools_pyt import Curvature
+from gravtools_pyt import curvatureObject
 import os
 import pickle as pk
 import gc
@@ -739,7 +739,7 @@ def MijEvolve(back, params, MTE,
         # Hubble rate at current step
         H = hubble[s]
         
-        MIj = np.asarray(MIj_lambda(*sym_subs))
+        # MIj = np.asarray(MIj_lambda(*sym_subs))
         
         # Get values for potential and derivatives
         V = V_evo[s]

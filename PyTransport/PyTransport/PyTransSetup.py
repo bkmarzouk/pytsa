@@ -245,7 +245,8 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
         print '[{time}] constructing curvature class instance'.format(time=time.ctime())
     
     # Initialize curvature class instance: This will handle all symbolic computations requried
-    curv_instance = gravtools_pyt.curvatureObject(G, f, V, params=p)
+    """ TODO: add kwargs for simplifying curv. and pots. """
+    curv_instance = gravtools_pyt.curvatureObject(G, f, V, params=p, simpleGeometric=True, simplePotentials=False)
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
     
@@ -271,12 +272,22 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
     ddV_arr = curv_instance.ddV
     dddV_arr = curv_instance.dddV
     
+    # for i in range(nF):
+    #     vd[i] = dV_arr[i]
+    #     for j in range(nF):
+    #         vdd[i + j * nF] = ddV_arr[i, j]
+    #         for k in range(nF):
+    #             vddd[i + j * nF + k * nF * nF] = dddV_arr[i, j, k]
+    
+    ddV_arr_flat = ddV_arr.flatten()
+    dddV_arr_flat = dddV_arr.T.flatten() # Transpose of canonical matrix coords. + flatten seems to agree
+    
     for i in range(nF):
         vd[i] = dV_arr[i]
         for j in range(nF):
-            vdd[i + j * nF] = ddV_arr[i, j]
+            vdd[i + j*nF] = ddV_arr_flat[i + j*nF]
             for k in range(nF):
-                vddd[i + j * nF + k * nF * nF] = dddV_arr[i, j, k]
+                vddd[i + j * nF + k * nF * nF] = dddV_arr_flat[i + j * nF + k * nF * nF]
     
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
@@ -413,9 +424,9 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
     
     else:
         # If curvature instance is passed, utilize precomputed objects
-        gab = curv_obj.metric           # Get metric with covariant indices
-        gAB = curv_obj.metric_inverse   # Get metric with contravariant indices
-        gAb = curv_obj.metric_updown    # Get metric with mixed indices
+        # gab = curv_obj.metric           # Get metric with covariant indices
+        # gAB = curv_obj.metric_inverse   # Get metric with contravariant indices
+        # gAb = curv_obj.metric_updown    # Get metric with mixed indices
         
         Ga  = curv_obj._christoffelSymbols
         Ri  = 0 # This isn't actually used...
@@ -436,32 +447,29 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
     Gamma_array = sym.symarray('Gamma', 2 * nF * 2 * nF * 2 * nF)
     R_array = sym.symarray('Riemann', nF * nF * nF * nF)
     gradR_array = sym.symarray('gradRiemann', nF * nF * nF * nF * nF)
-    
-    # populate metric matrix
-    for i in range(2 * nF):
-        for j in range(2 * nF):
-            if i < nF:
-                ii = -i - 1
-            else:
-                ii = i - (nF - 1)
-            if j < nF:
-                jj = -j - 1
-            else:
-                jj = j - (nF - 1)
-            
-            if curv_obj is None:
+
+    if curv_obj is None:
+        
+        # populate metric matrix
+        for i in range(2 * nF):
+            for j in range(2 * nF):
+                if i < nF:
+                    ii = -i - 1
+                else:
+                    ii = i - (nF - 1)
+                if j < nF:
+                    jj = -j - 1
+                else:
+                    jj = j - (nF - 1)
+                
                 if simple is True:
                     G_array[(2 * nF) * i + j] = sym.simplify(g(ii, jj))
                 else:
                     G_array[(2 * nF) * i + j] = g(ii, jj)
-            else:
-                if np.sign(ii) == np.sign(jj):
-                    if np.sign(ii) == 1:
-                        G_array[(2 * nF) * i + j] = gab[abs(ii)-1, abs(jj)-1]
-                    else:
-                        G_array[(2 * nF) * i + j] = gAB[abs(ii)-1, abs(jj)-1]
-                else:
-                    G_array[(2 * nF) * i + j] = gAb[abs(ii)-1, abs(jj)-1]
+                    
+    else:
+        
+        G_array = curv_obj.G_array
                 
     
     # populate connexion matrix
@@ -481,19 +489,17 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
                 else:
                     kk = k - (nF - 1)
                 
-                if curv_obj is None:
-                    if kk < 0 or jj < 0 or ii > 0:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
-                    else:
-                        if simple is True:
-                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(Ga(ii, jj, kk))
-                        else:
-                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(ii, jj, kk)
+                
+                if kk < 0 or jj < 0 or ii > 0:
+                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
                 else:
-                    if kk < 0 or jj < 0 or ii > 0:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
-                    else:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga[abs(ii)-1, abs(jj)-1, abs(kk)-1]
+                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(
+                        ii, jj, kk) if curv_obj is None else curv_obj.getChristoffel(abs(ii)-1, jj-1, kk-1)
+                    
+                    if curv_obj is None and simple is True:
+                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(
+                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k]
+                        )
     
     # populate Riemann matrix
     for i in range(nF):
