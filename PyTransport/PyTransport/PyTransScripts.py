@@ -118,6 +118,7 @@ def ICsBE(NBExit, k, back, params, MTE):
     if ll == np.size(back[:, 0]) or (NExit - back[0, 0]) < NBExit:
         print  ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
+    
     NexitMinus = back[ll - 2, 0]
     backExitMinus = back[ll - 2, 1:]
     
@@ -666,6 +667,7 @@ def MijEvolve(back, params, MTE,
     # Get field space metric and inverse
     G = curv_obj.metric
     Ginv = curv_obj.metric_inverse
+   
     
     # Build array and populate with field space lambda functions
     Glambdas = np.empty(np.shape(G), dtype=object)
@@ -689,6 +691,7 @@ def MijEvolve(back, params, MTE,
         for b in rnf:
             Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
             Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
+            
             if hess_approx is True:
                 pdpdV_lambdas[a, b] = sym.lambdify(fp_syms, pdpdV[a, b], "numpy")
             if full_mij:

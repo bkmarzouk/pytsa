@@ -117,7 +117,6 @@ class curvatureObject:
         self.dV = np.zeros((len(coords)), dtype=object)
         self.ddV = np.zeros((len(coords), len(coords)), dtype=object)
         self.dddV = np.zeros((len(coords), len(coords), len(coords)), dtype=object)
-        
 
         print "-- Precomputing symbolic expressions"
         
@@ -153,8 +152,6 @@ class curvatureObject:
         NN = self.nC**3 + self.nC**2 + self.nC
     
         for ii in self.nCr:
-            
-            print "{} / {}".format(c, NN)
             c += 1
         
             # Compute first partial derivative of V
@@ -165,11 +162,10 @@ class curvatureObject:
             if self.simpleV: _pdV = sym.simplify(_pdV)
         
             self._pdV[ii] = _pdV
+            
+            print "{} / {}".format(c, NN)
         
             for jj in self.nCr:
-    
-                print "{} / {}".format(c, NN)
-                c += 1
             
                 if jj >= ii:
                 
@@ -184,11 +180,11 @@ class curvatureObject:
             
                 else:
                     self._pdpdV[ii, jj] = self._pdpdV[jj, ii]
+
+                c += 1
+                print "{} / {}".format(c, NN)
             
                 for kk in self.nCr:
-    
-                    print "{} / {}".format(c, NN)
-                    c += 1
                 
                     if kk >= jj:
 
@@ -202,6 +198,9 @@ class curvatureObject:
                 
                     else:
                         self._pdpdpdV[ii, jj, kk] = self._pdpdpdV[ii, kk, jj]
+
+                    c += 1
+                    print "{} / {}".format(c, NN)
     
     
     def getChristoffel(self, a, b, c):
@@ -380,6 +379,8 @@ class curvatureObject:
                         self._christoffelSymbols[a, b, c] = self.getChristoffel(a, b, c)
                     else:
                         self._christoffelSymbols[a, b, c] = self._christoffelSymbols[a, c, b]
+                        
+                    print type(self._christoffelSymbols[a, b, c]), self._christoffelSymbols[a, b, c]
         
         print "-- Precomputing Riemann tensors"
         
@@ -397,12 +398,11 @@ class curvatureObject:
         symm_ijkl = np.asarray(symm_locs).T
         
         # Count fundamental component computations dynamically
-        c = 1
+        c = 0
         m = len(calc_ijkl)
         
         # Compute independent components
         for ijkl in calc_ijkl:
-            print "computing {}/{}".format(c, m)
             
             i, j, k, l = ijkl
             
@@ -413,8 +413,11 @@ class curvatureObject:
             Rijkl = self.getRiemann(i, j, k, l)
             
             self._riemannTensor[i, j, k, l] = Rijkl
-            
+
             c += 1
+            
+            print "computed {}/{}".format(c, m)
+            
         
         # Assign symmetrically related components
         for ijkl in symm_ijkl:

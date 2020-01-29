@@ -45,58 +45,157 @@ public:
         nP=pot.getnP();
         nF=pot.getnF();
     }
-    
+
+
+    // ****** NEW RECIPE FOR BACKGROUND
+
+    // function computes the kinetic energy of the fields
+    double ke(vector<double> fdf, vector<double> p)
+    {
+
+        // Unpack velocities from fields-dotfields
+        vector<double> phi(nF);
+        vector<double> phidot(nF);
+
+        for(int ii = 0; ii < nF; ii++)
+        {
+            phi[ii] = fdf[ii];
+            phidot[ii] = fdf[ii + nF];
+        }
+
+        // Get field metric
+        vector<double> FMi;
+		FMi = fmet.fmetric(fdf,p);
+
+        // Double-contract field space velocities with cov. field metric
+		double dotsigmasq = 0;
+		double iter_;
+
+		for (int i = 0; i < nF; i++){
+		    for (int j = 0; j < nF; j++){
+
+		        iter_ = FMi[(2*nF)*(i+nF)+(j+nF)]*phidot[j]*phidot[i];
+
+		        if ( isnan(iter_) != true || isinf(iter_) != true ){
+		            dotsigmasq += iter_;
+		        }
+		    }
+		}
+
+        if( isnan(dotsigmasq) || isinf(dotsigmasq)){ dotsigmasq = 0; }
+
+		return 0.5 * dotsigmasq;
+    }
+
+
     // function returns Hubble rate
 	double H(vector<double> f, vector<double> p   )
 	{
-//		double Hi2;
-//		Hi2=0.;
-
+	    // Compute potential
 		double Vi;
 		Vi=pot.V(f,p);
 
+        // Get field space metric
 		vector<double> FMi;
 		FMi = fmet.fmetric(f,p);
 
-		double hubble = 0.;
-		double dotsigma = 0.;
-        
-		for(int i=0; i<nF; i++)
-		{	for(int j=0; j<nF; j++)
-			{
-//				Hi2=Hi2+1./3.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i]/2.);
-                dotsigma += FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i];
-			}
-	
-		}
+        // Compute field-space kinetic energy
+        double dotsigmasq = ke(f, p);
 
-		hubble = sqrt((dotsigma/2. + Vi)/3.);
+        // Compute hubble rate directly from background EoM
+		double hubble = sqrt((dotsigmasq + Vi)/3.);
 
 		return hubble;
-
-//		Hi2=Hi2 + 1./3.*Vi;
-//
-//        return sqrt(Hi2);
 	}
+
 
     // function returns H dot
     double Hdot(vector<double> f, vector<double> p)
 	{
-        double sum=0.;
+        // Hdot is simply minus the kinetic energy of the fields
+        double dotsigmasq = ke(f, p);
 
-		vector<double> FMi;
-		FMi = fmet.fmetric(f,p);
-		
-		for(int i=0; i<nF; i++)
-		{for(int j=0; j<nF; j++)
-			{
-				sum= sum - 1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);
-				}
-		
-		}
-
-		return sum;
+		return -dotsigmasq;
 	}
+
+
+    // function returns epsilon
+	double Ep(vector<double> f,vector<double> p)
+	{
+
+        double Vi = pot.V(f, p);
+        double Hubble = H(f, p);
+        double Epsilon = 3. - Vi / (Hubble*Hubble);
+
+
+        return Epsilon;
+	}
+
+    // ****** ORIGINAL RECIPE FOR BACKGROUND
+
+//    // function returns Hubble rate
+//	double H(vector<double> f, vector<double> p   )
+//	{
+//		double Hi2;
+//		double Vi;
+//		vector<double> FMi;
+//		FMi = fmet.fmetric(f,p);
+//
+//		Vi=pot.V(f,p);
+//		Hi2=0.;
+//
+//
+//		for(int i=0; i<nF; i++)
+//		{	for(int j=0; j<nF; j++)
+//			{
+//				Hi2=Hi2+1./3.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+j]*f[nF+i]/2.);
+//			}
+//
+//		}
+//
+//		Hi2=Hi2 + 1./3.*Vi;
+//
+//        return sqrt(Hi2);
+//	}
+//
+//    // function returns H dot
+//    double Hdot(vector<double> f, vector<double> p)
+//	{
+//        double sum=0.;
+//
+//		vector<double> FMi;
+//		FMi = fmet.fmetric(f,p);
+//
+//		for(int i=0; i<nF; i++)
+//		{for(int j=0; j<nF; j++)
+//			{
+//				sum= sum - 1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);
+//				}
+//
+//		}
+//
+//		return sum;
+//	}
+//
+//	    // function returns epsilon
+//	double Ep(vector<double> f,vector<double> p)
+//	{
+//		double Hi = H(f,p);
+//		double mdotH=0.;
+//		vector<double> FMi;
+//		FMi = fmet.fmetric(f,p);
+//
+//		for(int i=0; i<nF; i++)
+//		{for(int j=0; j<nF; j++)
+//			{
+//			mdotH= mdotH + 1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);// should this be a minus?
+//			}
+//
+//		}
+//
+//  		return mdotH/(Hi*Hi);
+//	}
+
     // function returns a double dot
     double addot(vector<double> f, vector<double> p)
     {
@@ -117,24 +216,6 @@ public:
 		
         return addot;
     }
-    // function returns epsilon
-	double Ep(vector<double> f,vector<double> p)
-	{
-		double Hi = H(f,p);
-		double mdotH=0.;
-		vector<double> FMi;
-		FMi = fmet.fmetric(f,p);
-
-		for(int i=0; i<nF; i++)
-		{for(int j=0; j<nF; j++)
-			{
-			mdotH += FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j];// should this be a minus? <- Don't think so
-			}
-
-		}
-
-  		return 0.5*mdotH/(Hi*Hi);
-	}
 
 
     // function returns mass-squared-matrix in index-up-down representation
@@ -159,15 +240,13 @@ public:
         ddVi = pot.dVV(f,p);
 		dVi =  pot.dV(f,p);
 
-        // Hubble rate & inverse hubble rate
-        double Hi;
-        double Hinv;
-        Hi = H(f,p);
-        Hinv = 1./Hi;
-
         // Get epsilon
         double eps;
         eps = Ep(f, p);
+
+        // Get hubble rate
+        double Hi;
+        Hi = H(f, p);
 
         // Field metric
 		vector<double> FMi;
@@ -178,7 +257,7 @@ public:
 		RMi = fmet.Riemn(f,p);
 
 		// Lower index on field-space velocities
-		vector<double> phidot_d(nF);
+		vector<long double> phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
 		{
 		    phidot_d[ii] = 0.;
@@ -189,15 +268,11 @@ public:
 		}
 
 		// Covariant time derivatives of lowered-index field-space velocities
-		vector<double> cdt_phidot_d(nF);
+		vector<long double> cdt_phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
 		{
-//		    cdt_phidot_d[ii] = -dVi[ii];
-//		    for (int jj = 0; jj < nF; jj++)
-//		    {
-//		        cdt_phidot_d[ii] += -3.*Hi*FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
-//		    }
-            cdt_phidot_d[ii] = -3.*Hi*phidot_d[ii] - dVi[ii];
+//            cdt_phidot_d[ii] = -3.*Hi*phidot_d[ii] - dVi[ii];
+            cdt_phidot_d[ii] = -3.*phidot_d[ii] - dVi[ii] / Hi;
 		}
 
         // Output
@@ -211,16 +286,17 @@ public:
 		    for (int jj=0; jj < nF; jj++)
 		    {
 
-                double hij_sum = 0.0;
-                double rij_sum = 0.0;
-                double kij_sum = 0.0;
+                double hij_sum = 0;
+                double rij_sum = 0;
+                double kij_sum = 0;
 
 		        hij_sum += ddVi[ii*nF + jj];
 
-		        if (hessianApprox == 0)
+		        if (hessianApprox == false)
 		        {
 
-                    kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]) * Hinv;
+//                    kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]) / Hi;
+                    kij_sum -= (phidot_d[ii] * cdt_phidot_d[jj] + phidot_d[jj] * cdt_phidot_d[ii]);// / Hi;
                     kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
 
                     for (int kk=0; kk < nF; kk++)
@@ -233,11 +309,12 @@ public:
                     }
                 }
 
+                cout << hij_sum << " " << kij_sum << " " << rij_sum << " " << eps << " " << Hi << endl;
+
                 _mijout[ii*nF + jj] = hij_sum + rij_sum + kij_sum;
 
 		    }
 		}
-
 
         // Build up-down index representation of mij
         for (int ii=0; ii < nF; ii++)
@@ -256,7 +333,7 @@ public:
                         int gik_idx = ii*2*nF + kk;
                         int mkj_idx = kk*nF + jj;
 
-                        mijout[mij_idx] += FMi[gik_idx]*_mijout[mkj_idx];
+                        mijout[mij_idx] += FMi[gik_idx] *_mijout[mkj_idx];
                     }
 
                  }
@@ -265,7 +342,8 @@ public:
                     mijout[mij_idx] = _mijout[mij_idx];
                  }
 
-                mijout[mij_idx] *= Hinv*Hinv;
+                 mijout[mij_idx] /= Hi*Hi;
+
             }
         }
 
