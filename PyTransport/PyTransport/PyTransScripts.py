@@ -415,151 +415,19 @@ def kexitPhi(PhiExit, n, back, params, MTE):
     return k
 
 
-
-def dotdotfields(back, MTE, params):
-    """ Computes second time derivatives of the fields. Uses analytic form of background evolution equations. """
-    
-    """ Returns second time derivatives of the fields using analytic form of the background equations of motion
-        as a contravariant object"""
-    
-    # Find curvature records directory and create file instance to lead curvature class obj.
-    dir = os.path.dirname(__file__)
-    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
-    curv_path = os.path.join(curv_dir, curv_name)
-    curv_file = open(curv_path, 'r')
-    with curv_file:
-        curv_obj = pk.load(curv_file)
-    
-    nF = MTE.nF()
-
-    # Get Hubble values to transform N derivatives to t derivatives
-    Hubble = np.array([MTE.H(np.array([step[1:]][0]), params) for step in back])
-    
-    # Get field time derivatives from background data
-    phi = np.array([step[1:1+nF] for step in back])
-    phidot = np.array([step[1 + nF:1+2*nF] for step in back])
-    
-    subs = []
-    for s in range(len(back)):
-        # = {}
-        
-        for i in range(nF):
-            subs[curv_obj.coords[i]] = phi[i]
-
-    # Get derivatives of the potential from background data
-    dV_ = np.array([[MTE.dV(fvals[1:1 + nF], params) for fvals in back]])
-    
-    # Raise an index from dV
-    Ginv = curv_obj.metric_inverse
-    dV = np.array([Ginv[a, b]*dV_[b] for a in range(nF) for b in range(nF)])
-    
-    # Compute second time derivative of the fields
-    phidotdot = np.vstack(
-        (-3. * Hubble[i] * phidot[i] - dV[i] for i in range(nF))
-    )
-
-    return phidotdot
-
-
-def EvolveKE(back, params, MTE):
-    """ Computes the Kinetic Energy of the fields along the background trajectory """
-    
-    # Find curvature records directory and create file instance to lead curvature class obj.
-    dir = os.path.dirname(__file__)
-    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
-    curv_path = os.path.join(curv_dir, curv_name)
-    curv_file = open(curv_path, 'r')
-    with curv_file:
-        curv_obj = pk.load(curv_file)
-    
-    # Inverse metric
-    metric = curv_obj.metric
-    
-    # Get number of fields and params
-    nF = MTE.nF()
-    nP = MTE.nP()
-    
-    print "-- Building dict"
-    
-    # Build lambda functions for metric
-    pdict = dict()
-    for i in range(nP):
-        pdict[curv_obj.params[i]] = params[i]
-    
-    print "-- Building lambda functions"
-    
-    metric_lambdas = np.empty((nF, nF), dtype=object)
-    
-    for i in range(nF):
-        for j in range(nF):
-            metric_lambdas[i, j] = sym.lambdify([f for f in curv_obj.coords], metric[i, j].subs(pdict), "numpy")
-    
-    print "-- Computing K.E. evolution"
-    
-    
-    # Build dictionary for symbolic substitutions
-    def g_ab(a, b, step):
-        fields = list(step[1:1 + nF])
-        m_eval = metric_lambdas[a, b](*fields)
-        return m_eval
-    
-    
-    # Kinetic Energy = 1/2 * g_{ab} * dt phi^a dt phi^b
-    backKE = np.array(
-        [0.5 * sum([g_ab(a, b, step) * step[1 + nF + a] * step[1 + nF +  b] for a in range(nF) for b in range(nF)]) for
-         step in back])
-    
-    # return 2 x N numpy array, with the the first col containing efold number and the second the fields K.E.
-    return np.vstack([back.T[0], backKE]).T
-
-
-def KineticEnergy(fields, dotfields, params, MTE, curv_obj):
-    """ Computes the kinetic energy of the fields. Assumes canonical lagrangian kinetic term """
-    
-    if curv_obj is None:
-        # Find curvature records directory and create file instance to lead curvature class obj.
-        dir = os.path.dirname(__file__)
-        curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-        curv_name = str(MTE).split("'")[1][7:] + ".curvature"
-        curv_path = os.path.join(curv_dir, curv_name)
-        curv_file = open(curv_path, 'r')
-        with curv_file:
-            curv_obj = pk.load(curv_file)
-    
-    # Inverse metric
-    metric = curv_obj.metric
-    
-    nF = MTE.nF()
-    nP = MTE.nP()
-    KE = 0
-    
-    # Build dictionary for symbolic substitutions
-    sub_dict = dict()
-    for i in range(nF):
-        sub_dict[curv_obj.coords[i]] = fields[i]
-    if curv_obj.params is not None:
-        for i in range(nP):
-            sub_dict[curv_obj.params[i]] = params[i]
-    
-    # Iterate over field indices
-    for I in range(nF):
-        for J in range(nF):
-            # Contract field velocities with field metric to get kinetic energy
-            KE += 0.5 * metric[I, J].subs(sub_dict) * dotfields[I] * dotfields[J]
-    
-    return KE
-
-
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
                        tols=np.array([1e-12, 1e-12]), tmax_bg=-1):
+    """ Simple iterative procedure to extend canonical background evolution past epsilon;
+        differs from exit=True routine in backEvolve by attempting to re-integrate after integrator limit """
     
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
 
     """
+    
     Integrator flag defs.
+    
+    NOTE: Failure upon integrating background quantities return tuple: (flag, Efold)
 
     int SHORT = -50;          // Inflation too short
     int KEXIT = -49;          // Unable to find Fourier mode
@@ -568,283 +436,92 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     int VIOLATED = -46;       // Field space position violates model
     int ETERNAL = -45;        // Unable to find end of inflation
     int TIMEOUT = -44;        // Integration time exceeded
+    
     """
     
     # Get fiducial end of inflation, i.e. when epsilon=1
     Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000, tmax_bg)
     
-    if type(Nepsilon) is int and Nepsilon in [-48, -45, -44]:
-        return Nepsilon
+    # Return flag
+    if type(Nepsilon) is tuple: return Nepsilon[0]
     
     # Define initial efolding range and compute background
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
-    
-    if type(BG_epsilon) is int and BG_epsilon in [-47, -44]:
-        # del Nspace_init, n_iter
-        # gc.collect()
-        return BG_epsilon
+
+    # If extended integration immediately fails, return background up until integrator limit
+    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-47, -44]: return BG_epsilon
     
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]
     
+    # Iteration counter
     c = 0
-    tols = np.array([1e-12, 1e-12])  # Adapt to higher precision
+    
+    # Adapt to higher precision
+    tols = np.array([1e-12, 1e-12])
+    
     while c < n_iter:
         
-        # Define new initial conditions to be the field data at the previous background segment
-        N_init  = extensions[-1][-1][0]
-        bg_init = extensions[-1][-1][1:]
+        # Define new ICs with last background step
+        N_init, bg_init = extensions[-1][-1][0], extensions[-1][-1][1:]
         
-        # define new efolding range and compute extension to background
+        # Extend target efold range
         N_space = np.linspace(N_init, N_init + adpt_step, 100)
+        
+        # Try and compute extension to background evolution
         bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False, tmax_bg)
         
-        # If we fail to compute the backgroud, break out of iterative cycle
-        if type(bg_ext) is int and bg_ext in [-47, -44]:
-            break
+        # If a integration flag is returned, break out of loop
+        if type(bg_ext) is tuple and bg_ext[0] in [-47, -44]: break
         
-        # Otherwise add segment to the list of background data
-        extensions.append(bg_ext[1:])
+        # Otherwise append extension to list
+        extensions.append(bg_ext[1:]) # [1:] skips first step in extension (this is already in the list)
         
+        # Increment counter
         c += 1
     
+    # If no extensions are found, simply
     if len(extensions) == 1:
         return BG_epsilon, Nepsilon
     
     else:
-        # Stack together into numpy ndarray, structured consistently with typical backEvolve
+        # Reconstruct extensions to 2d numpy array (as backEvolve)
         stacked = np.vstack((bg for bg in extensions))
         
-        # return the background, as well as the efolding where slow-roll was violated
+        # return the background, as well as the e-folding where slow-roll was violated
         return stacked, Nepsilon
 
 
-def MijEvolve(back, params, MTE,
-              scale_eigs=False, hess_approx=False, chess_approx=False, verbose=False, covariant=False):
+def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
     
-    # Find curvature records directory and create file instance to lead curvature class obj.
-    dir = os.path.dirname(__file__)
-    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-    curv_name = str(MTE).split("'")[1][7:] + ".curvature"
-    curv_path = os.path.join(curv_dir, curv_name)
-    curv_file = open(curv_path, 'rb')
+    # Build empty array to populate with efold number + eigenvalues of mass-matrix at time step
+    eigs = np.empty((len(back), 1+MTE.nF()))
     
-    with curv_file:
-        curv_obj = pk.load(curv_file)
-    
-    # Number of fields and parameters
-    nF = MTE.nF()
-    nP = MTE.nP()
-    
-    """ Get evolution of background quantities """
-    
-    # Potential & derivatives efold evolution
-    V_evo = [MTE.V(step[1:1 + nF], params) for step in back] # Time series of potential
-    dV_evo = [MTE.dV(step[1:1 + nF], params) for step in back]  # Time series of 1st deriv. pot.
-    ddV_evo = [MTE.ddV(step[1:1 + nF], params) for step in back]  # Time series of 2nd deriv. pot.
-    
-    # Hubble rate
-    hubble = [MTE.H(np.concatenate([step[1:1 + nF], step[1 + nF:1+2*nF]]), params) for step in back]
-    
-    # Transpose background evolution into horizontal components
-    backT = back.T
-
-    # Get symbolic definitions for background
-    f_syms = curv_obj.coords        # fields
-    v_syms = sym.symarray("v", nF)  # velocities
-    p_syms = curv_obj.params        # parameters
-    fp_syms = [f for f in f_syms] + [v for v in v_syms] + [p for p in p_syms]
-    
-    # Flag full mass-matrix calculation
-    full_mij = not(hess_approx) and not(chess_approx)
-    
-    # Riemann tensor
-    if full_mij:
-        rsyms = curv_obj.Rsyms
-    
-    # Get field space metric and inverse
-    G = curv_obj.metric
-    Ginv = curv_obj.metric_inverse
-   
-    
-    # Build array and populate with field space lambda functions
-    Glambdas = np.empty(np.shape(G), dtype=object)
-    Ginvlambdas = np.empty(np.shape(Ginv), dtype=object)
-    if full_mij is True:
-        rlambdas = np.empty(np.shape(rsyms), dtype=object)
-
-    # Define coordinate index range to iterate over
-    rnf = range(nF)
-    
-    # If using purely Hessian approximation, load partial derivative expressions
-    if hess_approx is True:
-        pdpdV = curv_obj.pdpdV
-        pdpdV_lambdas = np.empty(np.shape(pdpdV), dtype=object)
-
-    if verbose is True:
-        print "-- lambdifying"
-    
-    # Lambdify symbolic expressions
-    for a in rnf:
-        for b in rnf:
-            Glambdas[a, b] = sym.lambdify(fp_syms, G[a, b], "numpy")
-            Ginvlambdas[a, b] = sym.lambdify(fp_syms, Ginv[a, b], "numpy")
-            
-            if hess_approx is True:
-                pdpdV_lambdas[a, b] = sym.lambdify(fp_syms, pdpdV[a, b], "numpy")
-            if full_mij:
-                for c in rnf:
-                    for d in rnf:
-                        rlambdas[a, b, c, d] = sym.lambdify(fp_syms, rsyms[a, b, c, d], "numpy")
-
-    if verbose is True:
-        print "-- done"
+    for idx, step in enumerate(back):
         
-    """ We can lambdify a symbolic matrix as follows, but this is slow... """
-    # Mij = sym.symarray("M", shape=(6,6))
-    #
-    # for a in rnf:
-    #     for b in rnf:
-    #         Mij[a, b] = curv_obj.pdpdV[a, b]
-    #
-    # MIj = sym.symarray("M", shape=(6,6))
-    #
-    # for a in rnf:
-    #     for b in rnf:
-    #         MIj[a, b] = sum([Ginv[a, c]*Mij[c, b] for c in rnf])
-    #
-    # print "-- lambdifying MIj"
-    # MIj_lambda = sym.lambdify(fp_syms, MIj, "numpy")
+        # Unpack efolding and fields as np arrays
+        N, fieldsdotfields = step[0], step[1:1 + 2 * MTE.nF()]
     
-    eig_evo_raw = [] # Record raw eigenvalues of mass-matrix
-    eig_evo_hub = [] # Record Hubble normalized eigenvalues of mass-matrix
+        # Compute mass matrix
+        Mij = MTE.massMatrix(fieldsdotfields, params, hess_approx, covariant)
     
-    s = 0
-    lb = len(back)
-    
-    for s in range(lb):
+        # Compute and sort eigenvalues
+        masses = np.linalg.eigvals(Mij)
+        masses = np.sort(masses)
         
-        if verbose is True:
-            print "Computing Mij step:", s+1, "/", lb
+        # If scale eigs m^2 -> m
+        if scale_eigs: masses = np.sign(masses) * np.sqrt(np.abs(masses))
         
-        # Background step
-        step = back[s]
+        # Assign row values for mass-matrix
+        eigs[idx] = np.concatenate((np.array([N]), masses))
         
-        # Fields and field time derivatives
-        phi = step[1:1+nF]
-        dtphi = step[1+nF:1+2*nF]
-        
-        # Values for symbolic evaluations
-        sym_subs = [x for x in phi] + [x for x in dtphi] + [x for x in params]
-        
-        # Hubble rate at current step
-        H = hubble[s]
-        
-        # MIj = np.asarray(MIj_lambda(*sym_subs))
-        
-        # Get values for potential and derivatives
-        V = V_evo[s]
-        dV = dV_evo[s]
-        ddV = ddV_evo[s]
-
-        # Initialize covariant Hessian, Riemann and Kinetic term
-        covhess = np.zeros((nF, nF), dtype=float)
-        if full_mij:
-            riemann = np.zeros((nF, nF), dtype=float)
-            kinetic = np.zeros((nF, nF), dtype=float)
-
-        # Compute covariant time derivatives of \phi from background equations of motion
-        def covdt_dtphi_up(idx): # \Dt\dot\phi^a
-            return -3.*H*dtphi[idx] - sum([Ginvlambdas[k, idx](*sym_subs)*dV[k] for k in rnf])
-
-        def covdt_dtphi_down(idx): # \Dt\dot\phi_a
-            return sum([-3.*H*Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf]) - dV[idx]
-
-        # Lower index of field time derivative \dot\phi_a = G_{ab}\dot\phi^b
-        def dtphi_down(idx):
-            return sum([Glambdas[idx, k](*sym_subs)*dtphi[k] for k in rnf])
-
-        # Get epsilon (dot H / H^2) from std. bg eom
-        if full_mij:
-            epsilon = -3. + V / H / H
-
-        # Iterate over range of coordinate indices
-        for a in rnf:
-            for b in rnf:
-
-                # In the Hessian approximation, we simply eval. partial derivatives along backgroudn values
-                if hess_approx:
-
-                    covhess[a, b] = pdpdV_lambdas[a, b](*sym_subs)
-
-                else:
-
-                    covhess[a, b] = ddV[a, b]
-
-                    # If we want the full mass-matrix, we add the Riemann and Kinetic terms
-                    if not chess_approx:
-
-                        riemann[a, b] = -sum([rlambdas[a, k, l, b](*sym_subs) * dtphi[k] * dtphi[l]
-                                               for k in rnf for l in rnf])
-
-                        kinetic[a, b] = -(dtphi_down(a) * covdt_dtphi_down(b) +
-                                           dtphi_down(b) * covdt_dtphi_down(a)) / H \
-                                         - (3 - epsilon) * dtphi_down(a) * dtphi_down(b)
-
-
-        # Combine terms to produce mass-squared-matrix
-        Mij = covhess
-        if full_mij:
-            Mij += riemann + kinetic
-
-        if not covariant:
-
-            MIj = np.empty(shape=np.shape(Mij), dtype=float)
-
-            for a in rnf:
-                for b in rnf:
-                    MIj[a, b] = sum([Ginvlambdas[a, k](*sym_subs)*Mij[k, b] for k in rnf])
-
-        else:
-            MIj = Mij
-            
-
-        # Compute eigenvalues
-        eig, eigv = np.linalg.eig(MIj)
-        
-        # Sort eigenvalues from most light -> heavy
-        eig_sorted = np.sort(eig)
-        
-        # Scale eigenvalues by sqrt of absolute value, identifying tachyonic behaviour as negative
-        eig_sorted_sqrt = np.sqrt(np.abs(eig_sorted)) * np.sign(eig_sorted)
-
-        # Normalize to hubble rate
-        eig_sorted_hubble = eig_sorted_sqrt / H
-        
-        # Track evolution of matrices
-        eig_evo_raw.append(eig_sorted_sqrt)
-        eig_evo_hub.append(eig_sorted_hubble)
-
-    # Construct 1 + nF x N_efolds arrays; with zeroth column corresponding to N and the nF columns for eigenvalues
-    eigstack_raw = np.vstack([np.asarray(eig) for eig in eig_evo_raw])
-    eigstack_raw = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_raw])
-    eigstack_hub = np.vstack([np.asarray(eig) for eig in eig_evo_hub])
-    eigstack_hub = np.hstack([np.asarray(backT[0]).reshape(len(back), 1), eigstack_hub])
-    
-    # Return matrix in typical PyTransport format
-    if scale_eigs is True:
-        return eigstack_hub
-    else:
-        sq = np.sign(eigstack_hub)*eigstack_hub**2
-        for i in range(len(back)):
-            sq[i][0] = eigstack_hub[i][0]
-        return sq
+    return eigs
 
 
 def GetCurvatureObject(MTE):
-    """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
+    """ Returns the class 'curvature' object associate with the MTE module """
     
     # Find curvature records directory and create file instance to lead curvature class obj.
     dir = os.path.dirname(__file__)

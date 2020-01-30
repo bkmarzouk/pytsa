@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Thu Jan 30 10:49:09 2020
+// Package recompile attempted at: Thu Jan 30 19:00:35 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -362,14 +362,14 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
         // measure time elapsed since first time instance
         deltat = difftime(t_fin,t_ini);
 
-        // if deltat exceeds allowed time and tmax_feoi > 0 (i.e. does not flag to exit)
+        // if deltat exceeds allowed time and tmax_feoi > 0
 
         if((deltat > tmax_feoi) && (tmax_feoi>0))
             {
-                // cout << "\nIntegrator timeout (feoi): " << deltat << "\n";
                 delete[] y;
                 delete[] dy;
-                return Py_BuildValue("i", TIMEOUT); // Report final efolding
+                PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
+                return flagReturn;
             }
 
         flag = r8_rkf45(evolveB, 2*nF, y, dy, &N, Nstop, &relerr, abserr, flag, Cparams);
@@ -379,7 +379,8 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
           {
             delete[] y;
             delete[] dy;
-            return Py_BuildValue("i", FEOI); // FEOI FLAG
+            PyObject *flagReturn = Py_BuildValue("id", FEOI, N);
+            return flagReturn;
           }
 
         // compute value of epsilon
@@ -403,7 +404,9 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     delete[] y;
     delete[] dy;
 
-    return Py_BuildValue("i", ETERNAL);
+
+    PyObject *flagReturn = Py_BuildValue("id", ETERNAL, N);
+    return flagReturn;
 }
 
 // function to calculate background evolution
@@ -519,7 +522,9 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                     // Deallocate integrator work space and return timeout flag
                     delete[] y;
                     delete[] yp;
-                    return Py_BuildValue("i", TIMEOUT);
+//                    return Py_BuildValue("i", TIMEOUT);
+                    PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
+                    return flagReturn;
                 }
 
             // Otherwise compute background step and get (flag for) integrator status
@@ -530,7 +535,9 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                 // Deallocate integrator work space and return integration failure flag for background
                 delete[] y;
                 delete[] yp;
-                return Py_BuildValue("i", BACK);
+//                return Py_BuildValue("i", BACK);
+                PyObject *flagReturn = Py_BuildValue("id", BACK, N);
+                return flagReturn;
                 }
 
             // Otherwise continue in single step mode
@@ -572,7 +579,9 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                 // Deallocate integrator workspace and return timeout flag
                 delete[] y;
                 delete[] yp;
-                return Py_BuildValue("i", TIMEOUT);
+//                return Py_BuildValue("i", TIMEOUT);
+                PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
+                return flagReturn;
             }
 
             // Compute integration step and get (flag for) integrator status
@@ -583,7 +592,9 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                 // deallocate integrator workspace and return background integration failure flag
                 delete[] y;
                 delete[] yp;
-                return Py_BuildValue("i", BACK);
+//                return Py_BuildValue("i", BACK);
+                PyObject *flagReturn = Py_BuildValue("id", BACK, N);
+                return flagReturn;
                 }
             flag=-2;
 
@@ -602,12 +613,13 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
             }
     }
 
+
     // Now create python array object with background computation
 
     // Build appropriate dimensions for numpy array
     npy_intp dims[2];
     dims[1]=1+2*nF;
-    dims[0]=ii;
+    dims[0]=ii; // Last iteration count
 
     // Create python array object
     backOut = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
@@ -895,7 +907,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransagarwal_6pt0_newMab_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans2Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -907,7 +919,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransagarwal_6pt0_newMab(void)    {        Py_InitModule3("PyTransagarwal_6pt0_newMab", PyTransagarwal_6pt0_newMab_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans2Quad(void)    {        Py_InitModule3("PyTrans2Quad", PyTrans2Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
