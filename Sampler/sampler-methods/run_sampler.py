@@ -1,41 +1,45 @@
+# Import system tools
+import os, sys, importlib, pickle as pk
+
 # Import numerical tools
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
+# Import other useful tools
+import time, warnings
 
-# Import system tools
-import os
-import sys
-import importlib
-import pickle as pk
-import time
-import warnings
+""" First we need to retrieve model specific data """
 
 
-# Load configuration file, set PyTransport paths and import relevant modules
-import config as cfg
-pytpath = cfg.system['pytpath']  # PyTransport installation
-saveloc = cfg.system['saveloc']  # Save location for sampler outputs
-smppath = cfg.system['smppath']  # Sampler files directory
+# Navigate to local files
+pathLocalData = os.path.join(os.getcwd(), ".localdata")
+sys.path.append(pathLocalData)
+import generator
 
 
-# Export environment variables for external functions
-os.environ['PyTS_pytpath'] = pytpath
-os.environ['PyTS_saveloc'] = saveloc
-os.environ['PyTS_smppath'] = smppath
-os.environ['PyTS_logpath'] = os.path.join(saveloc, "sampler_stats")
+# Get environment data
+envPath = os.path.join(pathLocalData, "env.localdata")
+envFile = open(envPath, "rb")
+with envFile: envDict = pk.load(envFile)
 
 
-# Set Paths
-rootpath = os.getcwd()
-os.environ['PyTSamplerRoot'] = rootpath
+# Define set of requried keys, export to environment & define system paths
+envKeys = [
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf',
+    'PYTS_path3pf', 'PyTS_pathMasses', 'PyTS_pathSamples', 'PyTS_pathStats'
+]
+
+for eK in envKeys + ['PyTS_pathLocalData']: os.environ[eK] = envDict[eK]
+pathPyT, pathRoot, path2pf, path3pf, pathMasses, pathSamples, pathStats = [envDict[eK] for eK in envKeys]
 
 
-path_2pf = os.path.join(saveloc, "2pf")
-path_3pf = os.path.join(saveloc, "3pf")
-Mij_path = os.path.join(saveloc, "Mij")
-cfg_path = os.path.join(saveloc, "config.py")
-smp_path = os.path.join(saveloc, "samples")
+# Get fNL data
+fNLPath = os.path.join(pathLocalData, "fNL.localdata")
+fNLFile = open(fNLPath, "rb")
+with fNLFile: fNLDict = pk.load(fNLFile)
+
+
+
 
 
 # Add methods to system path
@@ -48,7 +52,7 @@ import writer as w
 
 
 # Set PyTransport internal paths
-sys.path.append(pytpath)
+sys.path.append(pathRoot)
 import PyTransSetup
 PyTransSetup.pathSet()
 
@@ -196,6 +200,12 @@ if __name__ == "__main__":
     pyt_group.add_argument("--rerun_samples", dest="rerun_samples", default=False,
                        action="store_true", help="Re-run with existing sample core data")
     
+    pyt_group.add_argument("--run_2pf", dest="run_2pf", default=False,
+                       action="store_true", help="Compute 2pt function observables")
+    
+    pyt_group.add_argument("--run_3pf", dest="run_3pf", default=False,
+                       action="store_true", help="Compute 3pt function observables")
+    
     # Add group for timeout specs
     tmax_group = parser.add_argument_group()
     
@@ -207,10 +217,11 @@ if __name__ == "__main__":
     tmax_group.add_argument("--tmax_2pf", dest="tmax_2pf", default=600, type=int,
                         help="Number of seconds 2-point function tasks may run for")
 
-    # Max number of seconds that background tasks are allowed to run for (default 45 mins)
-    tmax_group.add_argument("--tmax_3pf", dest="tmax_3pf", default=2700, type=int,
+    # Max number of seconds that background tasks are allowed to run for (default 30 mins)
+    tmax_group.add_argument("--tmax_3pf", dest="tmax_3pf", default=1800, type=int,
                         help="Number of seconds 3-point function tasks may run for")
-
+    
+    
     args = parser.parse_args()
     
     # Export max execution times as environment variables
@@ -222,4 +233,4 @@ if __name__ == "__main__":
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)
 
     # Execute main
-    main(pool, args.use_samples, args.rerun_samples)
+    main(pool, args.use_samples, args.rerun_samples, args.run_2pf, args.run_3pf)

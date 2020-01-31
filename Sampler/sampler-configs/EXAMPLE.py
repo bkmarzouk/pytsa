@@ -20,4 +20,5 @@ model.setParameterValues(-1, "numpy.random.uniform(1e-6, 1e-2)", "numpy")
 # Set configurations for the reduced-Bispectrum
 model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
 
+# Once the parameters have been set, we simply execute buildSampler
 model.buildSampler(update=True)

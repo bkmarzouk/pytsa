@@ -255,9 +255,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             assert os.path.exists(self.saveLocation), "Savelocation does not exist: {}".format(self.saveLocation)
         else:
             self.saveLocation = os.path.abspath(os.path.join(os.getcwd(), "../sampler-builds"))
-
-        # global pytpath
         
+        # define core paths for directory structure
         self.pytpath = pytpath
         self.root = os.path.join(self.saveLocation, self.name)
         self.twopt_dir = os.path.join(self.root, "2pf")
@@ -266,9 +265,15 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.stats_dir = os.path.join(self.root, "stats")
         self.samples_dir = os.path.join(self.root, "samples")
         self.outputs_dir = os.path.join(self.root, "outputs")
+        self.localdata_dir = os.path.join(self.root, ".localdata")
         
+        # Add additional locations of classes and methods
+        self.classes_dir = os.path.abspath(os.path.join(os.getcwd(), "../classes"))
+        self.methods_dir = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods"))
+        
+        # Build paths as required, subject to whether the model file is being updated
         for item in [self.root, self.twopt_dir, self.threept_dir, self.mass_dir,
-                     self.stats_dir, self.samples_dir, self.outputs_dir]:
+                     self.stats_dir, self.samples_dir, self.outputs_dir, self.localdata_dir]:
             
             if update is False:
                 assert not os.path.exists(item), "Directory already exists! {}".format(item)
@@ -277,25 +282,32 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             else:
                 if not os.path.exists(item): os.makedirs(item)
 
-
+        # Add numpy to required modules list s.t. we can build arrays for sample specimens
         if "numpy" not in self.requiredModules: self.requiredModules.append("numpy")
 
-        # Setup import statements for writing process
+        # Setup import statements to write to file
         import_lines = ["import {}\n".format(m) for m in self.requiredModules]
         
+        # Start function definition
         func_lines = ["\ndef genSample(n):\n"]
         
+        # Start fields, dotfields and parameter arrays
         fields_lines = ["\tfvals = numpy.array([\n"]
         dotfields_lines = ["\tvvals = numpy.array([\n"]
         parameters_lines = ["\tpvals = numpy.array([\n"]
+        
+        # For every field index
         for ii in range(self.nF):
             
+            # Load the execution method for the initial field and velocity value(s)
             f_command = self.fields[str(ii)]
             v_command = self.dotfields[str(ii)]
             
+            # Add to lines list
             fval_line = "\t\t" + f_command
             vval_line = "\t\t" + v_command if v_command != "SR" else "\t\t" + "'" + v_command + "'"
         
+            # Add end of line, delimiter by comma if not at end
             if ii < self.nF - 1:
                 fval_line += ",\n"
                 vval_line += ",\n"
@@ -305,10 +317,12 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             
             fields_lines.append(fval_line)
             dotfields_lines.append(vval_line)
-                
+        
+        # Close initial condition definitions
         fields_lines.append("\t])\n\n")
         dotfields_lines.append("\t])\n\n")
         
+        # Repeat process for parameters
         for ii in range(self.nP):
             
             pval_line = "\t\t" + self.parameters[str(ii)]
@@ -322,24 +336,27 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         
         parameters_lines.append("\t])\n\n")
         
+        # Combine lines to write function
         func_lines.append(fields_lines)
         func_lines.append(dotfields_lines)
         func_lines.append(parameters_lines)
         func_lines.append("\treturn n, fvals, vvals, pvals")
         
-        genSamplePath = os.path.join(self.root, "generator.py")
+        # Define path to generator function
+        genSamplePath = os.path.join(self.localdata_dir, "generator.py")
         
+        # Build generator subject to update criteria
         if update is False:
             assert not os.path.exists(genSamplePath), "Generator already exists: {}".format(genSamplePath)
         else:
-            if os.path.exists(genSamplePath):
-                os.remove(genSamplePath)
-                
+            if os.path.exists(genSamplePath): os.remove(genSamplePath)
+        
+        # Write to file
         f = open(genSamplePath, "w")
         with f:
-            for line in import_lines + func_lines:
-                f.writelines(line)
+            for line in import_lines + func_lines: f.writelines(line)
         
+        # Define paths to copy sampler routine to local model directory
         runSamplerPath_keep = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods/run_sampler.py"))
         runSamplerPath_copy = os.path.join(self.root, "run_sampler.py")
         
@@ -351,21 +368,45 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
 
         shutil.copyfile(runSamplerPath_keep, runSamplerPath_copy)
         
-        bispectraObjPath = os.path.join(self.root, "fNL.localdata")
-        environmentObjPath = os.path.join(self.root, "env.localdata")
+        # Define paths to (hidden) local data
+        bispectraObjPath = os.path.join(self.localdata_dir, "fNL.localdata")
+        environmentObjPath = os.path.join(self.localdata_dir, "env.localdata")
+        transObjPath = os.path.join(self.localdata_dir, "transport.localdata")
         
+        # Define dictionary of key transport data
+        transDict = {
+            "transportModule" : self.transportModule.__name__,
+            "exitN"           : self.efoldsBeforeExit,
+            "subN"            : self.subHorizonEvolution,
+            "intTols"         : self.integratorTols,
+            "adiabaticN"      : self.adiabaticN
+        }
+        
+        # Define dictionary of key environment varaibles
         envDict = {
-            'PyTS_pytpath' : self.pytpath,
-            'PyTS_root'    : self.root,
-            'PyTS_2pf'     : self.twopt_dir,
-            'PYTS_3pf'     : self.threept_dir,
-            'PyTS_masses'  : self.mass_dir,
-            'PyTS_smppath' : self.samples_dir,
-            'PyTS_logpath' : self.stats_dir
+            'PyTS_pathPyT'       : self.pytpath,
+            'PyTS_pathRoot'      : self.root,
+            'PyTS_path2pf'       : self.twopt_dir,
+            'PYTS_path3pf'       : self.threept_dir,
+            'PyTS_pathMasses'    : self.mass_dir,
+            'PyTS_pathSamples'   : self.samples_dir,
+            'PyTS_pathStats'     : self.stats_dir,
+            'PyTS_pathLocalData' : self.localdata_dir
         }
         
         
-        localFiles = zip([bispectraObjPath, environmentObjPath], [self.fNLConfigs, envDict])
+        # Zip paths / objects and build. Add field space conditions if these are defined
+        localPaths = [bispectraObjPath, environmentObjPath, transObjPath]
+        localDicts = [self.fNLConfigs, envDict, transDict]
+        
+        if self.badExit is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "badExit.localdata"))
+            localDicts.append(self.badExit)
+        if self.goodExit is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "goodExit.localdata"))
+            localDicts.append(self.goodExit)
+            
+        localFiles = zip(localPaths, localDicts)
         
         for item in localFiles:
             lF, o = item
