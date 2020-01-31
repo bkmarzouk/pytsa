@@ -122,6 +122,11 @@ class icpsCfgTemplate:
     def setParameterValues(self, fpNums, command, *requiredModules):
     
         self.__setValues__("parameters", command, fpNums, *requiredModules)
+    
+    
+    def setParameterLaTeX(self, pNum, LaTeX):
+        """ TODO: Finish implementing this """
+        raise AttributeError, "NOT DONE"
         
         
     def checkicps(self):
@@ -375,6 +380,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         bispectraObjPath = os.path.join(self.localdata_dir, "fNL.localdata")
         environmentObjPath = os.path.join(self.localdata_dir, "env.localdata")
         transObjPath = os.path.join(self.localdata_dir, "transport.localdata")
+        paramsObjPath = os.path.join(self.localdata_dir, "parameters.localdata")
         
         # Define dictionary of key transport data
         transDict = {
@@ -402,8 +408,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         
         
         # Zip paths / objects and build. Add field space conditions if these are defined
-        localPaths = [bispectraObjPath, environmentObjPath, transObjPath]
-        localDicts = [self.fNLConfigs, envDict, transDict]
+        localPaths = [bispectraObjPath, environmentObjPath, transObjPath, paramsObjPath]
+        localDicts = [self.fNLConfigs, envDict, transDict, self.parameters]
         
         if self.badExit is not None:
             localPaths.append(os.path.join(self.localdata_dir, "badExit.localdata"))

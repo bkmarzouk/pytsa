@@ -115,16 +115,14 @@ def update_samples(modelnumber):
 def write_results(nF):
 
     headers = ('weight', 'like')
-    paths   = [ os.path.join(smp_path, m) for m in os.listdir(smp_path)]
+    paths   = [ os.path.join(pathSamples, m) for m in os.listdir(pathSamples)]
     labels  = []
     latexs = []
 
     ncols = 2
 
-    # Get information about observables
-    observables = cfg.computations
 
-    if observables['2pf'] is True:
+    if len(os.listdir(path2pf)) > 0:
         labs = ["ns", "alpha", "2pf_t"]
         lats = ["n_s", "\\alpha", "T_{2pf}"]
 
@@ -136,12 +134,12 @@ def write_results(nF):
         for item in lats: latexs.append(item)
 
 
-    if observables['3pf'] is True:
-        which3pf = cfg.which3pf
-        for c in which3pf:
-            labs = [c['config_name'], "{}_t".format(c['config_name'])]
-            lats = ["f_{NL}"+"^{}".format(c['config_name']),
-                    "T_{}".format("{"+c['config_name']+"}") ]
+    if len(os.listdir(path3pf)) > 0:
+        
+        for d in fNLDict:
+            labs = [d['name'], "{}_t".format(d['name'])]
+            lats = ["f_{NL}"+"^{}".format(d['name']),
+                    "T_{}".format("{"+d['name']+"}") ]
 
             for item in labs:
                 headers+=(item,)
@@ -150,28 +148,31 @@ def write_results(nF):
 
             for item in lats: latexs.append(item)
 
-    if observables['Mij'] is True:
+    if len(os.listdir(pathMasses)) > 0:
+        
         for i in range(nF):
             headers+=("m{}".format(i), )
             labels.append("m{}".format(i))
             latexs.append("m_{}^2/H^2".format(i))
             ncols+=1
-        headers+=("Mij_t",)
-        labels.append("Mij_t")
+            
+        headers+=("M_t",)
+        labels.append("M_t")
         latexs.append("T_{M}")
         ncols+=1
 
 
 
-    pinfo = cfg.parameter_values
-    for item in pinfo:
-        if item['LaTeX'] is not None:
-            pnumb = item['ParameterNumber']
-            pname = "p{}".format(pnumb)
-            headers+=(pname,)
-            labels.append(pname)
-            latexs.append(item['LaTeX'])
-            ncols+=1
+    # pinfo = cfg.parameter_values
+    # for item in pinfo:
+    #     if item['LaTeX'] is not None:
+    #         pnumb = item['ParameterNumber']
+    #         pname = "p{}".format(pnumb)
+    #         headers+=(pname,)
+    #         labels.append(pname)
+    #         latexs.append(item['LaTeX'])
+    #         ncols+=1
+
 
     dicts_evolving  = []
     dicts_adiabatic = []

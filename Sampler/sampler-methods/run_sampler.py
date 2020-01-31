@@ -136,9 +136,8 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
     pool.close()
 
     # Write results file(s)
-    if sum([compute_2pf, compute_3pf, compute_Mij])!=0:
-        print "\n-- Writing result files\n"
-        w.write_results(nF)
+    print "\n-- Writing result files\n"
+    w.write_results(nF)
     print "\n-- All Complete.\n"
 
 

@@ -45,6 +45,8 @@ class realization:
     def line_dict(self):
         """"""
         
+        """ TODO: Add parameter localmodel file such that we can recover latex data """
+        
         """ We initialize a dictionary for writing lines to results file"""
         line = {'weight': 1.0, 'like': 1.0}
 
