@@ -1,4 +1,4 @@
-import os, sys, numpy as np, importlib
+import os, sys, numpy as np, importlib, shutil, pickle as pk
 
 pytpath = (
     os.path.abspath(
@@ -9,6 +9,7 @@ pytpath = (
 )
 assert os.path.exists(pytpath), "Cannot locate PyTransport installation: {}".format(pytpath)
 sys.path.append(pytpath)
+
 
 import PyTransSetup
 PyTransSetup.pathSet()
@@ -88,6 +89,24 @@ class icpsCfgTemplate:
             except ImportError:
                 raise ImportError, "Was unable to import: {}".format(rM)
             
+        # Finally check that the command can be evaluated
+        if command == "SR" and attr_ == "dotfields":
+            pass
+        
+        else:
+            try:
+                # Execute import statements
+                for m in self.requiredModules: exec("import {}".format(m))
+                
+                # Attempt evaluation of result
+                result = eval(command)
+                
+                # Check result data type
+                assert type(result) in [float, int], "Invalid result: {} -> {}".format(command, result)
+                
+            except:
+                raise ValueError, "Could not evaluate command: {}".format(command)
+            
             
     def setInitialFieldValues(self, fpNums, command, *requiredModules):
         
@@ -102,12 +121,34 @@ class icpsCfgTemplate:
     def setParameterValues(self, fpNums, command, *requiredModules):
     
         self.__setValues__("parameters", command, fpNums, *requiredModules)
-
+        
+        
+    def checkicps(self):
+        
+        field_range = []
+        dotfield_range = []
+        parameter_range = []
+        
+        for key in self.fields: field_range.append(int(key))
+        for key in self.dotfields: dotfield_range.append(int(key))
+        for key in self.parameters: parameter_range.append(int(key))
+        
+        field_range.sort()
+        dotfield_range.sort()
+        parameter_range.sort()
+        
+        assert field_range == range(
+            self.nF), "Invalid field indices for initial conditions: {} != {}".format(field_range, range(self.nF))
+        assert dotfield_range == range(
+            self.nF), "Invalid dotfield indices for initial conditions: {} != {}".format(dotfield_range, range(self.nF))
+        assert parameter_range == range(
+            self.nP), "Invalid parameter indices for model: {} != {}".format(parameter_range, range(self.nP))
+            
 
 class bispectrumCfgTemplate:
     
     def __init__(self):
-        self.configurations = None
+        self.fNLConfigs = None
     
     
     def addBispectrumConfiguration(self, name, latex, alpha, beta):
@@ -116,9 +157,9 @@ class bispectrumCfgTemplate:
         assert type(alpha) is float, "alpha parameter must be float"
         assert type(beta) is float, "beta parameter must be float"
         
-        if not hasattr(self, "configurations"): self.configurations = []
+        if not hasattr(self, "fNLConfigs"): self.fNLConfigs = []
         
-        self.configurations.append(
+        self.fNLConfigs.append(
             {
                 "name" : name,
                 "latex": latex,
@@ -175,6 +216,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         
         if self.goodExit is None: self.goodExit = []
         
+        assert minFieldValue < maxFieldValue, "min greater than max: {} !< {}".format(minFieldValue, maxFieldValue)
+        
         self.goodExit.append(
             {
                 "fieldNumber"  : fieldNumber,
@@ -192,6 +235,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         
         if self.badExit is None: self.badExit = []
         
+        assert minFieldValue < maxFieldValue, "min greater than max: {} !< {}".format(minFieldValue, maxFieldValue)
+        
         self.badExit.append(
             {
                 "fieldNumber"  : fieldNumber,
@@ -201,6 +246,136 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         )
         
     
-    def buildSampler(self):
+    def buildSampler(self, update=False):
+        
+        self.checkicps()
+        self.requiredModules = list(set(self.requiredModules))
     
-    
+        if self.saveLocation != "default":
+            assert os.path.exists(self.saveLocation), "Savelocation does not exist: {}".format(self.saveLocation)
+        else:
+            self.saveLocation = os.path.abspath(os.path.join(os.getcwd(), "../sampler-builds"))
+
+        # global pytpath
+        
+        self.pytpath = pytpath
+        self.root = os.path.join(self.saveLocation, self.name)
+        self.twopt_dir = os.path.join(self.root, "2pf")
+        self.threept_dir = os.path.join(self.root, "3pf")
+        self.mass_dir = os.path.join(self.root, "masses")
+        self.stats_dir = os.path.join(self.root, "stats")
+        self.samples_dir = os.path.join(self.root, "samples")
+        self.outputs_dir = os.path.join(self.root, "outputs")
+        
+        for item in [self.root, self.twopt_dir, self.threept_dir, self.mass_dir,
+                     self.stats_dir, self.samples_dir, self.outputs_dir]:
+            
+            if update is False:
+                assert not os.path.exists(item), "Directory already exists! {}".format(item)
+                os.makedirs(item)
+                
+            else:
+                if not os.path.exists(item): os.makedirs(item)
+
+
+        if "numpy" not in self.requiredModules: self.requiredModules.append("numpy")
+
+        # Setup import statements for writing process
+        import_lines = ["import {}\n".format(m) for m in self.requiredModules]
+        
+        func_lines = ["\ndef genSample(n):\n"]
+        
+        fields_lines = ["\tfvals = numpy.array([\n"]
+        dotfields_lines = ["\tvvals = numpy.array([\n"]
+        parameters_lines = ["\tpvals = numpy.array([\n"]
+        for ii in range(self.nF):
+            
+            f_command = self.fields[str(ii)]
+            v_command = self.dotfields[str(ii)]
+            
+            fval_line = "\t\t" + f_command
+            vval_line = "\t\t" + v_command if v_command != "SR" else "\t\t" + "'" + v_command + "'"
+        
+            if ii < self.nF - 1:
+                fval_line += ",\n"
+                vval_line += ",\n"
+            else:
+                fval_line += "\n"
+                vval_line += "\n"
+            
+            fields_lines.append(fval_line)
+            dotfields_lines.append(vval_line)
+                
+        fields_lines.append("\t])\n\n")
+        dotfields_lines.append("\t])\n\n")
+        
+        for ii in range(self.nP):
+            
+            pval_line = "\t\t" + self.parameters[str(ii)]
+            
+            if ii < self.nP - 1:
+                pval_line += ",\n"
+            else:
+                pval_line += "\n"
+            
+            parameters_lines.append(pval_line)
+        
+        parameters_lines.append("\t])\n\n")
+        
+        func_lines.append(fields_lines)
+        func_lines.append(dotfields_lines)
+        func_lines.append(parameters_lines)
+        func_lines.append("\treturn n, fvals, vvals, pvals")
+        
+        genSamplePath = os.path.join(self.root, "generator.py")
+        
+        if update is False:
+            assert not os.path.exists(genSamplePath), "Generator already exists: {}".format(genSamplePath)
+        else:
+            if os.path.exists(genSamplePath):
+                os.remove(genSamplePath)
+                
+        f = open(genSamplePath, "w")
+        with f:
+            for line in import_lines + func_lines:
+                f.writelines(line)
+        
+        runSamplerPath_keep = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods/run_sampler.py"))
+        runSamplerPath_copy = os.path.join(self.root, "run_sampler.py")
+        
+        if update is False:
+            assert not os.path.exists(runSamplerPath_copy), "Object already exists: {}".format(runSamplerPath_copy)
+        else:
+            if os.path.exists(runSamplerPath_copy):
+                os.remove(runSamplerPath_copy)
+
+        shutil.copyfile(runSamplerPath_keep, runSamplerPath_copy)
+        
+        bispectraObjPath = os.path.join(self.root, "fNL.localdata")
+        environmentObjPath = os.path.join(self.root, "env.localdata")
+        
+        envDict = {
+            'PyTS_pytpath' : self.pytpath,
+            'PyTS_root'    : self.root,
+            'PyTS_2pf'     : self.twopt_dir,
+            'PYTS_3pf'     : self.threept_dir,
+            'PyTS_masses'  : self.mass_dir,
+            'PyTS_smppath' : self.samples_dir,
+            'PyTS_logpath' : self.stats_dir
+        }
+        
+        
+        localFiles = zip([bispectraObjPath, environmentObjPath], [self.fNLConfigs, envDict])
+        
+        for item in localFiles:
+            lF, o = item
+            
+            if update is False:
+                assert not os.path.exists(lF), "Local file object already exists: {}".format(lF)
+            else:
+                if os.path.exists(lF):
+                    os.remove(lF)
+                    
+            f = open(lF, "wb")
+            with f: pk.dump(o, f)
+        

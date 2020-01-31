@@ -15,8 +15,9 @@ model.setCoreParams("dquad_exmaple")
 # Set priors on initial conditions and parameters
 model.setInitialFieldValues(-1, "numpy.random.uniform(-20, 20)", "numpy")
 model.setInitialFieldVelocities(-1, "SR")
-model.setParameterValues(-1, "numpy.uniform(1e-6, 1e-2)", "numpy")
+model.setParameterValues(-1, "numpy.random.uniform(1e-6, 1e-2)", "numpy")
 
 # Set configurations for the reduced-Bispectrum
 model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
 
+model.buildSampler(update=True)
