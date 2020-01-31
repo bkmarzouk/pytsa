@@ -1,9 +1,8 @@
 import numpy as np
 import os
 import pickle as pk
-import config as cfg
 
-rootpath = os.environ['PyTSamplerRoot']
+rootpath = os.environ['PyTS_pathRoot']
 
 class realization:
 

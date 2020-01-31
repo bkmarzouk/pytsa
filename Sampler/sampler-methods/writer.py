@@ -5,25 +5,32 @@ import pickle as pk
 import csv
 import shutil
 
-rootpath = os.environ['PyTSamplerRoot']; import config as cfg
-path_2pf = os.path.join(rootpath, "2pf")
-path_3pf = os.path.join(rootpath, "3pf")
-Mij_path = os.path.join(rootpath, "Mij")
-cfg_path = os.path.join(rootpath, "config.py")
-smp_path = os.path.join(rootpath, "samples")
+# Retrieve paths from environment variables
+envKeys = [
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf', 'PYTS_path3pf', 'PyTS_pathMasses', 'PyTS_pathSamples',
+    'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods', 'PyTS_pathLocalData'
+]
+
+pathPyT, pathRoot, path2pf, path3pf, pathMasses, \
+pathSamples, pathStats, pathClasses, pathMethods, pathLocalData = [os.environ[eK] for eK in envKeys]
+
+
+# Get fNL data
+fNLPath = os.path.join(pathLocalData, "fNL.localdata")
+fNLFile = open(fNLPath, "rb")
+with fNLFile: fNLDict = pk.load(fNLFile)
+
 
 def load_obs(pk_path):
     f = open(pk_path, "rb")
     with f: obs = pk.load(f)
     return obs
 
+
 def bg_summary():
     
-    # Get log directory
-    sample_stats_dir = os.environ['PyTS_logpath']
-    
     # Build paths to pickled minor stats
-    stat_paths = [os.path.join(sample_stats_dir, item) for item in os.listdir(sample_stats_dir)]
+    stat_paths = [os.path.join(pathStats, item) for item in os.listdir(pathStats)]
     
     # Set counters dictionary (will sum minor stats)
     counters = {'short': 0, 'kexit': 0, 'feoi': 0, 'back': 0,
@@ -49,7 +56,7 @@ def bg_summary():
         # remove minor stats data
         os.remove(sp)
             
-    stats_file = open(os.path.join(sample_stats_dir, "summary.txt"), "w")
+    stats_file = open(os.path.join(pathStats, "summary.txt"), "w")
     
     error    = "-- Rejections summary:\n"
     short    = "Insufficient inflation:                {}\n".format(counters['short'])
@@ -78,32 +85,28 @@ def bg_summary():
 def update_samples(modelnumber):
 
     # Load sample
-    save_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
+    save_path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
     f=open(save_path, "rb")
     with f:
         sample = pk.load(f)
     assert sample.modelnumber == modelnumber
 
-    # Get information about observables
-    observables = cfg.computations
-
-    if observables['2pf'] is True:
-        twoPt_path = os.path.join(path_2pf, "{}.2pf".format(modelnumber))
+    if len(os.listdir(path2pf)) > 0:
+        twoPt_path = os.path.join(path2pf, "{}.2pf".format(modelnumber))
         obs = load_obs(twoPt_path)
         sample.update_observables(obs, "2pf")
 
-    if observables['3pf'] is True:
-        which3pf = cfg.which3pf
-        for c in which3pf:
-            cname = c['config_name']
-            cpath = os.path.join(path_3pf, "{m}.{c}".format(m=modelnumber, c=cname))
+    if len(os.listdir(path3pf)) > 0:
+        for d in fNLDict:
+            cname = d['name']
+            cpath = os.path.join(path3pf, "{m}.{c}".format(m=modelnumber, c=cname))
             obs = load_obs(cpath)
             sample.update_observables(obs, cname)
 
-    if observables['Mij'] is True:
-        Mij_obspath = os.path.join(Mij_path, "{}.Mij".format(modelnumber))
+    if len(os.listdir(pathMasses)) > 0:
+        Mij_obspath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
         obs = load_obs(Mij_obspath)
-        sample.update_observables(obs, "Mij")
+        sample.update_observables(obs, "masses")
 
     os.remove(save_path)
     f = open(save_path, "wb")

@@ -10,49 +10,48 @@ import pickle as pk
 import time
 import warnings
 
-rootpath = os.environ['PyTSamplerRoot']
-path_2pf = os.path.join(rootpath, "2pf")
-path_3pf = os.path.join(rootpath, "3pf")
-Mij_path = os.path.join(rootpath, "Mij")
-cfg_path = os.path.join(rootpath, "config.py")
-smp_path = os.path.join(rootpath, "samples")
+# Retrieve paths from environment variables
+envKeys = [
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf', 'PYTS_path3pf', 'PyTS_pathMasses', 'PyTS_pathSamples',
+    'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods', 'PyTS_pathLocalData'
+]
 
-# Load configuration file, set PyTransport paths and import relevant modules
-import config as cfg
-pytpath = cfg.system['pytpath']  # PyTransport installation
-saveloc = cfg.system['saveloc']  # Save location for sampler outputs
-smppath = cfg.system['smppath']  # Sampler build directory
+pathPyT, pathRoot, path2pf, path3pf, pathMasses, \
+pathSamples, pathStats, pathClasses, pathMethods, pathLocalData = [os.environ[eK] for eK in envKeys]
 
-sys.path.append(pytpath)
+
+# get transport data dictionary
+transportPath = os.path.join(pathLocalData, "transport.localdata")
+transportFile = open(transportPath, "rb")
+with transportFile: transportDict = pk.load(transportFile)
+
+
+# configure internal pytransport paths
+sys.path.append(pathPyT)
 import PyTransSetup
-
 PyTransSetup.pathSet()
 
-PyT = importlib.import_module(cfg.sampler['PyTransportModule'])
+
+# Import module and get other required data for computing observables
+PyT = importlib.import_module(transportDict['transportModule'])
 import PyTransScripts as PyS
 
-# Yield configuration data
-subevo = cfg.sampler['SubEvolution']
-Nexit = cfg.sampler['ExitTime']
-minN = cfg.accept_criteria['MinimumEfolds']
-tols = np.asarray(cfg.sampler['tols'])
-canonical = cfg.end_inflation['Canonical']
-if canonical is False:
-    conditions = cfg.end_conditions
-else:
-    conditions = None
+transportKeys = ["exitN", "subN", "intTols", "adiabaticN", "minN"]
+Nexit, subevo, tols, adiabaticN, minN = [transportDict[tK] for tK in transportKeys]
 
-from generator import gen_sample
-from realization import realization
+
+# Get fNL data
+fNLPath = os.path.join(pathLocalData, "fNL.localdata")
+fNLFile = open(fNLPath, "rb")
+with fNLFile: fNLDict = pk.load(fNLFile)
+
+
+# Import sample generator & other useful class structures
+from generator import genSample
+from realization import realization as new_sample
 import record_stats
 
-"""
 
-Model Setup function
-
-For a given Sample and configuration module, we compute the end of inflation subject to appropriate conditions
-
-"""
 
 def Initialize(modelnumber, rerun_model=False):
     
@@ -60,21 +59,19 @@ def Initialize(modelnumber, rerun_model=False):
     
     if rerun_model is False:
         # Generate new sample with parameter & field priori
-        n, fvals, vvals, pvals = gen_sample(modelnumber)
-        fvals = np.asarray(fvals)
-        vvals = np.asarray(vvals)
-        pvals = np.asarray(pvals)
+        n, fvals, vvals, pvals = genSample(modelnumber)
+
     else:
         # Load an existing set of parameters & model priori
         model_path = os.path.join(saveloc, "samples", "{}.sample".format(modelnumber))
         model_file = open(model_path, "rb")
+        
         with model_file as mf:
             model = pk.load(mf)
             fvals = model.fields
             vvals = model.velocities
             pvals = model.parameters
-        # del model_file
-        # del model_path
+
 
     # Cross-check the number of fields needed for the potential
     nF = PyT.nF()
@@ -84,9 +81,9 @@ def Initialize(modelnumber, rerun_model=False):
     V = PyT.V(fvals, pvals)
 
     # Iterate over velocity definitions
-    if "SlowRoll" in vvals:
+    if "SR" in vvals:
         assert all(
-            v == "SlowRoll" for v in vvals), "If one field velocity is defined via the slow roll equation, all must be"
+            v == "SR" for v in vvals), "If one field velocity is defined via the slow roll equation, all must be"
 
         # Compute derivatices of the potential
         dV = PyT.dV(fvals, pvals)
@@ -109,18 +106,21 @@ def Initialize(modelnumber, rerun_model=False):
     int TIMEOUT = -44;        // Integration time exceeded
     
     """
+    
+    badExitPath = os.path.join(pathLocalData, "badExit.localdata")
+    goodExitPath = os.path.join(pathLocalData, "goodExit.localdata")
+    
+    # Define canonical end to inflation if there are no field conditions to search through
+    canonical = not (os.path.exists(badExitPath) or os.path.exists(goodExitPath))
 
     # If we choose to end inflation with eps = 1
     if canonical is True:
         
+        # Compute end of inflation
         Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg)
 
         # Integration fails / eternal
-        if type(Nend) is int and Nend in [-48, -45, -44]:
-            
-            # del V, dV, initial, pvals, fvals, vvals
-            # gc.collect()
-            return Nend
+        if type(Nend) is tuple: return Nend[0]
         
         # Attempt computation of background
         else:
@@ -128,86 +128,78 @@ def Initialize(modelnumber, rerun_model=False):
                                   initial, pvals, tols, False, tmax_bg)
             
             # If not numpy array, background computation failed
-            if type(back) is int and back in [-47, -44]:
-                return back
-
-    # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
-    else:
-
-        # Compute extended background evolution
-        back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
-
-        # If integration / background failure / eternal model is reported, return this information
-        if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
-            return back_ext
-
-        # Otherwise unpack background and efolding where epsilon = 1
-        back, Nepsilon = back_ext
-        
-        print back.T[0][-1], back.T[1][-1]
-
-        # Iterate over conditions list
-        for item in conditions:
-
-            # Unpack conditions for fields values subject to background data
-            field_number = item['FieldNumber']
-            field_value = item['FieldValue']
-            from_above = item['FromAbove']
-            successful = item['Successful']
-
-            # Transpose evolution to extract independent evolution for field in question
-            Nevo = back.T[0]
-            Fevo = back.T[1 + field_number]
-            # Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
-
-            # Try to find instances of field conditions within background evolution
-            try:
-                # If conditional field value is approached from above
-                if from_above is True:
-                    Nloc = np.where(Fevo <= field_value)[0][0] # Find first instance of condition being True
-                    
-                # If conditional field value is approached from below
-                elif from_above is False:
-                    Nloc = np.where(Fevo >= field_value)[0][0] # Fine first instance of condition being True
-                
-                else:
-                    raise ValueError, "Unrecognized value assignment 'from above': {}".format(from_above)
-
-                # If condition successfully ends inflation, redefine Nend to this point
-                if successful is True:
-                    Nend = Nevo[Nloc]
-                    
-                # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
-                elif successful is False:
-                    Nend = -46
-                    
-                else:
-                    raise ValueError, "Unrecognized value assignment: {}".format(successful)
-
-            # Index error is raised if field value condition cannot be foudn
-            except IndexError:
-
-                # If the condition corresponded to a successful end to the evolution, return "NotFound"
-                if successful is True:
-                    Nend = -45
-                
-                # If the condition was supposed to terminate the evolution, pass (everything is OK)
-                elif successful is False:
-                    pass
-                
-                else:
-                    raise ValueError, "Unrecognized value assignment: {}".format(successful)
+            if type(back) is tuple: return back[0]
+    #
+    # # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
+    # else:
+    #
+    #     # Compute extended background evolution
+    #     back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
+    #
+    #     # If integration / background failure / eternal model is reported, return this information
+    #     if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
+    #         return back_ext
+    #
+    #     # Otherwise unpack background and efolding where epsilon = 1
+    #     back, Nepsilon = back_ext
+    #
+    #     print back.T[0][-1], back.T[1][-1]
+    #
+    #     # Iterate over conditions list
+    #     for item in conditions:
+    #
+    #         # Unpack conditions for fields values subject to background data
+    #         field_number = item['FieldNumber']
+    #         field_value = item['FieldValue']
+    #         from_above = item['FromAbove']
+    #         successful = item['Successful']
+    #
+    #         # Transpose evolution to extract independent evolution for field in question
+    #         Nevo = back.T[0]
+    #         Fevo = back.T[1 + field_number]
+    #         # Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
+    #
+    #         # Try to find instances of field conditions within background evolution
+    #         try:
+    #             # If conditional field value is approached from above
+    #             if from_above is True:
+    #                 Nloc = np.where(Fevo <= field_value)[0][0] # Find first instance of condition being True
+    #
+    #             # If conditional field value is approached from below
+    #             elif from_above is False:
+    #                 Nloc = np.where(Fevo >= field_value)[0][0] # Fine first instance of condition being True
+    #
+    #             else:
+    #                 raise ValueError, "Unrecognized value assignment 'from above': {}".format(from_above)
+    #
+    #             # If condition successfully ends inflation, redefine Nend to this point
+    #             if successful is True:
+    #                 Nend = Nevo[Nloc]
+    #
+    #             # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
+    #             elif successful is False:
+    #                 Nend = -46
+    #
+    #             else:
+    #                 raise ValueError, "Unrecognized value assignment: {}".format(successful)
+    #
+    #         # Index error is raised if field value condition cannot be foudn
+    #         except IndexError:
+    #
+    #             # If the condition corresponded to a successful end to the evolution, return "NotFound"
+    #             if successful is True:
+    #                 Nend = -45
+    #
+    #             # If the condition was supposed to terminate the evolution, pass (everything is OK)
+    #             elif successful is False:
+    #                 pass
+    #
+    #             else:
+    #                 raise ValueError, "Unrecognized value assignment: {}".format(successful)
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if Nend in [-46, -45]:
-        return Nend
     
-    if Nend < minN:
-        # del V, initial, pvals, fvals, vvals, Nend, Nevo, Fevo, Nloc
-        # gc.collect()
-        return -50
-    
-    print back
+    if Nend < minN: return -50
 
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
@@ -227,14 +219,14 @@ def Initialize(modelnumber, rerun_model=False):
                     t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
                     back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
                 
-                # For non-canonical
-                else:
-                    
-                    # *Small* chance that extension may mess up, returning ValueError
-                    try:
-                        back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
-                    except ValueError:
-                        back_adj = None
+                # # For non-canonical
+                # else:
+                #
+                #     # *Small* chance that extension may mess up, returning ValueError
+                #     try:
+                #         back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
+                #     except ValueError:
+                #         back_adj = None
                 
                 # Break out of search window
                 break
@@ -257,40 +249,37 @@ def Initialize(modelnumber, rerun_model=False):
     # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
 
-    if cfg.accept_criteria['TestAdiabaticLimit'] is True:
-        
-        print "-- Searching for adiabatic limit: %05d" % modelnumber
-        
-        # Define number of efolds from end of inflation which should be adiabatic TODO: Wrap this into config. file
-        Nadiabatic = 1.
-        
-        # Find first efoldign to perform eigenvalue test
-        Nadiabatic_start = np.where(back.T[0] >= Nend - Nadiabatic)[0][0]
-        
-        # Compute mass-matrix evolution from this point
-        Mij_end = PyS.MijEvolve(back[Nadiabatic_start:], pvals, PyT)
+    print "-- Searching for adiabatic limit: %05d" % modelnumber
+    
+    # Define number of efolds from end of inflation which should be adiabatic TODO: Wrap this into config. file
+    
+    # Find first efoldign to perform eigenvalue test
+    adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
+    
+    # Compute mass-matrix evolution from this point
+    Mij_end = PyS.evolveMasses(back[adiabaticN_start:], pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)
 
-        # For each mass-matrix evolution step
-        for item in Mij_end:
-            
-            # Determine if lightest mass is tachyonic
-            tachyon = item[1] < 0
-            
-            # Determine number of hubble scale heavier masses
-            rest_large = sum([eig >= 1 for eig in item[2:]]) == nF - 1
+    # For each mass-matrix evolution step
+    for item in Mij_end:
+        
+        # Determine if lightest mass is tachyonic
+        tachyon = item[1] < 0
+        
+        # Determine number of hubble scale heavier masses
+        rest_large = sum([eig >= 1 for eig in item[2:]]) == nF - 1
 
-            # If there is no tachyon or the remaining masses aren't large for the portion of evolution
-            if not (tachyon and rest_large):
-                
-                # Change adiabatic property to False, and break out of search window
-                adiabatic = False
-                
-                print "-- Adiabatic limit not found: %05d" % modelnumber
-                break
+        # If there is no tachyon or the remaining masses aren't large for the portion of evolution
+        if not (tachyon and rest_large):
+            
+            # Change adiabatic property to False, and break out of search window
+            adiabatic = False
+            
+            print "-- Adiabatic limit not found: %05d" % modelnumber
+            break
 
     # Record all sample data
-    realization(modelnumber, fvals, vvals, pvals,
-                back, adiabatic, Nend, kExit, smp_path, rerun_model)
+    new_sample(modelnumber, fvals, vvals, pvals, back, adiabatic, Nend, kExit, pathSamples, rerun_model)
+
 
     print "-- Generated sample: %05d" % modelnumber
     
@@ -304,7 +293,7 @@ def DemandSample(modelnumber):
     """ Repeat initialization until successful sample is found """
     
     # Get directory for sample stats log
-    sample_stats_dir = os.environ['PyTS_logpath']
+    sample_stats_dir = pathStats
     
     # Start timer
     tstart = time.clock()
@@ -358,7 +347,7 @@ def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found """
     
     # Get directory for sample stats log
-    sample_stats_dir = os.environ['PyTS_logpath']
+    sample_stats_dir = pathStats
     
     # Start timer
     tstart = time.clock()
@@ -409,10 +398,9 @@ def DemandSample_rerun(modelnumber):
 def Mij(modelnumber):
     
     # Unload sample data
-    sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
-    assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
-    
-    s = open(sampler_path, "rb")
+    path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
+    assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
+    s = open(path, "rb")
     with s:
         sample = pk.load(s)
 
@@ -431,7 +419,7 @@ def Mij(modelnumber):
     backT = back.T
     
     # Build save path for mass-matrix eigenvalues
-    Mij_savepath = os.path.join(Mij_path, "{}.Mij".format(modelnumber))
+    Mij_savepath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
 
     # Get number of fields
     nF = PyT.nF()
@@ -440,7 +428,7 @@ def Mij(modelnumber):
     ti = time.clock()
 
     # Define Nstar, i.e. exit time of interest
-    Nstar = Nend - cfg.sampler['ExitTime']
+    Nstar = Nend - Nexit
     
     # Unpack efold evolution
     Nevo = backT[0]
@@ -460,17 +448,31 @@ def Mij(modelnumber):
             dN += 0.5
             idx_above = np.where(np.logical_and(Nevo>Nstar, Nevo<Nstar+dN))[0]
             idx_below = np.where(np.logical_and(Nevo < Nstar, Nevo > Nstar-dN))[0]
+            
             Nstar_idx = list(np.concatenate([idx_below, idx_above]))
             Nfit = len(Nstar_idx)
 
         # Define efold range to "smooth" over
         Nsmooth = [Nevo[idx] for idx in Nstar_idx]
         
+        # We check for repeated efold numbers as this will throw the interpolation scheme
+        repLog = []
+        for ii in range(len(Nsmooth)-1):
+            if Nsmooth[ii] == Nsmooth[ii+1]:
+                repLog.append(ii+1)
+        for index in sorted(repLog, reverse=True):
+            del Nstar_idx[index]
+            
+        
+        Nsmooth = [Nevo[idx] for idx in Nstar_idx]
+        
+        
         # BY default, we choose a cubic spline, but if this is not possible, we reduce the order
         if len(Nstar_idx) <= 3:
             k = len(Nstar_idx) - 1
         else:
             k = 3
+
 
         # Construct splines for the field evolution over Nsmooth
         fsplines = [
@@ -488,7 +490,8 @@ def Mij(modelnumber):
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
         
     # Compute mass matrix eigenvalues at the exit time
-    Mij = PyS.MijEvolve(np.array([back_star]), pvals, PyT, scale_eigs=True)[0][1:]
+    Mij = PyS.evolveMasses(
+        np.array([back_star]), pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)[0][1:]
 
     # Build dictionary of masses
     Mij_eig = {}
@@ -507,10 +510,9 @@ def Mij(modelnumber):
 def SpectralIndex(modelnumber):
     
     # Unload sample data
-    sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
-    assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
-    
-    s = open(sampler_path, "rb")
+    path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
+    assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
+    s = open(path, "rb")
     with s:
         sample = pk.load(s)
 
@@ -529,7 +531,7 @@ def SpectralIndex(modelnumber):
     kExit = sample.kExit
 
     # Build path for two-point function result
-    twoPt_savepath = os.path.join(path_2pf, "{}.2pf".format(modelnumber))
+    twoPt_savepath = os.path.join(path2pf, "{}.2pf".format(modelnumber))
 
     # Begin timer
     ti = time.clock()
@@ -593,12 +595,20 @@ def SpectralIndex(modelnumber):
         pk.dump(twoPt_dict, twoPt_file)
 
 
-def fNL(modelnumber, which3pf):
+def fNL(modelnumber, configName):
+    
+    # Gather configuration data from configName
+    for d in fNLDict:
+        if d['name'] == configName:
+            name = configName
+            alpha = d['alpha']
+            beta  = d['beta']
+            break
 
     # Unload sample data
-    sampler_path = os.path.join(smp_path, "{}.sample".format(modelnumber))
-    assert os.path.exists(sampler_path), "Unable to locate sample location: {}".format(sampler_path)
-    s = open(sampler_path, "rb")
+    path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
+    assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
+    s = open(path, "rb")
     with s:
         sample = pk.load(s)
 
@@ -614,13 +624,8 @@ def fNL(modelnumber, which3pf):
     kExit = sample.kExit
     pvals = np.asarray(sample.parameters)
 
-    # Get dictionary items for bispectrum configuration
-    name = which3pf['config_name']
-    alpha = which3pf['alpha']
-    beta = which3pf['beta']
-
     # Build savee path
-    fNL_savepath = os.path.join(path_3pf, "{num}.{ext}".format(num=modelnumber, ext=name))
+    fNL_savepath = os.path.join(path3pf, "{num}.{ext}".format(num=modelnumber, ext=name))
 
     # Begin timer
     ti = time.clock()
@@ -673,28 +678,24 @@ def computations(mn_calc):
     
     # Unpack model number and calculation type
     modelnumber, calculation = mn_calc
-    
-    # Get bispectrum information
-    which3pf = cfg.which3pf
 
     # Prevent computation fails from hanging via catch_warnings
     with warnings.catch_warnings(record=True) as w:
 
-        if calculation == "Mij":
-            print "-- Start Mij: model %06d" % modelnumber
+        if calculation == "masses":
+            print "-- Start masses: model %06d" % modelnumber
             Mij(modelnumber)
-            print "--   End Mij: model %06d" % modelnumber
+            print "--   End masses: model %06d" % modelnumber
 
         if calculation == "2pf":
             print "-- Start 2pf: model %06d" % modelnumber
             SpectralIndex(modelnumber)
             print "--   End 2pf: model %06d" % modelnumber
 
-        for config in which3pf:
-            if config['config_name'] == calculation:
-                print "-- Start fNL: model %06d, config {}".format(config['config_name']) % modelnumber
-                fNL(modelnumber, config)
-                print "--   End fNL: model %06d, config {}".format(config['config_name']) % modelnumber
+        if calculation not in ["masses", "2pf"]:
+            print "-- Start fNL: model %06d, config {}".format(calculation) % modelnumber
+            fNL(modelnumber, calculation)
+            print "--   End fNL: model %06d, config {}".format(calculation) % modelnumber
 
         if len(w) > 0:
             print "-- {t} TASK FAILURE, MODEL {m}".format(t=calculation, m=modelnumber)

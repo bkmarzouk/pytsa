@@ -102,7 +102,8 @@ class icpsCfgTemplate:
                 result = eval(command)
                 
                 # Check result data type
-                assert type(result) in [float, int], "Invalid result: {} -> {}".format(command, result)
+                assert type(result) in [
+                    float, int, np.float, np.float32, np.float64], "Invalid result: {} -> {}".format(command, result)
                 
             except:
                 raise ValueError, "Could not evaluate command: {}".format(command)
@@ -183,6 +184,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.subHorizonEvolution = None
         self.integratorTols = None
         self.adiabaticN = None
+        self.minN = None
         
         self.goodExit = None
         self.badExit = None
@@ -191,14 +193,14 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
     
     
     def setCoreParams(self, name, saveLocation="default", efoldsBeforeExit=55., subHorizonEvolution=6.,
-                      integratorTols=[1e-8, 1e-8], adiabaticN=1.):
+                      integratorTols=np.array([1e-8, 1e-8]), adiabaticN=1., minN=60.):
         
         assert type(name) is str, "sampler name must be string to build directories"
         assert saveLocation == "default" or os.path.exists(saveLocation), "Path not found: {}".format(saveLocation)
         assert type(efoldsBeforeExit) in [float, int], "Specify N, s.t. Nend - N defines the pivot scale"
         assert type(subHorizonEvolution) in [float, int], "Specify the amount of subhorizon evolution"
-        assert type(integratorTols) is list, "Specify a list of tols. for the integrator"
-        assert len(integratorTols) == 2 and all([type(t) is float for t in integratorTols]), "set 2 floats"
+        assert type(integratorTols) is np.ndarray, "Integrator tols must be numpy array"
+        assert np.size(integratorTols) == 2, "Set abs. and rel. error (2 args) for tols."
         
         self.name = name
         self.saveLocation = saveLocation
@@ -206,6 +208,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.subHorizonEvolution = subHorizonEvolution
         self.integratorTols = integratorTols
         self.adiabaticN = adiabaticN
+        self.minN = minN
     
     
     def addEndRegion(self, fieldNumber, minFieldValue, maxFieldValue):
@@ -379,7 +382,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             "exitN"           : self.efoldsBeforeExit,
             "subN"            : self.subHorizonEvolution,
             "intTols"         : self.integratorTols,
-            "adiabaticN"      : self.adiabaticN
+            "adiabaticN"      : self.adiabaticN,
+            "minN"            : self.minN
         }
         
         # Define dictionary of key environment varaibles
@@ -391,7 +395,9 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             'PyTS_pathMasses'    : self.mass_dir,
             'PyTS_pathSamples'   : self.samples_dir,
             'PyTS_pathStats'     : self.stats_dir,
-            'PyTS_pathLocalData' : self.localdata_dir
+            'PyTS_pathLocalData' : self.localdata_dir,
+            'PyTS_pathClasses'   : self.classes_dir,
+            'PyTS_pathMethods'   : self.methods_dir
         }
         
         
