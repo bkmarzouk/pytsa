@@ -124,9 +124,42 @@ class icpsCfgTemplate:
         self.__setValues__("parameters", command, fpNums, *requiredModules)
     
     
-    def setParameterLaTeX(self, pNum, LaTeX):
-        """ TODO: Finish implementing this """
-        raise AttributeError, "NOT DONE"
+    def __setLaTeX__(self, attr_, num, LaTeX):
+        
+        if not hasattr(self, "latex"): self.latex = {}
+        
+        # Locate number of expected value assignments for a given attribute
+        if attr_ == "fields":
+            prefix = "f"
+            assert type(num) is int and num in range(0, self.nF), "Invalid field index: {}".format(self.nF)
+        elif attr_ == "dotfields":
+            prefix = "v"
+            assert type(num) is int and num in range(0, self.nF), "Invalid field index: {}".format(self.nF)
+        elif attr_ == "parameters":
+            prefix = "p"
+            assert type(num) is int and num in range(0, self.nP), "Invalid param index: {}".format(self.nP)
+        else:
+            raise AttributeError, "Attempting to set invalid attribute: {}".format(attr_)
+
+        key = prefix + str(num)
+        
+        assert key not in self.latex, "LaTeX definition already prescribed: {} -> {}".format(key, self.latex[key])
+        
+        assert type(LaTeX) is str, "LaTeX definition must be string: {}".format(LaTeX)
+
+        self.latex[key] = LaTeX
+        
+
+    def recordFieldValue(self, fieldIndex, latex):
+        self.__setLaTeX__("fields", fieldIndex, latex)
+        
+    
+    def recordDotFieldValue(self, fieldIndex, latex):
+        self.__setLaTeX__("dotfields", fieldIndex, latex)
+        
+        
+    def recordParameterValue(self, parameterIndex, latex):
+        self.__setLaTeX__("parameters", parameterIndex, latex)
         
         
     def checkicps(self):
