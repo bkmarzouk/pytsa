@@ -126,11 +126,11 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
                 taskpool.append(task)
 
     # Map task pool to computation handler
-    # pool.map(pytm.computations, taskpool)
+    pool.map(pytm.computations, taskpool)
     
     # Update samples with results from task pool
     print "\n-- Updating sample objects\n"
-    # pool.map(w.update_samples, sample_range)
+    pool.map(w.update_samples, sample_range)
 
     # Close pool
     pool.close()

@@ -21,9 +21,13 @@ model.setParameterValues(-1, "numpy.exp(numpy.random.uniform(-6, -1))", "numpy")
 model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
 
 # # Once the parameters have been set, we simply execute buildSampler
-# model.buildSampler(update=True)
 
-model.recordFieldValue(0, "L")
+model.recordFieldValue(0, "\chi_{0}")
+model.recordDotFieldValue(0, "\dot\chi_{0}")
 model.recordParameterValue(0, "m_\chi")
 
-print model.latex
+model.recordFieldValue(1, "\phi_{0}")
+model.recordDotFieldValue(1, "\dot\phi_{0}")
+model.recordParameterValue(1, "m_\phi")
+
+model.buildSampler()

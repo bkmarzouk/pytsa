@@ -120,7 +120,17 @@ def write_results(nF):
     latexs = []
 
     ncols = 2
-
+    
+    latexFile = open(os.path.join(pathLocalData, "latex.localdata"), "rb")
+    
+    with latexFile as f:
+        latexDefs = pk.load(latexFile)
+    
+    for key in latexDefs:
+        headers += (key,)
+        labels.append(key)
+        ncols += 1
+        latexs.append(latexDefs[key])
 
     if len(os.listdir(path2pf)) > 0:
         labs = ["ns", "alpha", "2pf_t"]
@@ -156,22 +166,10 @@ def write_results(nF):
             latexs.append("m_{}^2/H^2".format(i))
             ncols+=1
             
-        headers+=("M_t",)
-        labels.append("M_t")
+        headers+=("masses_t",)
+        labels.append("masses_t")
         latexs.append("T_{M}")
         ncols+=1
-
-
-
-    # pinfo = cfg.parameter_values
-    # for item in pinfo:
-    #     if item['LaTeX'] is not None:
-    #         pnumb = item['ParameterNumber']
-    #         pname = "p{}".format(pnumb)
-    #         headers+=(pname,)
-    #         labels.append(pname)
-    #         latexs.append(item['LaTeX'])
-    #         ncols+=1
 
 
     dicts_evolving  = []
@@ -193,8 +191,8 @@ def write_results(nF):
             else:
                 failed_samples.append(p+"\n")
 
-    f = open(os.path.join(rootpath, "outputs", "r_adiabatic.txt"), "w")
-    g = open(os.path.join(rootpath, "outputs", "r_evolving.txt" ), "w")
+    f = open(os.path.join(pathRoot, "outputs", "r_adiabatic.txt"), "w")
+    g = open(os.path.join(pathRoot, "outputs", "r_evolving.txt" ), "w")
 
     with f:
         w = csv.DictWriter(f, headers, delimiter=' ')
@@ -206,8 +204,8 @@ def write_results(nF):
         for d in dicts_evolving:
             v.writerow(d)
 
-    pfile1 = os.path.join(rootpath, "outputs", "r_adiabatic.paramnames")
-    pfile2 = os.path.join(rootpath, "outputs", "r_evolving.paramnames")
+    pfile1 = os.path.join(pathRoot, "outputs", "r_adiabatic.paramnames")
+    pfile2 = os.path.join(pathRoot, "outputs", "r_evolving.paramnames")
     h = open(pfile1, "w")
     headers = ('label', 'LaTeX')
     with h:
@@ -217,6 +215,6 @@ def write_results(nF):
             x.writerow({'label': lab, 'LaTeX': lat})
     shutil.copyfile(pfile1, pfile2)
 
-    i = open(os.path.join(rootpath, "outputs", "failed.txt"), "w")
+    i = open(os.path.join(pathRoot, "outputs", "failed.txt"), "w")
     with i:
         i.writelines(failed_samples)

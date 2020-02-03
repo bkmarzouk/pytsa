@@ -3,6 +3,7 @@ import os
 import pickle as pk
 
 rootpath = os.environ['PyTS_pathRoot']
+localPath = os.environ['PyTS_pathLocalData']
 
 class realization:
 
@@ -49,15 +50,42 @@ class realization:
         
         """ We initialize a dictionary for writing lines to results file"""
         line = {'weight': 1.0, 'like': 1.0}
-
-        """ We extract the parameter info from configuration file, e.g. LaTeX definitions"""
-        pinfo = cfg.parameter_values
-        for p in pinfo:
-            if p['LaTeX'] is not None:
-                pn = p['ParameterNumber']    # Get parameter number
-                if pn != "ALL":
-                    pv = self.parameters[pn]     # Get parameter value
-                    line['p{}'.format(pn)] = pv  # Add parameter to dictionary
+        
+        """ Load definitions of sample data we want to record in results """
+        latexFile = open(os.path.join(localPath, "latex.localdata"), "rb")
+        
+        with latexFile as f: lDefs = pk.load(f)
+        pNums = []
+        pVals = []
+        pDefs = []
+        
+        fNums = []
+        fVals = []
+        fDefs = []
+        
+        vNums = []
+        vVals = []
+        vDefs = []
+        
+        for key in lDefs:
+            x, num = key[0], int(key[1:])
+            if x=="p":
+                line[key] = self.parameters[num]
+                # pNums.append(num)
+                # pVals.append(self.parameters[num])
+                # pDefs.append(lDefs[key])
+            elif x=="f":
+                line[key] = self.fields[num]
+                # fNums.append(num)
+                # fVals.append(self.fields[num])
+                # fDefs.append(lDefs[key])
+            elif x =="v":
+                line[key] = self.velocities[num]
+                # vNums.append(num)
+                # vVals.append(self.velocities[num])
+                # vDefs.append(lDefs[key])
+            else:
+                raise KeyError, "Unrecognized key: {}".format(key)
 
         """ Add results for observables """
         for o in self.observables:

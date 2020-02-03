@@ -413,7 +413,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         bispectraObjPath = os.path.join(self.localdata_dir, "fNL.localdata")
         environmentObjPath = os.path.join(self.localdata_dir, "env.localdata")
         transObjPath = os.path.join(self.localdata_dir, "transport.localdata")
-        paramsObjPath = os.path.join(self.localdata_dir, "parameters.localdata")
+        latexObjPath = os.path.join(self.localdata_dir, "latex.localdata")
         
         # Define dictionary of key transport data
         transDict = {
@@ -441,8 +441,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         
         
         # Zip paths / objects and build. Add field space conditions if these are defined
-        localPaths = [bispectraObjPath, environmentObjPath, transObjPath, paramsObjPath]
-        localDicts = [self.fNLConfigs, envDict, transDict, self.parameters]
+        localPaths = [bispectraObjPath, environmentObjPath, transObjPath, latexObjPath]
+        localDicts = [self.fNLConfigs, envDict, transDict, self.latex]
         
         if self.badExit is not None:
             localPaths.append(os.path.join(self.localdata_dir, "badExit.localdata"))
