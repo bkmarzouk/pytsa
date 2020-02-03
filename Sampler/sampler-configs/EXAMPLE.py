@@ -24,10 +24,10 @@ model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
 
 model.recordFieldValue(0, "\chi_{0}")
 model.recordDotFieldValue(0, "\dot\chi_{0}")
-model.recordParameterValue(0, "m_\chi")
+model.recordParameterValue(0, "M_\chi")
 
 model.recordFieldValue(1, "\phi_{0}")
 model.recordDotFieldValue(1, "\dot\phi_{0}")
-model.recordParameterValue(1, "m_\phi")
+model.recordParameterValue(1, "M_\phi")
 
 model.buildSampler()

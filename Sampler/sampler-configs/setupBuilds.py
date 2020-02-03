@@ -223,9 +223,14 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.integratorTols = None
         self.adiabaticN = None
         self.minN = None
+    
+        self.rejectIfAny = None
+        self.rejectIfAll = None
         
-        self.goodExit = None
-        self.badExit = None
+        self.acceptIfAny = None
+        self.acceptIfAll = None
+    
+        self.groupNames = None
         
         self.recordMasses = True
     
@@ -247,46 +252,119 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.integratorTols = integratorTols
         self.adiabaticN = adiabaticN
         self.minN = minN
+        
+        assert efoldsBeforeExit < minN, "Horizon exit time greater than duration of inflation:" \
+                                        "{} > {}".format(efoldsBeforeExit, minN)
     
+
+    def addCriticalValueGroup(self, groupName, nature):
+        
+        assert type(groupName) is str, "groupName should be string type: {}".format(groupName)
+        assert type(nature) is str and nature in [
+            "acceptSample", "rejectSample"], "nature should belong to {}".format(str(["acceptSample",
+                                                                                          "rejectSample"]))
     
-    def addEndRegion(self, fieldNumber, minFieldValue, maxFieldValue):
+        if self.groupNames is None: self.groupNames = []
         
-        assert type(fieldNumber) is int, "field number must be an integer corresponding to the installation"
-        assert type(minFieldValue) in [int, float], "minFieldValue must be an integer or float"
-        assert type(maxFieldValue) in [int, float], "maxFieldValue must be an integer or float"
-        
-        if self.goodExit is None: self.goodExit = []
-        
-        assert minFieldValue < maxFieldValue, "min greater than max: {} !< {}".format(minFieldValue, maxFieldValue)
-        
-        self.goodExit.append(
-            {
-                "fieldNumber"  : fieldNumber,
-                "minFieldValue": minFieldValue,
-                "maxFieldValue": maxFieldValue
-            }
-        )
+        assert groupName not in self.groupNames, "groupName already use: {}".format(groupName)
+
+        self.groupNames.append(groupName)
+
+        if nature == "acceptSample":
     
+            if self.acceptIfAll is None: self.acceptIfAll = {}
     
-    def addViolatedRegion(self, fieldNumber, minFieldValue, maxFieldValue):
-        
-        assert type(fieldNumber) is int, "field number must be an integer corresponding to the installation"
-        assert type(minFieldValue) in [int, float], "minFieldValue must be an integer or float"
-        assert type(maxFieldValue) in [int, float], "maxFieldValue must be an integer or float"
-        
-        if self.badExit is None: self.badExit = []
-        
-        assert minFieldValue < maxFieldValue, "min greater than max: {} !< {}".format(minFieldValue, maxFieldValue)
-        
-        self.badExit.append(
-            {
-                "fieldNumber"  : fieldNumber,
-                "minFieldValue": minFieldValue,
-                "maxFieldValue": maxFieldValue
-            }
-        )
+            self.acceptIfAll[groupName] = {'idx': np.array([], dtype=int), 'min': np.array([]), 'max': np.array([])}
+
+        if nature == "rejectSample":
+    
+            if self.rejectIfAll is None: self.rejectIfAll = {}
+    
+            self.rejectIfAll[groupName] = {'idx': np.array([], dtype=int), 'min': np.array([]), 'max': np.array([])}
+            
+        else: raise KeyError, nature
         
     
+    def __addCriticalValue__(self, fieldNumber, minValue, maxValue, attr_, nature=None, groupName=None):
+        
+        assert type(fieldNumber) is int and fieldNumber < self.nF and fieldNumber >= 0, fieldNumber
+        assert type(minValue) in [int, float], minValue
+        assert type(maxValue) in [int, float], maxValue
+        
+        if attr_ == "fields":
+            idx = 1 + fieldNumber
+        elif attr_ == "dotFields":
+            idx = 1 + fieldNumber + self.nF
+        else:
+            raise KeyError, attr_
+        
+        if groupName is None:
+            
+            if nature == "acceptSample":
+
+                if self.acceptIfAny is None:
+                    self.acceptIfAny = {}
+                    self.acceptIfAny['idx'] = np.array([idx], dtype=int)
+                    self.acceptIfAny['min'] = np.array([minValue])
+                    self.acceptIfAny['max'] = np.array([maxValue])
+                else:
+                    self.acceptIfAny['idx'] = np.concatenate((self.acceptIfAny['idx'], np.array([idx], dtype=int)))
+                    self.acceptIfAny['min'] = np.concatenate((self.acceptIfAny['min'], np.array([minValue])))
+                    self.acceptIfAny['max'] = np.concatenate((self.acceptIfAny['max'], np.array([maxValue])))
+                
+            elif nature == "rejectSample":
+
+                if self.rejectIfAny is None:
+                    self.rejectIfAny = {}
+                    self.rejectIfAny['idx'] = np.array([idx], dtype=int)
+                    self.rejectIfAny['min'] = np.array([minValue])
+                    self.rejectIfAny['max'] = np.array([maxValue])
+                else:
+                    self.rejectIfAny['idx'] = np.concatenate((self.rejectIfAny['idx'], np.array([idx], dtype=int)))
+                    self.rejectIfAny['min'] = np.concatenate((self.rejectIfAny['min'], np.array([minValue])))
+                    self.rejectIfAny['max'] = np.concatenate((self.rejectIfAny['max'], np.array([maxValue])))
+                    
+            else: raise KeyError, nature
+            
+        else:
+            
+            assert groupName in self.groupNames, groupName
+
+            if nature == "acceptSample":
+                self.acceptIfAll[groupName]['idx'] = np.concatenate(
+                    (self.acceptIfAll[groupName]['idx'], np.array([idx], dtype=int)))
+                self.acceptIfAll[groupName]['min'] = np.concatenate(
+                    (self.acceptIfAll[groupName]['min'], np.array([minValue])))
+                self.acceptIfAll[groupName]['max'] = np.concatenate(
+                    (self.acceptIfAll[groupName]['max'], np.array([maxValue])))
+
+            elif nature == "rejectSample":
+                self.rejectIfAll[groupName]['idx'] = np.concatenate(
+                    (self.rejectIfAll[groupName]['idx'], np.array([idx], dtype=int)))
+                self.rejectIfAll[groupName]['min'] = np.concatenate(
+                    (self.rejectIfAll[groupName]['min'], np.array([minValue])))
+                self.rejectIfAll[groupName]['max'] = np.concatenate(
+                    (self.rejectIfAll[groupName]['max'], np.array([maxValue])))
+
+            else: raise KeyError, nature
+
+
+    def addAcceptSampleFieldValue(self, fieldNumber, minValue, maxValue, groupName=None):
+        self.__addCriticalValue__(fieldNumber, minValue, maxValue, "fields", "acceptSample", groupName)
+    
+    
+    def addRejectSampleFieldValue(self, fieldNumber, minValue, maxValue, groupName=None):
+        self.__addCriticalValue__(fieldNumber, minValue, maxValue, "fields", "rejectSample", groupName)
+    
+    
+    def addAcceptSampleDotFieldValue(self, fieldNumber, minValue, maxValue, groupName=None):
+        self.__addCriticalValue__(fieldNumber, minValue, maxValue, "dotFields", "acceptSample", groupName)
+    
+    
+    def addRejectSampleDotFieldValue(self, fieldNumber, minValue, maxValue, groupName=None):
+        self.__addCriticalValue__(fieldNumber, minValue, maxValue, "dotFields", "rejectSample", groupName)
+        
+
     def buildSampler(self, update=False):
         
         self.checkicps()
@@ -410,7 +488,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         shutil.copyfile(runSamplerPath_keep, runSamplerPath_copy)
         
         # Define paths to (hidden) local data
-        bispectraObjPath = os.path.join(self.localdata_dir, "fNL.localdata")
+        bispectraObjPath   = os.path.join(self.localdata_dir, "fNL.localdata")
         environmentObjPath = os.path.join(self.localdata_dir, "env.localdata")
         transObjPath = os.path.join(self.localdata_dir, "transport.localdata")
         latexObjPath = os.path.join(self.localdata_dir, "latex.localdata")
@@ -444,12 +522,22 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         localPaths = [bispectraObjPath, environmentObjPath, transObjPath, latexObjPath]
         localDicts = [self.fNLConfigs, envDict, transDict, self.latex]
         
-        if self.badExit is not None:
-            localPaths.append(os.path.join(self.localdata_dir, "badExit.localdata"))
-            localDicts.append(self.badExit)
-        if self.goodExit is not None:
-            localPaths.append(os.path.join(self.localdata_dir, "goodExit.localdata"))
-            localDicts.append(self.goodExit)
+        if self.acceptIfAny is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "acceptIfAny.localdata"))
+            localDicts.append(self.acceptIfAny)
+            
+        if self.rejectIfAny is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "rejectIfAny.localdata"))
+            localDicts.append(self.rejectIfAny)
+            
+        if self.acceptIfAll is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "acceptIfAll.localdata"))
+            localDicts.append(self.acceptIfAll)
+            
+        if self.rejectIfAll is not None:
+            localPaths.append(os.path.join(self.localdata_dir, "rejectIfAll.localdata"))
+            localDicts.append(self.rejectIfAll)
+            
             
         localFiles = zip(localPaths, localDicts)
         

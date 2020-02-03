@@ -88,8 +88,11 @@ def Initialize(modelnumber, rerun_model=False):
         # Compute derivatices of the potential
         dV = PyT.dV(fvals, pvals)
 
+        # Compute velocities via slowroll equation
+        vvals = -dV / np.sqrt(3 * V)
+
         # Concatenate field values with the slow-roll velocities
-        initial = np.concatenate((fvals, -dV / np.sqrt(3 * V)))
+        initial = np.concatenate((fvals, vvals))
 
     # If specified initial velocities: Read directly from configuration module
     else:
@@ -107,11 +110,14 @@ def Initialize(modelnumber, rerun_model=False):
     
     """
     
-    badExitPath = os.path.join(pathLocalData, "badExit.localdata")
-    goodExitPath = os.path.join(pathLocalData, "goodExit.localdata")
+    acceptIfAnyPath = os.path.join(pathLocalData, "acceptIfAny.localdata")
+    rejectIfAnyPath = os.path.join(pathLocalData, "rejectIfAny.localdata")
+    acceptIfAllPath = os.path.join(pathLocalData, "acceptIfAll.localdata")
+    rejectIfAllPath = os.path.join(pathLocalData, "rejectIfAll.localdata")
     
     # Define canonical end to inflation if there are no field conditions to search through
-    canonical = not (os.path.exists(badExitPath) or os.path.exists(goodExitPath))
+    canonical = not (os.path.exists(acceptIfAnyPath) or os.path.exists(rejectIfAnyPath)
+                     or os.path.exists(acceptIfAllPath) or os.path.exists(rejectIfAllPath))
 
     # If we choose to end inflation with eps = 1
     if canonical is True:
@@ -129,78 +135,110 @@ def Initialize(modelnumber, rerun_model=False):
             
             # If not numpy array, background computation failed
             if type(back) is tuple: return back[0]
-    #
-    # # Inflation ends due to exotic conditioning: Integrate as far as possible to maximise background data
-    # else:
-    #
-    #     # Compute extended background evolution
-    #     back_ext = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
-    #
-    #     # If integration / background failure / eternal model is reported, return this information
-    #     if type(back_ext) is int and back_ext in [-48, -47, -45, -44]:
-    #         return back_ext
-    #
-    #     # Otherwise unpack background and efolding where epsilon = 1
-    #     back, Nepsilon = back_ext
-    #
-    #     print back.T[0][-1], back.T[1][-1]
-    #
-    #     # Iterate over conditions list
-    #     for item in conditions:
-    #
-    #         # Unpack conditions for fields values subject to background data
-    #         field_number = item['FieldNumber']
-    #         field_value = item['FieldValue']
-    #         from_above = item['FromAbove']
-    #         successful = item['Successful']
-    #
-    #         # Transpose evolution to extract independent evolution for field in question
-    #         Nevo = back.T[0]
-    #         Fevo = back.T[1 + field_number]
-    #         # Vevo = back.T[1 + field_number + PyT.nF()] # TODO: Consider velocity conditions on fields
-    #
-    #         # Try to find instances of field conditions within background evolution
-    #         try:
-    #             # If conditional field value is approached from above
-    #             if from_above is True:
-    #                 Nloc = np.where(Fevo <= field_value)[0][0] # Find first instance of condition being True
-    #
-    #             # If conditional field value is approached from below
-    #             elif from_above is False:
-    #                 Nloc = np.where(Fevo >= field_value)[0][0] # Fine first instance of condition being True
-    #
-    #             else:
-    #                 raise ValueError, "Unrecognized value assignment 'from above': {}".format(from_above)
-    #
-    #             # If condition successfully ends inflation, redefine Nend to this point
-    #             if successful is True:
-    #                 Nend = Nevo[Nloc]
-    #
-    #             # If condition unsuccessfully terminates inflation, redefine Nend as "Violated" model
-    #             elif successful is False:
-    #                 Nend = -46
-    #
-    #             else:
-    #                 raise ValueError, "Unrecognized value assignment: {}".format(successful)
-    #
-    #         # Index error is raised if field value condition cannot be foudn
-    #         except IndexError:
-    #
-    #             # If the condition corresponded to a successful end to the evolution, return "NotFound"
-    #             if successful is True:
-    #                 Nend = -45
-    #
-    #             # If the condition was supposed to terminate the evolution, pass (everything is OK)
-    #             elif successful is False:
-    #                 pass
-    #
-    #             else:
-    #                 raise ValueError, "Unrecognized value assignment: {}".format(successful)
+
+    else:
+        if os.path.exists(acceptIfAnyPath):
+            f = open(acceptIfAnyPath, "rb")
+            with f:
+                acceptIfAny = pk.load(f)
+                acceptIfAnyIdx = acceptIfAny['idx']
+                acceptIfAnyMin = acceptIfAny['min']
+                acceptIfAnyMax = acceptIfAny['max']
+                
+        else: acceptIfAny = None
+        
+        if os.path.exists(rejectIfAnyPath):
+            f = open(rejectIfAnyPath, "rb")
+            with f:
+                rejectIfAny = pk.load(f)
+                rejectIfAnyIdx = rejectIfAny['idx']
+                rejectIfAnyMin = rejectIfAny['min']
+                rejectIfAnyMax = rejectIfAny['max']
+                
+        else: rejectIfAny = None
+        
+        if os.path.exists(acceptIfAllPath):
+            f = open(acceptIfAllPath, "rb")
+            with f:
+                acceptIfAll = pk.load(f)
+                
+        else: acceptIfAll = None
+
+        if os.path.exists(rejectIfAllPath):
+            f = open(rejectIfAllPath, "rb")
+            with f:
+                rejectIfAll = pk.load(f)
+                
+        else: rejectIfAll = None
+        
+        rowCount = 0
+        breakFlag = False if (acceptIfAny is True or acceptIfAll is True) else True
+        
+        if breakFlag is True:
+            backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
+            
+            if type(backExtended) is int and backExtended in [-47, -44]:
+                return backExtended
+
+            back, Nepsilon = backExtended
+            
+        else:
+            back = PyT.backEvolve(np.linspace(0, Nend, 1000),
+                                  initial, pvals, tols, False, tmax_bg)
+            
+            if type(back) is tuple: return back[0]
+        
+        for row in back:
+            
+            """ Check for violations """
+
+            if rejectIfAny is not None:
+                if np.any(np.logical_and(row[rejectIfAnyIdx] > rejectIfAnyMin, row[rejectIfAnyIdx] < rejectIfAnyMax)):
+                    # bad
+                    return -46
+            
+            if rejectIfAll is not None:
+                for d in rejectIfAll:
+                    idx = rejectIfAll[d]['idx']
+                    min = rejectIfAll[d]['min']
+                    max = rejectIfAll[d]['max']
+                    if np.all(np.logical_and(row[idx] > min, row[idx] < max)):
+                        # bad
+                        return -46
+                
+            if acceptIfAny is not None:
+                if np.any(np.logical_and(row[acceptIfAnyIdx] > acceptIfAnyMin, row[acceptIfAnyIdx] < acceptIfAnyMax)):
+                    # good
+                    breakFlag = True
+                    break
+                
+            if acceptIfAll is not None:
+                for d in acceptIfAll:
+                    idx = acceptIfAll[d]['idx']
+                    min = acceptIfAll[d]['min']
+                    max = acceptIfAll[d]['max']
+                    if np.all(np.logical_and(row[idx] > min, row[idx] < max)):
+                        # good
+                        breakFlag = True
+                        break
+                
+                    if breakFlag: break
+                    
+            Nend = row[0]
+            rowCount += 1
+            
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
+    if breakFlag is not True:
+        print "** No end found"
+        return -50
     
-    if Nend < minN: return -50
-
+    if Nend < minN:
+        print "** Inflation too short: {}".format(Nend)
+        return -45
+    
+    back = back[:rowCount]
+    
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
         
@@ -214,33 +252,22 @@ def Initialize(modelnumber, rerun_model=False):
                 initial = row[1:]
                 Nend = Nend - row[0]
                 
-                # For canonical end, this should be straightforward
-                if canonical is True:
-                    t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
-                    back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
+                t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
+                back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
                 
-                # # For non-canonical
-                # else:
-                #
-                #     # *Small* chance that extension may mess up, returning ValueError
-                #     try:
-                #         back_adj, Neps = PyS.ExtendedBackEvolve(initial, pvals, PyT)
-                #     except ValueError:
-                #         back_adj = None
+                if type(back_adj) != np.ndarray:
+                    back_adj = back
+                
+                if back_adj[-1][0] != back[-1][0]:
+                    back_adj = back
                 
                 # Break out of search window
                 break
     else:
         back_adj = back
 
-    # If rescaling procedure fails: Revert to initial background computation
-    if type(back_adj) == np.ndarray:
-        pass
-    else:
-        back = back_adj
-
     # Attempt computation of momenta at horizon crossing, this will be used in all calculations of observables
-    kExit = PyS.kexitN(Nend - Nexit, back, pvals, PyT)
+    kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
     
     # Asses success by data type of momenta result
     if type(kExit) not in [float, np.float, np.float32, np.float64]:
@@ -254,7 +281,10 @@ def Initialize(modelnumber, rerun_model=False):
     # Define number of efolds from end of inflation which should be adiabatic TODO: Wrap this into config. file
     
     # Find first efoldign to perform eigenvalue test
-    adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
+    try:
+        adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
+    except IndexError:
+        return -47
     
     # Compute mass-matrix evolution from this point
     Mij_end = PyS.evolveMasses(back[adiabaticN_start:], pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)
@@ -274,12 +304,10 @@ def Initialize(modelnumber, rerun_model=False):
             # Change adiabatic property to False, and break out of search window
             adiabatic = False
             
-            print "-- Adiabatic limit not found: %05d" % modelnumber
             break
 
     # Record all sample data
-    new_sample(modelnumber, fvals, vvals, pvals, back, adiabatic, Nend, kExit, pathSamples, rerun_model)
-
+    new_sample(modelnumber, fvals, vvals, pvals, back_adj, adiabatic, Nend, kExit, pathSamples, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
     
@@ -308,8 +336,8 @@ def DemandSample(modelnumber):
         
         ii = Initialize(modelnumber)
         
-        print modelnumber, ii
-            
+        print ii
+        
         # If fail flag received: log statistic
         if ii in flags:
             flag_counts[flags.index(ii)] += 1

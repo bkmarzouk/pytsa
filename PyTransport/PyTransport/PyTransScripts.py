@@ -450,7 +450,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
 
     # If extended integration immediately fails, return background up until integrator limit
-    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-47, -44]: return BG_epsilon
+    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-47, -44]: return BG_epsilon[0]
     
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]

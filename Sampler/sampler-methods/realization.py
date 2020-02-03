@@ -43,6 +43,7 @@ class realization:
                 time_key = "{}_t".format(name_timer)
                 self.observables[time_key] = obsdict[key]
 
+
     def line_dict(self):
         """"""
         
@@ -69,27 +70,13 @@ class realization:
         
         for key in lDefs:
             x, num = key[0], int(key[1:])
-            if x=="p":
-                line[key] = self.parameters[num]
-                # pNums.append(num)
-                # pVals.append(self.parameters[num])
-                # pDefs.append(lDefs[key])
-            elif x=="f":
-                line[key] = self.fields[num]
-                # fNums.append(num)
-                # fVals.append(self.fields[num])
-                # fDefs.append(lDefs[key])
-            elif x =="v":
-                line[key] = self.velocities[num]
-                # vNums.append(num)
-                # vVals.append(self.velocities[num])
-                # vDefs.append(lDefs[key])
-            else:
-                raise KeyError, "Unrecognized key: {}".format(key)
+            if x=="p": line[key] = self.parameters[num]
+            elif x=="f": line[key] = self.fields[num]
+            elif x =="v": line[key] = self.velocities[num]
+            else: raise KeyError, "Unrecognized key: {}".format(key)
 
         """ Add results for observables """
-        for o in self.observables:
-            line[o] = self.observables[o]
+        for o in self.observables: line[o] = self.observables[o]
 
         return line
 
