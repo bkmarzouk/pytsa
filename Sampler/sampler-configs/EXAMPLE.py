@@ -10,7 +10,7 @@ import PyTrans2Quad as PyT
 model = PyTransportSampler(PyT)
 
 # Set core params
-model.setCoreParams("dquad_exmaple_extra")
+model.setCoreParams("EXAMPLE_dquad")
 
 # Set priors on initial conditions and parameters
 model.setInitialFieldValues(-1, "numpy.random.uniform(-20, 20)", "numpy")
@@ -20,8 +20,7 @@ model.setParameterValues(-1, "numpy.exp(numpy.random.uniform(-6, -1))", "numpy")
 # Set configurations for the reduced-Bispectrum
 model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
 
-# # Once the parameters have been set, we simply execute buildSampler
-
+# Once the parameters have been set, we simply execute buildSampler
 model.recordFieldValue(0, "\chi_{0}")
 model.recordDotFieldValue(0, "\dot{\chi_{0}}")
 model.recordParameterValue(0, "M_\chi")

@@ -588,7 +588,7 @@ def SpectralIndex(modelnumber):
         assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
 
         # Get initial condition for each momenta
-        ICsEvos = [PyS.ICs(subevo, kE, back, pvals, PyT) for kE in kExitrange]
+        ICsEvos = [PyS.ICsBM(subevo, kE, back, pvals, PyT) for kE in kExitrange]
 
         # Check initial conditions array(s) are correct length of correct dtype
         for item in ICsEvos:
@@ -677,7 +677,7 @@ def fNL(modelnumber, configName):
     try:
 
         # Compute initial conditions
-        ICs = PyS.ICs(subevo, kmin, back, pvals, PyT)
+        ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
         assert len(ICs) == 2, "Initial conditions incorrect length: model {m}, config {c}".format(
             m=modelnumber, c=name
         )
@@ -733,4 +733,4 @@ def computations(mn_calc):
             print "--   End fNL: model %06d, config {}".format(calculation) % modelnumber
 
         if len(w) > 0:
-            print "-- {t} TASK FAILURE, MODEL {m}".format(t=calculation, m=modelnumber)
+            print "-- TASK FAILURE: {t}, MODEL {m}".format(t=calculation, m=modelnumber)
