@@ -50,7 +50,7 @@ A directory `/<save location>/<sampler name>/` will now be constructed, containi
 
 Generally speaking, we probably want to explore the space of parameters and initial conditions associated with the model. We now describe how to define sampling space on such data fields. We describe first the **basic**, then **advanced** configuration options.
 
-**Basic Definitions**
+**Basic: Defining intial conditions and model parameters**
 
 Initial conditions and parameters are all defined with the same basic syntax
 
@@ -60,11 +60,52 @@ model.setDotFieldValues(index, command, *modules)
 model.setParameterValues(index, command, *modules)
 ```
 
-The first argument, `index` corresponds to the index value of field *or* parameter associated with the PyTransport installation file (PyT). The second argument, `command` informs the sampler what to do. E.g. if we want to assign a constant value, simply enter the value. More interestingly is the case where we may wish to draw values from a distrribution. As an example, let's suppose that we want to draw values from the a uniform distribution for the field with index 0. This could be achieved quite easily using the ``numpy`` module in the following way
+The first argument, `index` corresponds to the index value of field *or* parameter associated with the PyTransport installation file (PyT). The second argument, `command` informs the sampler what to do. Let's say that we wish the zeroth parameter to always have a fixed value of 0.1, we would define this in the following way:
+
+```python
+model.setParameterValues(0, 0.01)
+```
+
+More interestingly is the case where we may wish to draw values from a distrribution. To illustrate. let's suppose that we want to draw values from the a uniform distribution for the field with index 0. This could be achieved quite easily using the ``numpy`` module in the following way:
 
 ```python
 model.setFieldValues(0, "numpy.random.uniform(-20, 20)", "numpy")
 ```
 
+Often we may want to prescribe repeated value definitions. Rather than writing similar statements over-and-over, in place of a single index value we can pass a list (or any iterable) containing multiple indices, or `-1`. In the latter case, all available indices will be assigned the same command.
+
+**Basic: Recording initial conditions and paramter values**
+
+By default, PyT-Sample will take the relevant definitions and perform calculations: ultimately saving outputs to a result file. In the case of sampling, we might want to keep track of some additional information. To do this, the following optional commands are available:
+
 ```python
-model.set
+model.recordFieldValue(index, LaTeX)
+model.recordDotFieldValue(index, LaTeX)
+model.recordParameterValue(index, LaTeX)
+```
+
+The `index` argument is analagous to that previously discussed. Notabaly however, it does not currently permit multiple-value assignments (this will be updated soon). The `LaTeX` field is a string that can be formatted in *LaTeX* style. This is useful for example if we wish to export our results to `GetDist` for analysis (see later discussion).
+
+**Basic: Defining reduced-Bispectrum configurations**
+
+PyTransport supports 3-point function calculations, which are wrapped into `fNL` calculations by PyT-Sample. During sampler configuration, it is possible to define which fNL calculations will be available at runtime. It is possible to add bispectrum configurations with the following commands
+
+```python
+model.addBispectrumConfiguration(name, latex, alpha, beta)
+```
+
+The `name` field is simply used to distinguish between configurations. `latex` enables *LaTeX* formatting in analysis files. Finally, `alpha` and `beta` are simply used to parameterize the relative momenta about the pivot-scale:
+
+```python
+k1 = kExit / 2. - beta * kExit / 2.
+k2 = kExit * (1. + alpha + beta) / 4.
+k3 = kExit * (1. - alpha + beta) / 4.
+```
+
+For example, we may wish to define the following canonical configurations
+
+```python
+model.addBispectrumConfiguration("equilateral", "f_{NL}^{eq}", 1./3., 1./3.)
+model.addBispectrumConfiguration("squeezed", "f_{NL}^{sq}", 0.9, 0.01)
+model.addBispectrumConfiguration("folded", "f_{NL}^{fo}", -0.5, 0.5)
+```
