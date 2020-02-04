@@ -122,6 +122,8 @@ def Initialize(modelnumber, rerun_model=False):
     # If we choose to end inflation with eps = 1
     if canonical is True:
         
+        breakFlag = True
+        
         # Compute end of inflation
         Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg)
 
@@ -132,6 +134,8 @@ def Initialize(modelnumber, rerun_model=False):
         else:
             back = PyT.backEvolve(np.linspace(0, Nend, 1000),
                                   initial, pvals, tols, False, tmax_bg)
+            
+            rowCount = len(back)
             
             # If not numpy array, background computation failed
             if type(back) is tuple: return back[0]
@@ -183,8 +187,12 @@ def Initialize(modelnumber, rerun_model=False):
             # Simply change this to return if int? All all flags *should" be handled
             if type(backExtended) is int and backExtended in [-48, -47, -44]:
                 return backExtended
-
+            
             back, Nepsilon = backExtended
+
+            N, X = back.T[0], back.T[1]
+
+            print np.max(N), np.min(X)
             
         else:
             Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg)

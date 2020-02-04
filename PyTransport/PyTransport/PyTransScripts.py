@@ -416,7 +416,7 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
-                       tols=np.array([1e-12, 1e-12]), tmax_bg=-1):
+                       tols=np.array([1e-8, 1e-8]), tmax_bg=-1):
     """ Simple iterative procedure to extend canonical background evolution past epsilon;
         differs from exit=True routine in backEvolve by attempting to re-integrate after integrator limit """
     
@@ -450,7 +450,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
 
     # If extended integration immediately fails, return background up until integrator limit
-    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-47, -44]: return BG_epsilon[0]
+    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-48, -47, -44]: return BG_epsilon[0]
     
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]

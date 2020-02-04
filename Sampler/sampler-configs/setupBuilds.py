@@ -41,7 +41,7 @@ class icpsCfgTemplate:
         
         # Check command will make sense by interpreter
         assert type(command) in [
-            str, float, int], "Write functional command in '' markers, or present a constant numeric value"
+            str, float, np.float, np.float32, np.float64, int], "Write functional command in '' markers, or present a constant numeric value"
         
         # Try and iterate over attribute indices
         try:
@@ -373,7 +373,10 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
     def buildSampler(self, update=False):
         
         self.checkicps()
-        self.requiredModules = list(set(self.requiredModules))
+        if hasattr(self, "requiredModules"):
+            self.requiredModules = list(set(self.requiredModules))
+        else:
+            self.requiredModules = []
     
         if self.saveLocation != "default":
             assert os.path.exists(self.saveLocation), "Savelocation does not exist: {}".format(self.saveLocation)

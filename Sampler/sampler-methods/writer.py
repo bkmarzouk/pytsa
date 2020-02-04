@@ -45,14 +45,18 @@ def bg_summary():
         # unload binary file
         f = open(sp, "rb")
         with f:
-            stats = pk.load(f)
+            try:
+                stats = pk.load(f)
+            except:
+                raise OSError, sp
         
         # add corresponding dictionary keys
         for key in stats:
             counters[key] += stats[key]
             if key not in ["end", "time"]:
                 rej_tot += stats[key]
-        
+    
+    for sp in stat_paths:
         # remove minor stats data
         os.remove(sp)
             
@@ -123,14 +127,27 @@ def write_results(nF):
     
     latexFile = open(os.path.join(pathLocalData, "latex.localdata"), "rb")
     
-    with latexFile as f:
-        latexDefs = pk.load(latexFile)
+    with latexFile: latexDefs = pk.load(latexFile)
     
-    for key in latexDefs:
+    fkeys = []
+    vkeys = []
+    pkeys = []
+    for k in sorted(latexDefs.keys()):
+        if k.startswith("f"): fkeys.append(k)
+        elif k.startswith("v"): vkeys.append(k)
+        elif k.startswith("p"): pkeys.append(k)
+        else: raise KeyError, k
+    
+    sortedKeys = fkeys + vkeys + pkeys
+    
+    for key in sortedKeys:
         headers += (key,)
         labels.append(key)
         ncols += 1
         latexs.append(latexDefs[key])
+        
+    # Since dictionary items will be read in arbitrary order, resort list based on param number
+    
 
     if len(os.listdir(path2pf)) > 0:
         labs = ["ns", "alpha", "2pf_t"]
