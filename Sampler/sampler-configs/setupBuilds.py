@@ -55,7 +55,7 @@ class icpsCfgTemplate:
                 assert fN < nFP and fN >= 0, "Invalid field/parameter number: {}".format(fN)
                 
                 # Assign dictionary key value for index
-                getattr(self, attr_)[str(fpNums)] = command
+                getattr(self, attr_)[str(fN)] = command
             
         # If not iterable
         except TypeError:
@@ -95,15 +95,19 @@ class icpsCfgTemplate:
         
         else:
             try:
+                
                 # Execute import statements
-                for m in self.requiredModules: exec("import {}".format(m))
+                if hasattr(self, "requiredModules"):
+                    for m in self.requiredModules:
+                        exec("import {}".format(m))
                 
                 # Attempt evaluation of result
-                result = eval(command)
+                constTypes = [int, float, np.float, np.float32, np.float64]
+                
+                result = command if type(command) in constTypes else eval(command)
                 
                 # Check result data type
-                assert type(result) in [
-                    float, int, np.float, np.float32, np.float64], "Invalid result: {} -> {}".format(command, result)
+                assert type(result) in constTypes, "Invalid result: {} -> {}".format(command, result)
                 
             except:
                 raise ValueError, "Could not evaluate command: {}".format(command)
@@ -168,6 +172,7 @@ class icpsCfgTemplate:
         dotfield_range = []
         parameter_range = []
         
+        """TODO: Iterable definitions not working!! """
         for key in self.fields: field_range.append(int(key))
         for key in self.dotfields: dotfield_range.append(int(key))
         for key in self.parameters: parameter_range.append(int(key))
@@ -422,6 +427,9 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             f_command = self.fields[str(ii)]
             v_command = self.dotfields[str(ii)]
             
+            f_command = str(f_command) if type(f_command) != str else f_command
+            v_command = str(v_command) if type(v_command) != str else v_command
+            
             # Add to lines list
             fval_line = "\t\t" + f_command
             vval_line = "\t\t" + v_command if v_command != "SR" else "\t\t" + "'" + v_command + "'"
@@ -444,7 +452,11 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         # Repeat process for parameters
         for ii in range(self.nP):
             
-            pval_line = "\t\t" + self.parameters[str(ii)]
+            p_command = self.parameters[str(ii)]
+            
+            p_command = str(p_command) if type(p_command) != str else p_command
+            
+            pval_line = "\t\t" + p_command
             
             if ii < self.nP - 1:
                 pval_line += ",\n"

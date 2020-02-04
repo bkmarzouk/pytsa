@@ -172,17 +172,22 @@ def Initialize(modelnumber, rerun_model=False):
         else: rejectIfAll = None
         
         rowCount = 0
-        breakFlag = False if (acceptIfAny is True or acceptIfAll is True) else True
         
-        if breakFlag is True:
+        # We flag to break out of loop cycle if there is a condition that ends inflation
+        breakFlag = False if (acceptIfAny is not None or acceptIfAll is not None) else True
+        
+        # If we aren't looking for a specific exit condition, then we
+        if breakFlag is False:
             backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
             
-            if type(backExtended) is int and backExtended in [-47, -44]:
+            # Simply change this to return if int? All all flags *should" be handled
+            if type(backExtended) is int and backExtended in [-48, -47, -44]:
                 return backExtended
 
             back, Nepsilon = backExtended
             
         else:
+            Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg)
             back = PyT.backEvolve(np.linspace(0, Nend, 1000),
                                   initial, pvals, tols, False, tmax_bg)
             
@@ -229,13 +234,9 @@ def Initialize(modelnumber, rerun_model=False):
             
 
     # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if breakFlag is not True:
-        print "** No end found"
-        return -50
+    if breakFlag is not True: return -50
     
-    if Nend < minN:
-        print "** Inflation too short: {}".format(Nend)
-        return -45
+    if Nend < minN: return -45
     
     back = back[:rowCount]
     
@@ -335,8 +336,6 @@ def DemandSample(modelnumber):
     while ii != modelnumber:
         
         ii = Initialize(modelnumber)
-        
-        print ii
         
         # If fail flag received: log statistic
         if ii in flags:
