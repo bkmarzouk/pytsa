@@ -103,7 +103,8 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
 
     # write summary stats for background
     if use_samples is True:
-        if not os.path.exists(os.path.join(pathStats, "summary.txt")): w.bg_summary()
+        if not os.path.exists(os.path.join(pathStats, "bg", "summary.txt")):
+            w.bg_summary()
     else: w.bg_summary()
 
 

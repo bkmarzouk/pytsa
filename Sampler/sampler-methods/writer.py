@@ -30,11 +30,26 @@ def load_obs(pk_path):
 def bg_summary():
     
     # Build paths to pickled minor stats
-    stat_paths = [os.path.join(pathStats, item) for item in os.listdir(pathStats)]
+    bgd = os.path.join(pathStats, "bg")
+    stat_paths = [os.path.join(bgd, item) for item in os.listdir(bgd)]
     
     # Set counters dictionary (will sum minor stats)
-    counters = {'short': 0, 'kexit': 0, 'feoi': 0, 'back': 0,
-                "violated": 0, "eternal": 0, "timeout": 0, "time": 0, "end": 0, "samples": len(stat_paths)}
+    # Flag defs.
+    timeoutFlags = [
+        -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
+    ]
+
+    integratorFlags = [
+        -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
+    ]
+
+    samplerFlags = [
+        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+    ]
+
+    allFlags = timeoutFlags + integratorFlags + samplerFlags
+    allKeys = [str(f) for f in allFlags] + ["time"]
+    totDict = {k: 0 for k in allKeys}
     
     print "\n-- Writing background statistics\n"
     
@@ -51,39 +66,42 @@ def bg_summary():
                 raise OSError, sp
         
         # add corresponding dictionary keys
-        for key in stats:
-            counters[key] += stats[key]
-            if key not in ["end", "time"]:
-                rej_tot += stats[key]
+        for k in allKeys:
+            totDict[k] += stats[k]
     
     for sp in stat_paths:
         # remove minor stats data
         os.remove(sp)
-            
-    stats_file = open(os.path.join(pathStats, "summary.txt"), "w")
+        
+    f = open(os.path.join(pathStats, "bg", "summary.pk"), "rb")
     
-    error    = "-- Rejections summary:\n"
-    short    = "Insufficient inflation:                {}\n".format(counters['short'])
-    kexit    = "Failed to compute kExit:               {}\n".format(counters['kexit'])
-    feoi     = "Integration error, findEndOfInflation: {}\n".format(counters['feoi'])
-    back     = "Integration error, backEvolve:         {}\n".format(counters['back'])
-    violated = "Model violation:                       {}\n".format(counters['violated'])
-    timeout  = "Integration timout:                    {}\n".format(counters['timeout'])
-    rejects  = "Total rejected samples:                {}\n\n".format(rej_tot)
+    with f: pk.dump(totDict, f)
     
-    success  = "-- Ensemble overview:\n"
-    tsa      = "Total number of attempted samples:     {}\n".format(counters['end'])
-    tss      = "Total number of successful samples:    {}\n".format(counters['samples'])
-    p_N      = "Probability of inflation:              {}\n".format(float(counters['samples']) / float(counters['end']))
-    ttotal   = "Total time to build ensemble:          {} seconds\n".format(float(counters['time']))
-    taverage = "Av. time to obtain successful sample:  {}\n".format(float(counters['time']/ float(counters['samples'])))
-    
-    lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, tsa, tss, p_N, ttotal, taverage]
-    
-    with stats_file as f:
-        for line in lines:
-            f.write(line)
-    
+    #
+    # stats_file = open(os.path.join(pathStats, "summary.txt"), "w")
+    #
+    # error    = "-- Rejections summary:\n"
+    # short    = "Insufficient inflation:                {}\n".format(counters['short'])
+    # kexit    = "Failed to compute kExit:               {}\n".format(counters['kexit'])
+    # feoi     = "Integration error, findEndOfInflation: {}\n".format(counters['feoi'])
+    # back     = "Integration error, backEvolve:         {}\n".format(counters['back'])
+    # violated = "Model violation:                       {}\n".format(counters['violated'])
+    # timeout  = "Integration timout:                    {}\n".format(counters['timeout'])
+    # rejects  = "Total rejected samples:                {}\n\n".format(rej_tot)
+    #
+    # success  = "-- Ensemble overview:\n"
+    # tsa      = "Total number of attempted samples:     {}\n".format(counters['end'])
+    # tss      = "Total number of successful samples:    {}\n".format(counters['samples'])
+    # p_N      = "Probability of inflation:              {}\n".format(float(counters['samples']) / float(counters['end']))
+    # ttotal   = "Total time to build ensemble:          {} seconds\n".format(float(counters['time']))
+    # taverage = "Av. time to obtain successful sample:  {}\n".format(float(counters['time']/ float(counters['samples'])))
+    #
+    # lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, tsa, tss, p_N, ttotal, taverage]
+    #
+    # with stats_file as f:
+    #     for line in lines:
+    #         f.write(line)
+    #
     
 
 def update_samples(modelnumber):
