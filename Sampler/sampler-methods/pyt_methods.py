@@ -80,23 +80,33 @@ def Initialize(modelnumber, rerun_model=False):
     # Compute potential based on the fields and model parameters
     V = PyT.V(fvals, pvals)
 
-    # Iterate over velocity definitions
+    # If SR is in vvals, compute initial velocity value via slowroll equation
     if "SR" in vvals:
-        assert all(
-            v == "SR" for v in vvals), "If one field velocity is defined via the slow roll equation, all must be"
-
+        
+        # Construct np float array
+        vvals_ = np.zeros(np.shape(vvals), dtype=float)
+        
         # Compute derivatices of the potential
         dV = PyT.dV(fvals, pvals)
 
         # Compute velocities via slowroll equation
-        vvals = -dV / np.sqrt(3 * V)
+        vvalsSR = -dV / np.sqrt(3 * V)
 
-        # Concatenate field values with the slow-roll velocities
-        initial = np.concatenate((fvals, vvals))
+        # For each velocity def.
+        for jj in range(len(vvals)):
+            
+            #  If def. is SR, assign slow-roll velocity to float array
+            if vvals[jj] == "SR":
+                vvals_[jj] = vvalsSR[jj]
+            else:
+                # Otherwise force float-type to other array elements
+                vvals_[jj] = float(vvals[jj])
+                
+        # Redefine vvals
+        vvals = vval_
 
-    # If specified initial velocities: Read directly from configuration module
-    else:
-        initial = np.concatenate((fvals, vvals))
+    # Concatenate field and velocity values into initial conditions array
+    initial = np.concatenate((fvals, vvals))
 
     """ We have the following flags in place:
     
@@ -143,15 +153,17 @@ def Initialize(modelnumber, rerun_model=False):
         if type(Nend) is tuple: return Nend[0]
         
         # Attempt computation of background
-        else:
-            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
-            
-            rowCount = len(back)
-            
-            # If not numpy array, background computation failed
-            if type(back) is tuple: return back[0]
+        back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
+        
+        # If not numpy array, background computation failed
+        if type(back) is tuple: return back[0]
+
+        # Get number of rows in bg evo
+        rowCount = len(back)
 
     else:
+        # Load model constriants
+        
         if os.path.exists(acceptIfAnyPath):
             f = open(acceptIfAnyPath, "rb")
             with f:
@@ -186,6 +198,7 @@ def Initialize(modelnumber, rerun_model=False):
                 
         else: rejectIfAll = None
         
+        # Start background row counter
         rowCount = 0
         
         # We flag to break out of loop cycle if there is a condition that ends inflation
@@ -196,17 +209,16 @@ def Initialize(modelnumber, rerun_model=False):
             backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
             
             # Simply change this to return if int? All all flags *should" be handled
-            if type(backExtended) is int and backExtended in [-48, -47, -44]:
-                return backExtended
+            if type(backExtended) is tuple: return backExtended[0]
             
+            # Get background
             back, Nepsilon = backExtended
-
-            N, X = back.T[0], back.T[1]
-
-            print np.max(N), np.min(X)
             
         else:
             Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
+            
+            if type(Nend) is tuple: return Nend[0]
+            
             back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
             
             if type(back) is tuple: return back[0]
@@ -245,16 +257,14 @@ def Initialize(modelnumber, rerun_model=False):
                         breakFlag = True
                         break
                 
-                    if breakFlag: break
+                if breakFlag: break
                     
             Nend = row[0]
             rowCount += 1
-            
-
-    # We infer whether the background evolution was successful and whether it was too short subject to definition
-    if breakFlag is not True: return -50
     
-    if Nend < minN: return -45
+    if Nend < minN: return -30
+
+    if breakFlag is not True: return -34
     
     back = back[:rowCount]
     
@@ -289,8 +299,7 @@ def Initialize(modelnumber, rerun_model=False):
     kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
     
     # Asses success by data type of momenta result
-    if type(kExit) not in [float, np.float, np.float32, np.float64]:
-        return -47
+    if type(kExit) not in [float, np.float, np.float32, np.float64]: return -31
 
     # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
@@ -303,7 +312,7 @@ def Initialize(modelnumber, rerun_model=False):
     try:
         adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
     except IndexError:
-        return -47
+        return -11
     
     # Compute mass-matrix evolution from this point
     Mij_end = PyS.evolveMasses(back[adiabaticN_start:], pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)
@@ -338,6 +347,8 @@ def Initialize(modelnumber, rerun_model=False):
 
 def DemandSample(modelnumber):
     """ Repeat initialization until successful sample is found """
+    
+    """ FIX FLAGS """
     
     # Get directory for sample stats log
     sample_stats_dir = pathStats
@@ -390,6 +401,8 @@ def DemandSample(modelnumber):
 
 def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found """
+    
+    """ FIX FLAGS """
     
     # Get directory for sample stats log
     sample_stats_dir = pathStats
@@ -571,7 +584,8 @@ def SpectralIndex(modelnumber):
 
     # Unpack background information
     back = sample.background
-    Nend = sample.Nend;
+    Nend = sample.Nend
+    
     assert Nend is not None, "Nend = None should not be a saved sample"
     pvals = np.asarray(sample.parameters)
     
@@ -584,59 +598,52 @@ def SpectralIndex(modelnumber):
     # Begin timer
     ti = time.clock()
 
-    # Try and compute two-point function: Assert dtypes & catch attribute errors from failed calculations
-    try:
-        
-        # Define an efolding range 2-efolds above and below the exit time
-        Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
+    # Compute two-point function
 
-        # Compute the corresponding momenta at horizon exit times
-        kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
-        
-        # Insert existing results from model initialization
-        Nrange.insert(2, Nend - Nexit)
-        kExitrange.insert(2, kExit)
+    # Define an efolding range 2-efolds above and below the exit time
+    Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
 
-        # Check momenta are monotonically increasing
-        assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
+    # Compute the corresponding momenta at horizon exit times
+    kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
+    
+    # Insert existing results from model initialization
+    Nrange.insert(2, Nend - Nexit)
+    kExitrange.insert(2, kExit)
 
-        # Get initial condition for each momenta
-        ICsEvos = [PyS.ICsBM(subevo, kE, back, pvals, PyT) for kE in kExitrange]
+    # Check momenta are monotonically increasing
+    assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
 
-        # Check initial conditions array(s) are correct length of correct dtype
-        for item in ICsEvos:
-            assert len(item) == 2, "Initial conditions incorrect length"
-        for item in ICsEvos:
-            assert type(item[1]) == np.ndarray, "Initial conditions are wrong dtype"
+    # Get initial condition for each momenta
+    ICsEvos = [PyS.ICsBM(subevo, kE, back, pvals, PyT) for kE in kExitrange]
 
-        # Prescribe Nstart and Nend as evaluation times for 2pf run
-        Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
-        
-        # Call sigEvolve to compute power spectra
-        twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True).T for NkBack in zip(
-            Nevals, kExitrange, ICsEvos
-        )]
-        
-        # If flag return for sigEvolve, return flag data
-        for item in twoPt:
-            if type(item) is tuple: return item
+    # Check initial conditions array(s)
+    for item in ICsEvos:
+        if item == (np.nan, np.nan):
+            return {"mn": modelnumber, "flag": -32}
 
-        # Log power spectra and momenta
-        logPz = [np.log(xx[1][-1]) for xx in twoPt]
-        logkE = [np.log(kE) for kE in kExitrange]
+    # Prescribe Nstart and Nend as evaluation times for 2pf run
+    Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
+    
+    # Call sigEvolve to compute power spectra
+    twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True).T for NkBack in zip(
+        Nevals, kExitrange, ICsEvos
+    )]
+    
+    # If flag return for sigEvolve, return flag data
+    for item in twoPt:
+        if type(item) is tuple:
+            return {"mn": modelnumber, "flag": item[0]}
 
-        # Compute spectral index and running via spline derivatives of logged values
-        ns = UnivariateSpline(
-            logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExitrange[2])) + 4.
-        alpha = UnivariateSpline(
-            logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExitrange[2])) + 0.
-        
-        
-    except (AssertionError, AttributeError) as e:
+    # Log power spectra and momenta
+    logPz = [np.log(xx[1][-1]) for xx in twoPt]
+    logkE = [np.log(kE) for kE in kExitrange]
 
-        # Set None values for failed computation
-        ns = None
-        alpha = None
+    # Compute spectral index and running via spline derivatives of logged values
+    ns = UnivariateSpline(
+        logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExitrange[2])) + 4.
+    
+    alpha = UnivariateSpline(
+        logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExitrange[2])) + 0.
 
     # End calculation timer and build results dictionary
     twoPt_dict = {'ns': ns, 'alpha': alpha, 'time': time.clock() - ti}
@@ -646,6 +653,7 @@ def SpectralIndex(modelnumber):
     with twoPt_file:
         pk.dump(twoPt_dict, twoPt_file)
 
+    return 0
 
 def fNL(modelnumber, configName):
     
@@ -692,34 +700,26 @@ def fNL(modelnumber, configName):
     # Find smallest momentum: Build ICs from largest scale mode
     kmin = np.min([k1, k2, k3])
     
-    # Try and compute three-point function: Assert dtypes & catch attribute errors from failed calculations
-    try:
+    # Compute three-point function
 
-        # Compute initial conditions
-        ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
-        assert len(ICs) == 2, "Initial conditions incorrect length: model {m}, config {c}".format(
-            m=modelnumber, c=name
-        )
+    # Compute initial conditions
+    ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
+    
+    if ICs == (np.nan, np.nan):
+        return {"mn": modelnumber, "flag": -33}
 
-        assert type(ICs[1]) == np.ndarray, "Initial conditions incorrect dtype: model {m}, config {c}".format(
-            m=modelnumber, c=name
-        )
+    # Compute 3pt function
+    threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True).T
 
-        # Compute 3pt function
-        threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True).T
+    # If flag has been returned when computing 3pf, return flag data
+    if type(threePt) is tuple:
+        return {"mn": modelnumber, "flag": threePt[0]}
 
-        # If flag has been returned when computing 3pf, return flag data
-        if type(threePt) is tuple: return threePt
+    # Get power spectra and bispectrum for triangule
+    Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
 
-        # Get power spectra and bispectrum for triangule
-        Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
-
-        # Compute fNL
-        fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
-
-    # Except TypeError, typically propagates from bad BackExitMinus, i.e. float rather than ndarray
-    except (AssertionError,  AttributeError) as e:
-        fNL = None
+    # Compute fNL
+    fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
 
     # Build result dictionary
     fNL_dict = {'{}'.format(name): fNL, 'time': time.clock() - ti}
@@ -728,6 +728,8 @@ def fNL(modelnumber, configName):
     fNL_file = open(fNL_savepath, "wb")
     with fNL_file:
         pk.dump(fNL_dict, fNL_file)
+        
+    return 0
         
 
 def computations(mn_calc):
@@ -741,18 +743,24 @@ def computations(mn_calc):
 
         if calculation == "masses":
             print "-- Start masses: model %06d" % modelnumber
-            Mij(modelnumber)
+            r = Mij(modelnumber)
             print "--   End masses: model %06d" % modelnumber
 
-        if calculation == "2pf":
+        elif calculation == "2pf":
             print "-- Start 2pf: model %06d" % modelnumber
-            SpectralIndex(modelnumber)
+            r = SpectralIndex(modelnumber)
             print "--   End 2pf: model %06d" % modelnumber
 
-        if calculation not in ["masses", "2pf"]:
+        elif calculation not in ["masses", "2pf"]:
             print "-- Start fNL: model %06d, config {}".format(calculation) % modelnumber
-            fNL(modelnumber, calculation)
+            r = fNL(modelnumber, calculation)
             print "--   End fNL: model %06d, config {}".format(calculation) % modelnumber
 
-        if len(w) > 0:
-            print "-- TASK FAILURE: {t}, MODEL {m}".format(t=calculation, m=modelnumber)
+        else:
+            raise ValueError, "Undefined calculation: {}".format(calculation)
+        
+        if r != 0:
+            
+            """ WRITE TO STATS DIRECTORY """
+            
+            raise RuntimeError, "STOP!"
