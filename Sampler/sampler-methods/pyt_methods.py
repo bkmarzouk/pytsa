@@ -98,15 +98,27 @@ def Initialize(modelnumber, rerun_model=False):
     else:
         initial = np.concatenate((fvals, vvals))
 
-    """ Integration flags:
+    """ We have the following flags in place:
     
-    int SHORT = -50;          // Inflation too short
-    int KEXIT = -49;          // Unable to find Fourier mode
-    int FEOI = -48;           // Integration failure in feoi
-    int BACK = -47;           // Integration failure in background
-    int VIOLATED = -46;       // Field space position violates model
-    int ETERNAL = -45;        // Unable to find end of inflation
-    int TIMEOUT = -44;        // Integration time exceeded
+    Timeout flags:
+    -10 : findEndOfInflation
+    -11 : backEvolve
+    -12 : sigEvolve
+    -13 : alphaEvolve
+    
+    Integration error flags:
+    -20 : findEndOfInflation
+    -21 : beckEvolve
+    -22 : sigEvolve
+    -23 : alphaEvolve
+    
+    Misc. PyT:
+    -30 : Nend < Nmin
+    -31 : k not found
+    -32 : No ICsBM (2pf)
+    -33 : No ICsBM (3pf)
+    -34 : Model violation
+    -35 : Eternal inflation
     
     """
     
@@ -132,8 +144,7 @@ def Initialize(modelnumber, rerun_model=False):
         
         # Attempt computation of background
         else:
-            back = PyT.backEvolve(np.linspace(0, Nend, 1000),
-                                  initial, pvals, tols, False, tmax_bg)
+            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
             
             rowCount = len(back)
             
@@ -182,7 +193,7 @@ def Initialize(modelnumber, rerun_model=False):
         
         # If we aren't looking for a specific exit condition, then we
         if breakFlag is False:
-            backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg)
+            backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
             
             # Simply change this to return if int? All all flags *should" be handled
             if type(backExtended) is int and backExtended in [-48, -47, -44]:
@@ -196,8 +207,7 @@ def Initialize(modelnumber, rerun_model=False):
             
         else:
             Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
-            back = PyT.backEvolve(np.linspace(0, Nend, 1000),
-                                  initial, pvals, tols, False, tmax_bg)
+            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
             
             if type(back) is tuple: return back[0]
         
@@ -262,7 +272,7 @@ def Initialize(modelnumber, rerun_model=False):
                 Nend = Nend - row[0]
                 
                 t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
-                back_adj = PyT.backEvolve(t, initial, pvals, tols, False)
+                back_adj = PyT.backEvolve(t, initial, pvals, tols, False, tmax_bg, True)
                 
                 if type(back_adj) != np.ndarray:
                     back_adj = back
@@ -544,6 +554,9 @@ def Mij(modelnumber):
 
 def SpectralIndex(modelnumber):
     
+    # Get timeout
+    tmax_2pf = int(os.environ['tmax_2pf'])
+    
     # Unload sample data
     path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
     assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
@@ -600,9 +613,13 @@ def SpectralIndex(modelnumber):
         Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
         
         # Call sigEvolve to compute power spectra
-        twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False).T for NkBack in zip(
+        twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True).T for NkBack in zip(
             Nevals, kExitrange, ICsEvos
         )]
+        
+        # If flag return for sigEvolve, return flag data
+        for item in twoPt:
+            if type(item) is tuple: return item
 
         # Log power spectra and momenta
         logPz = [np.log(xx[1][-1]) for xx in twoPt]
@@ -631,6 +648,8 @@ def SpectralIndex(modelnumber):
 
 
 def fNL(modelnumber, configName):
+    
+    tmax_3pf = int(os.environ['tmax_3pf'])
     
     # Gather configuration data from configName
     for d in fNLDict:
@@ -687,7 +706,10 @@ def fNL(modelnumber, configName):
         )
 
         # Compute 3pt function
-        threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True).T
+        threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True).T
+
+        # If flag has been returned when computing 3pf, return flag data
+        if type(threePt) is tuple: return threePt
 
         # Get power spectra and bispectrum for triangule
         Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]

@@ -424,41 +424,29 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
-                       tols=np.array([1e-8, 1e-8]), tmax_bg=-1):
+                       tols=np.array([1e-8, 1e-8]), tmax_bg=-1, flag_return=False):
     """ Simple iterative procedure to extend canonical background evolution past epsilon;
         differs from exit=True routine in backEvolve by attempting to re-integrate after integrator limit """
     
     # Define number of iterations to attempt
     n_iter = Next / adpt_step
-
-    """
-    
-    Integrator flag defs.
-    
-    NOTE: Failure upon integrating background quantities return tuple: (flag, Efold)
-
-    int SHORT = -50;          // Inflation too short
-    int KEXIT = -49;          // Unable to find Fourier mode
-    int FEOI = -48;           // Integration failure in feoi
-    int BACK = -47;           // Integration failure in background
-    int VIOLATED = -46;       // Field space position violates model
-    int ETERNAL = -45;        // Unable to find end of inflation
-    int TIMEOUT = -44;        // Integration time exceeded
-    
-    """
     
     # Get fiducial end of inflation, i.e. when epsilon=1
-    Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000, tmax_bg)
+    Nepsilon = MTE.findEndOfInflation(initial, params, tols, Nstart, 12000, tmax_bg, True)
     
     # Return flag
-    if type(Nepsilon) is tuple: return Nepsilon[0]
+    if type(Nepsilon) is tuple:
+        if flag_return: return Nepsilon
+        else: return Nepsilon[1]
     
     # Define initial efolding range and compute background
     Nspace_init = np.linspace(Nstart, Nepsilon, 10000)
-    BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg)
+    BG_epsilon = MTE.backEvolve(Nspace_init, initial, params, tols, True, tmax_bg, True)
 
     # If extended integration immediately fails, return background up until integrator limit
-    if type(BG_epsilon) is tuple and BG_epsilon[0] in [-48, -47, -44]: return BG_epsilon[0]
+    if type(BG_epsilon) is tuple:
+        if flag_return: return Nepsilon
+        else: return BG_epsilon[1]
     
     # We will store extensions to the background evolution in the following list
     extensions = [BG_epsilon]
@@ -478,10 +466,10 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
         N_space = np.linspace(N_init, N_init + adpt_step, 100)
         
         # Try and compute extension to background evolution
-        bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False, tmax_bg)
+        bg_ext = MTE.backEvolve(N_space, bg_init, params, tols, False, tmax_bg, True)
         
         # If a integration flag is returned, break out of loop
-        if type(bg_ext) is tuple and bg_ext[0] in [-47, -44]: break
+        if type(bg_ext) is tuple: break
         
         # Otherwise append extension to list
         extensions.append(bg_ext[1:]) # [1:] skips first step in extension (this is already in the list)
