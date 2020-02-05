@@ -66,18 +66,26 @@ def ICsBM(NBMassless, k, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
     massEff = -1;
     
-    # calculate the element of back for which -k^2/a^2 + M^2 for M the largest eigenvalue of mass matrix
+    # calculate the element of back for which -k^2/a^2 + M^2 for M the largest eigenvalue of the full mass-matrix
+
     jj = 0
     while (massEff < 0 and jj < np.size(back[:, 0]) - 1):
-        w, v = np.linalg.eig(MTE.ddV(back[jj, 1:1 + nF], params))
-        eigen = np.max(w)
+        
+        # w, v = np.linalg.eig(MTE.ddV(back[jj, 1:1 + nF], params))
+        # eigen = np.max(w)
+        
+        # Note we have changed this to compute the canonical form of the full mass matrix
+        w, v = np.linalg.eig(MTE.massMatrix(back[jj, 1:1 + 2*nF], params))
+        eigen = np.max(np.real(w))
+        
         massEff = -k ** 2 * np.exp(-2.0 * back[jj, 0]) + eigen
         jj = jj + 1
+        
     if jj == np.size(back[:, 0]):
         print ("\n\n\n\n warning massless condition not found \n\n\n\n")
         return np.nan, np.nan
+    
     NMassless = back[jj - 2, 0]
-    backExitMinus = np.zeros(2 * nF)
     ll = 0
     Ncond = -1.
     while (Ncond < 0.0 and ll < np.size(back[:, 0]) - 1):

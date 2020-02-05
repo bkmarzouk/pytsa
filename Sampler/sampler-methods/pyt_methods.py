@@ -125,7 +125,7 @@ def Initialize(modelnumber, rerun_model=False):
         breakFlag = True
         
         # Compute end of inflation
-        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg)
+        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg, True)
 
         # Integration fails / eternal
         if type(Nend) is tuple: return Nend[0]
@@ -195,7 +195,7 @@ def Initialize(modelnumber, rerun_model=False):
             print np.max(N), np.min(X)
             
         else:
-            Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg)
+            Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
             back = PyT.backEvolve(np.linspace(0, Nend, 1000),
                                   initial, pvals, tols, False, tmax_bg)
             

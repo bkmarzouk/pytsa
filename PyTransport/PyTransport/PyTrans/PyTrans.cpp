@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Thu Jan 30 19:00:35 2020
+// Package recompile attempted at: Wed Feb  5 18:31:49 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -263,6 +263,7 @@ static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
     return PyArray_Return(mij_out);
 }
 
+
 // detect end of inflation within a suitable search window
 static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 {
@@ -277,13 +278,16 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     double tmax_feoi = -1;      // max integration time, tmax_feoi < 0 => no limit
 
     // Setup integration flags
-    int FEOI    = -48;        // Integration failure in feoi
-    int ETERNAL = -45;        // Unable to find end of inflation
-    int TIMEOUT = -44;        // Integration time exceeded
+    int timeoutFlag     = -10;        // Integration timeout flag
+    int integrationFlag = -20;        // Integration failure flag
+    int eternalFlag     = -35;        // Unable to find end of inflation flag
+
+    // Indicate whether to return flag tuple, or eFold at failure
+    bool flagReturn = false;
 
     // parse arguments; args after | are optional (https://docs.python.org/3/c-api/arg.html)
-    if(!PyArg_ParseTuple(args, "O!O!O!d|dd", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
-                         &Ninit, &DeltaN, &tmax_feoi))
+    if(!PyArg_ParseTuple(args, "O!O!O!|dddp", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
+                         &Ninit, &DeltaN, &tmax_feoi, &flagReturn))
                          {
                             return NULL;
                          }
@@ -340,9 +344,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     const double Nstop = Ninit + DeltaN;
     evolveB(N, y, dy, Cparams);
 
-    // we now set up the integration timer
-
-    // Initialize time difference (will measure exec. time)
+    // Initialize time difference (will measure elapsed time with every step of integration)
     double deltat;
 
     // Build time instances
@@ -364,23 +366,38 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 
         // if deltat exceeds allowed time and tmax_feoi > 0
 
-        if((deltat > tmax_feoi) && (tmax_feoi>0))
-            {
+        if((deltat > tmax_feoi) && (tmax_feoi>0)){
+
                 delete[] y;
                 delete[] dy;
-                PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
-                return flagReturn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", timeoutFlag, N);
+
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
             }
 
         flag = r8_rkf45(evolveB, 2*nF, y, dy, &N, Nstop, &relerr, abserr, flag, Cparams);
 
         // detect some error conditions
-        if(flag == 50)
-          {
+        if(flag == 50){
+
             delete[] y;
             delete[] dy;
-            PyObject *flagReturn = Py_BuildValue("id", FEOI, N);
-            return flagReturn;
+
+            if(flagReturn == true){
+                return Py_BuildValue("id", integrationFlag, N);
+            }
+
+            else{
+                return Py_BuildValue("d", N);
+            }
+
           }
 
         // compute value of epsilon
@@ -390,45 +407,58 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
         double eps = mm.Ep(vecy, vecParams);
 
         // If we have an unacceptable result, or if we are now past the end of inflation
-        if(eps < 0 || eps > 1)
-          {
+        if(eps < 0 || eps > 1){
+
             delete[] y;
             delete[] dy;
-            return Py_BuildValue("d", N); // REPORT EFOLDING AT INTEGRATOR LIMIT
+            return Py_BuildValue("d", N); // Report integration lim. under epsilon condition
+
           }
 
-        flag = -2;      // '-2' means continue as normal in 'single-step' mode
+        // '-2' means continue as normal in 'single-step' mode
+        flag = -2;
       }
 
     // deallocate workspace
     delete[] y;
     delete[] dy;
 
-
-    PyObject *flagReturn = Py_BuildValue("id", ETERNAL, N);
-    return flagReturn;
+    // No end to inflation
+    if(flagReturn == true){
+        return Py_BuildValue("id", eternalFlag, N);
+    }
+    else{
+        return Py_BuildValue("d", N);
+    }
 }
+
 
 // function to calculate background evolution
 static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 {
+
     // Initialize python (array) objects; these should be parsed from the python side
     PyArrayObject *initialCs, *t, *backOut, *backOutT, *params, *tols;
 
     // Initialize corresponding ctype arrays
     double *CinitialCs, *tc, *Cparams, *tolsC ;
 
-    // Define bool var for exit routine and early exit flags
+    // exit: if true -> exit when epsilon > 1
     bool exit;
-    int TIMEOUT = -44;  // integration timeout
-    int BACK    = -47;  // background integration fail
 
-    // Maximum integration time: Default -1 implies no max, otherwise acquires python arg. (secs)
+    // setup flags
+    int timeoutFlag     = -11;  // timeout flag
+    int integrationFlag = -21;  // integration flag
+
+    // Maximum integration time: Default -1 implies no max
     double tmax_back = -1;
 
+    // If true, returns tuple with error flag, else N
+    bool flagReturn = false;
+
     // Parse python arguments
-    if (!PyArg_ParseTuple(args, "O!O!O!O!b|d",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
-        &PyArray_Type, &tols, &exit, &tmax_back)) {
+    if (!PyArg_ParseTuple(args, "O!O!O!O!b|dp",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
+        &PyArray_Type, &tols, &exit, &tmax_back, &flagReturn)) {
         return NULL;
     }
 
@@ -518,13 +548,20 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
             deltat = difftime(t_fin,t_ini);
 
             // If time exceeds max integration time
-            if((deltat > tmax_back) && (tmax_back>0)) {
+            if((deltat > tmax_back) && (tmax_back>0)){
+
                     // Deallocate integrator work space and return timeout flag
                     delete[] y;
                     delete[] yp;
-//                    return Py_BuildValue("i", TIMEOUT);
-                    PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
-                    return flagReturn;
+
+                    if(flagReturn == true){
+                        return Py_BuildValue("id", timeoutFlag, N);
+                    }
+
+                    else{
+                        return Py_BuildValue("d", N);
+                    }
+
                 }
 
             // Otherwise compute background step and get (flag for) integrator status
@@ -532,13 +569,20 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 
             // If integrator error is raised
             if (flag== 50){
+
                 // Deallocate integrator work space and return integration failure flag for background
                 delete[] y;
                 delete[] yp;
-//                return Py_BuildValue("i", BACK);
-                PyObject *flagReturn = Py_BuildValue("id", BACK, N);
-                return flagReturn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", integrationFlag, N);
                 }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
+            }
 
             // Otherwise continue in single step mode
             flag=-2;
@@ -576,26 +620,41 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
 
             // If time difference is greater than maximum integration time
             if((deltat > tmax_back) && (tmax_back>0)){
+
                 // Deallocate integrator workspace and return timeout flag
                 delete[] y;
                 delete[] yp;
-//                return Py_BuildValue("i", TIMEOUT);
-                PyObject *flagReturn = Py_BuildValue("id", TIMEOUT, N);
-                return flagReturn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", timeoutFlag, N);
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
             }
 
             // Compute integration step and get (flag for) integrator status
             flag = r8_rkf45(evolveB , 2*nF, y, yp, &N, tc[ii], &relerr, abserr, flag, Cparams );
 
-            // If (flag 50) an integration error has occured
+            // Integration error
             if (flag== 50){
+
                 // deallocate integrator workspace and return background integration failure flag
                 delete[] y;
                 delete[] yp;
-//                return Py_BuildValue("i", BACK);
-                PyObject *flagReturn = Py_BuildValue("id", BACK, N);
-                return flagReturn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", integrationFlag, N);
                 }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+            }
+
+            // integration continues in single step-mode
             flag=-2;
 
             // Populate background C array for current step (row) value
@@ -641,18 +700,32 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     return PyArray_Return(backOut);
 }
 
+
 // function to calculate 2pt evolution
 static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
 {
+
     PyArrayObject *initialCs, *t, *sigOut, *params, *tols;
     double *CinitialCs, *tc, k, *Cparams, *tolsC;
     bool full;
-    if (!PyArg_ParseTuple(args, "O!dO!O!O!b", &PyArray_Type, &t, &k, &PyArray_Type, &initialCs,&PyArray_Type, &params, &PyArray_Type, &tols,&full)) {
-        return NULL;}
+
+    // Setup flags
+    int timeoutFlag = -12;
+    int integrationFlag = -22;
+
+    // Report tuple flag or N at fail
+    bool flagReturn = false;
+
+    // Set max integration time
+    double tmax_2pf = -1;
+
+    if (!PyArg_ParseTuple(args, "O!dO!O!O!bdp", &PyArray_Type, &t, &k, &PyArray_Type, &initialCs,&PyArray_Type, &params,
+        &PyArray_Type, &tols, &full, &tmax_2pf, &flagReturn)) {
+        return NULL;
+    }
+
     CinitialCs = pyvector_to_Carray(initialCs);
     tc = pyvector_to_Carray(t);
-
-//    if (full != 0 && full !=1 ){ full=1; cout << "\n \n \n Number out of range, defaulted to full outout mode \n \n \n";}
 
     tolsC = pyvector_to_Carray(tols);
     double rtol, atol;
@@ -721,13 +794,61 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
     sigOut = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
     sigOutC = (double *) PyArray_DATA(sigOut);
 
+    // Initialize time objects for measuring relative integrator times
+    double deltat;
+    time_t t_ini, t_fin;
 
+    // Record start time
+    time(&t_ini);
+
+    // Start integration
     for(int ii=0; ii<nt; ii++ ){
         while (N<tc[ii]-log(kscale)){
+
+            // Check whether maximum time has exceeded
+            time(&t_fin);
+            deltat = difftime(t_fin,t_ini);
+
+            // If time difference is greater than maximum integration time
+            if((deltat > tmax_2pf) && (tmax_2pf>0)){
+
+                // Deallocate integrator workspace and return timeout flag
+                delete [] y;
+                delete [] yp;
+                delete [] paramsIn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", timeoutFlag, N);
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
+            }
+
+            // Compute step
             flag = r8_rkf45(evolveSig , 2*nF+2*nF*2*nF, y, yp, &N, tc[ii]-log(kscale), &rtol, atol, flag, paramsIn );
-            if (flag== 50){cout<< "\n \n \n Integrator failed at time N = " <<N <<" \n \n \n"; return Py_BuildValue("d", N);}
+
+            if (flag== 50){
+
+                delete [] y;
+                delete [] yp;
+                delete [] paramsIn;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", integrationFlag, N);
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
+            }
             flag = -2;
+
         }
+
         fieldIn = vector<double>(y,y+2*nF);
 
         sigOutC[ii*size] = N+log(kscale);
@@ -753,19 +874,37 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
 
     }
 
-    delete [] y; delete [] yp;
+    delete [] y;
+    delete [] yp;
     delete [] paramsIn;
+
     return PyArray_Return(sigOut);
 }
+
 
 // function to calculate 3pt evolution
 static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
 {
+
     PyArrayObject *initialCs, *t, *alpOut,*params, *tols;
+
     double k1, k2, k3, Nstart, *CinitialCs, *tc,*Cparams, *tolsC;
+
     bool full;
-    if (!PyArg_ParseTuple(args, "O!dddO!O!O!b", &PyArray_Type, &t, &k1,&k2,&k3, &PyArray_Type, &initialCs,&PyArray_Type,&params,&PyArray_Type,&tols, &full)) {
-        return NULL; }
+
+    // Setup flags
+    int timeoutFlag = -13;
+    int integrationFlag = -23;
+    bool flagReturn = false;
+
+    // Maximum integration time, if < 0 then no max
+    double tmax_3pf = -1;
+
+    if (!PyArg_ParseTuple(args, "O!dddO!O!O!bdp", &PyArray_Type, &t, &k1, &k2, &k3, &PyArray_Type, &initialCs,
+        &PyArray_Type,&params,&PyArray_Type,&tols, &full, &tmax_3pf, &flagReturn)) {
+        return NULL;
+    }
+
     CinitialCs = pyvector_to_Carray(initialCs);
     tc = pyvector_to_Carray(t);
     int nt = t->dimensions[0];
@@ -840,19 +979,69 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     alpOut = (PyArrayObject*) PyArray_SimpleNew(2,dims,NPY_DOUBLE);
     alpOutC = (double *) PyArray_DATA(alpOut);
 
-
     evolveAlp(N, y, yp, paramsIn2);
     int flag=-1;
+
+    // Initialize time objects for measuring relative integrator times
+    double deltat;
+    time_t t_ini, t_fin;
+
+    // Record start time
+    time(&t_ini);
 
     // run alpha *******************************************
     vector<double> fieldIn(2*nF);
 
     for(int ii=0; ii<nt; ii++ ){
         while (N<(tc[ii]-log(kscale))){
-            flag = r8_rkf45(evolveAlp, 2*nF + 6*(2*nF*2*nF) + 2*nF*2*nF*2*nF, y, yp, &N, tc[ii]-log(kscale), &rtol, atol, flag, paramsIn2);
-            if (flag== 50){cout<< "\n \n \n Integrator failed at time N = " <<N <<" \n \n \n"; return Py_BuildValue("d", N);}
+
+            // Check whether maximum time has exceeded
+            time(&t_fin);
+            deltat = difftime(t_fin,t_ini);
+
+            // If time difference is greater than maximum integration time
+            if((deltat > tmax_3pf) && (tmax_3pf>0)){
+
+                // Deallocate integrator workspace and return timeout flag
+                delete [] y;
+                delete [] yp;
+                delete [] paramsIn2;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", timeoutFlag, N);
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
+            }
+
+            // Compute integration step
+            flag = r8_rkf45(evolveAlp, 2*nF + 6*(2*nF*2*nF) + 2*nF*2*nF*2*nF, y, yp, &N,
+                            tc[ii]-log(kscale), &rtol, atol, flag, paramsIn2);
+
+            // If integration failure
+            if (flag== 50){
+
+                // Deallocate integrator workspace and return integrator flag
+                delete [] y;
+                delete [] yp;
+                delete [] paramsIn2;
+
+                if(flagReturn == true){
+                    return Py_BuildValue("id", integrationFlag, N);
+                }
+
+                else{
+                    return Py_BuildValue("d", N);
+                }
+
+            }
+
             flag=-2;
         }
+
         fieldIn = vector<double>(y,y+2*nF);
         Ni=mm.N1(fieldIn,Vparams,N); // calculate N,i array
         Nii1=mm.N2(fieldIn,Vparams,k1n,k2n,k3n,N); // claculate N,ij array for first arrangement of ks
@@ -878,7 +1067,6 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
             }}}}
 
         alpOutC[ii*size] =  N+log(kscale);
-        //cout << N+log(kscale) << endl;
         alpOutC[ii*size+1] = ZZ1/kscale/kscale/kscale;
         alpOutC[ii*size+2] = ZZ2/kscale/kscale/kscale;
         alpOutC[ii*size+3] = ZZ3/kscale/kscale/kscale;
@@ -897,7 +1085,9 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
 
     }
 
-    delete [] y;  delete [] paramsIn2; delete [] yp;
+    delete [] y;
+    delete [] yp;
+    delete [] paramsIn2;
 
     return PyArray_Return(alpOut);
 }
