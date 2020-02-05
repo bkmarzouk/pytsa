@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Wed Feb  5 18:31:49 2020
+// Package recompile attempted at: Wed Feb  5 21:10:35 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -286,7 +286,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     bool flagReturn = false;
 
     // parse arguments; args after | are optional (https://docs.python.org/3/c-api/arg.html)
-    if(!PyArg_ParseTuple(args, "O!O!O!|dddp", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
+    if(!PyArg_ParseTuple(args, "O!O!O!|dddb", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
                          &Ninit, &DeltaN, &tmax_feoi, &flagReturn))
                          {
                             return NULL;
@@ -457,7 +457,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     bool flagReturn = false;
 
     // Parse python arguments
-    if (!PyArg_ParseTuple(args, "O!O!O!O!b|dp",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
+    if (!PyArg_ParseTuple(args, "O!O!O!O!b|db",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
         &PyArray_Type, &tols, &exit, &tmax_back, &flagReturn)) {
         return NULL;
     }
@@ -719,7 +719,7 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
     // Set max integration time
     double tmax_2pf = -1;
 
-    if (!PyArg_ParseTuple(args, "O!dO!O!O!bdp", &PyArray_Type, &t, &k, &PyArray_Type, &initialCs,&PyArray_Type, &params,
+    if (!PyArg_ParseTuple(args, "O!dO!O!O!bdb", &PyArray_Type, &t, &k, &PyArray_Type, &initialCs,&PyArray_Type, &params,
         &PyArray_Type, &tols, &full, &tmax_2pf, &flagReturn)) {
         return NULL;
     }
@@ -900,7 +900,7 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     // Maximum integration time, if < 0 then no max
     double tmax_3pf = -1;
 
-    if (!PyArg_ParseTuple(args, "O!dddO!O!O!bdp", &PyArray_Type, &t, &k1, &k2, &k3, &PyArray_Type, &initialCs,
+    if (!PyArg_ParseTuple(args, "O!dddO!O!O!bdb", &PyArray_Type, &t, &k1, &k2, &k3, &PyArray_Type, &initialCs,
         &PyArray_Type,&params,&PyArray_Type,&tols, &full, &tmax_3pf, &flagReturn)) {
         return NULL;
     }

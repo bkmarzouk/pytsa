@@ -103,7 +103,7 @@ def Initialize(modelnumber, rerun_model=False):
                 vvals_[jj] = float(vvals[jj])
                 
         # Redefine vvals
-        vvals = vval_
+        vvals = vvals_
 
     # Concatenate field and velocity values into initial conditions array
     initial = np.concatenate((fvals, vvals))
@@ -150,13 +150,13 @@ def Initialize(modelnumber, rerun_model=False):
         Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg, True)
 
         # Integration fails / eternal
-        if type(Nend) is tuple: return Nend[0]
+        if type(Nend) is tuple: return Nend
         
         # Attempt computation of background
         back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
         
         # If not numpy array, background computation failed
-        if type(back) is tuple: return back[0]
+        if type(back) is tuple: return back
 
         # Get number of rows in bg evo
         rowCount = len(back)
@@ -209,7 +209,7 @@ def Initialize(modelnumber, rerun_model=False):
             backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
             
             # Simply change this to return if int? All all flags *should" be handled
-            if type(backExtended) is tuple: return backExtended[0]
+            if type(backExtended) is tuple: return backExtended
             
             # Get background
             back, Nepsilon = backExtended
@@ -217,11 +217,11 @@ def Initialize(modelnumber, rerun_model=False):
         else:
             Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
             
-            if type(Nend) is tuple: return Nend[0]
+            if type(Nend) is tuple: return Nend
             
             back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
             
-            if type(back) is tuple: return back[0]
+            if type(back) is tuple: return back
         
         for row in back:
             
@@ -381,6 +381,10 @@ def DemandSample(modelnumber):
         if type(ii) is tuple:
             flagKey = str(ii[0])
             flagDict[flagKey] += 1
+            
+        elif type(ii) is int and ii in allFlags:
+            flagKey = str(ii)
+            flagDict[flagKey] += 1
     
         # If model number, sum number of iterations
         elif ii == modelnumber:
@@ -391,7 +395,7 @@ def DemandSample(modelnumber):
             f = open(sample_path, "wb")
         
             with f:
-                pk.dump(log, f)
+                pk.dump(flagDict, f)
     
         else:
             raise KeyError, ii

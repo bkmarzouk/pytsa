@@ -410,7 +410,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
                 os.makedirs(item)
                 
             else:
-                if not os.path.exists(item): os.makedirs(item)
+                if not os.path.exists(item):
+                    os.makedirs(item)
 
         # Add numpy to required modules list s.t. we can build arrays for sample specimens
         if "numpy" not in self.requiredModules: self.requiredModules.append("numpy")
