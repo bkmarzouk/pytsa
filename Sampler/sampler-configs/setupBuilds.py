@@ -390,6 +390,9 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.threept_dir = os.path.join(self.root, "3pf")
         self.mass_dir = os.path.join(self.root, "masses")
         self.stats_dir = os.path.join(self.root, "stats")
+        self.stats_dir_bg = os.path.join(self.stats_dir, "bg")
+        self.stats_dir_2pf = os.path.join(self.stats_dir, "2pf")
+        self.stats_dir_3pf = os.path.join(self.stats_dir, "3pf")
         self.samples_dir = os.path.join(self.root, "samples")
         self.outputs_dir = os.path.join(self.root, "outputs")
         self.localdata_dir = os.path.join(self.root, ".localdata")
@@ -399,8 +402,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.methods_dir = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods"))
         
         # Build paths as required, subject to whether the model file is being updated
-        for item in [self.root, self.twopt_dir, self.threept_dir, self.mass_dir,
-                     self.stats_dir, self.samples_dir, self.outputs_dir, self.localdata_dir]:
+        for item in [self.root, self.twopt_dir, self.threept_dir, self.mass_dir, self.stats_dir, self.stats_dir_bg,
+                     self.stats_dir_2pf, self.stats_dir_3pf, self.samples_dir, self.outputs_dir, self.localdata_dir]:
             
             if update is False:
                 assert not os.path.exists(item), "Directory already exists! {}".format(item)

@@ -347,73 +347,82 @@ def Initialize(modelnumber, rerun_model=False):
 
 def DemandSample(modelnumber):
     """ Repeat initialization until successful sample is found """
-    
-    """ FIX FLAGS """
-    
+
     # Get directory for sample stats log
-    sample_stats_dir = pathStats
-    
+    sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
+
+    # Flag defs.
+    timeoutFlags = [
+        -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
+    ]
+
+    integratorFlags = [
+        -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
+    ]
+
+    samplerFlags = [
+        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+    ]
+
+    allFlags = timeoutFlags + integratorFlags + samplerFlags
+    flagDict = {str(f): 0 for f in allFlags}
+
     # Start timer
     tstart = time.clock()
-    
+
     ii = -1
-    
-    flags = [-50, -49, -48, -47, -46, -45, -44]
-    flag_counts = [0 for flag in flags]
-    
+
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
-        
+    
         ii = Initialize(modelnumber)
-        
+    
         # If fail flag received: log statistic
-        if ii in flags:
-            flag_counts[flags.index(ii)] += 1
-        
+        if type(ii) is tuple:
+            flagKey = str(ii[0])
+            flagDict[flagKey] += 1
+    
         # If model number, sum number of iterations
         elif ii == modelnumber:
             tfinal = time.clock() - tstart
-            fail_total = sum(flag_counts)
-            total = fail_total + 1
-            
-            log = {
-                'short':    flag_counts[0],
-                'kexit':    flag_counts[1],
-                'feoi':     flag_counts[2],
-                'back':     flag_counts[3],
-                'violated': flag_counts[4],
-                'eternal':  flag_counts[5],
-                'timeout':  flag_counts[6],
-                'end':      total,
-                'time':     tfinal
-            }
-
-            log_path = os.path.join(sample_stats_dir, "{}.stats".format(modelnumber))
-            
-            f = open(log_path, "wb")
-            
+        
+            flagDict['time'] = tfinal
+        
+            f = open(sample_path, "wb")
+        
             with f:
                 pk.dump(log, f)
-                
+    
         else:
             raise KeyError, ii
         
 
 def DemandSample_rerun(modelnumber):
-    """ Repeat initialization until successful sample is found """
-    
-    """ FIX FLAGS """
+    """ Repeat initialization until successful sample is found : using rerun samples"""
     
     # Get directory for sample stats log
-    sample_stats_dir = pathStats
+    sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
+    
+    # Flag defs.
+    timeoutFlags = [
+        -10, -11, -12, -13 # end of inflation, background, 2pf, 3pf
+    ]
+    
+    integratorFlags = [
+        -20, -21, -22, -23 # end of inflation, background, 2pf, 3pf
+    ]
+    
+    samplerFlags = [
+        -30, -31, -32, -33, -34, -35 # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+    ]
+    
+    allFlags = timeoutFlags + integratorFlags + samplerFlags
+    flagDict = {str(f) : 0 for f in allFlags}
     
     # Start timer
     tstart = time.clock()
     
     ii = -1
-    
-    flags = [-50, -49, -48, -47, -46, -45, -44]
-    flag_counts = [0 for flag in flags]
     
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
@@ -421,34 +430,21 @@ def DemandSample_rerun(modelnumber):
         ii = Initialize(modelnumber, rerun_model=True)
         
         # If fail flag received: log statistic
-        if ii in flags:
-            flag_counts[flags.index(ii)] += 1
+        if type(ii) is tuple:
+            flagKey = str(ii[0])
+            flagDict[flagKey] += 1
         
         # If model number, sum number of iterations
         elif ii == modelnumber:
             tfinal = time.clock() - tstart
-            fail_total = sum(flag_counts)
-            total = fail_total + 1
             
-            log = {
-                'short'   : flag_counts[0],
-                'kexit'   : flag_counts[1],
-                'feoi'    : flag_counts[2],
-                'back'    : flag_counts[3],
-                'violated': flag_counts[4],
-                'eternal' : flag_counts[5],
-                'timeout' : flag_counts[6],
-                'end'     : total,
-                'time'    : tfinal
-            }
+            flagDict['time'] = tfinal
             
-            log_path = os.path.join(sample_stats_dir, "{}.stats".format(modelnumber))
-            
-            f = open(log_path, "wb")
+            f = open(sample_path, "wb")
             
             with f:
                 pk.dump(log, f)
-        
+                
         else:
             raise KeyError, ii
 
@@ -564,6 +560,8 @@ def Mij(modelnumber):
     with Mij_file:
         pk.dump(Mij_eig, Mij_file)
         
+    return 0
+        
 
 def SpectralIndex(modelnumber):
     
@@ -619,7 +617,7 @@ def SpectralIndex(modelnumber):
     # Check initial conditions array(s)
     for item in ICsEvos:
         if item == (np.nan, np.nan):
-            return {"mn": modelnumber, "flag": -32}
+            return {"mn": modelnumber, "flag": -32, "ext": "2pf"}
 
     # Prescribe Nstart and Nend as evaluation times for 2pf run
     Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
@@ -632,7 +630,7 @@ def SpectralIndex(modelnumber):
     # If flag return for sigEvolve, return flag data
     for item in twoPt:
         if type(item) is tuple:
-            return {"mn": modelnumber, "flag": item[0]}
+            return {"mn": modelnumber, "flag": item[0], "ext": "2pf"}
 
     # Log power spectra and momenta
     logPz = [np.log(xx[1][-1]) for xx in twoPt]
@@ -706,14 +704,14 @@ def fNL(modelnumber, configName):
     ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
     
     if ICs == (np.nan, np.nan):
-        return {"mn": modelnumber, "flag": -33}
+        return {"mn": modelnumber, "flag": -33, "ext": name}
 
     # Compute 3pt function
     threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True).T
 
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:
-        return {"mn": modelnumber, "flag": threePt[0]}
+        return {"mn": modelnumber, "flag": threePt[0], "ext": name}
 
     # Get power spectra and bispectrum for triangule
     Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
@@ -761,6 +759,16 @@ def computations(mn_calc):
         
         if r != 0:
             
-            """ WRITE TO STATS DIRECTORY """
+            # To do: Add error stats for mass-matrix. Though this should be stable.
             
-            raise RuntimeError, "STOP!"
+            if calculation == "masses":
+                pass
+            else:
+                # Get / remove extension key from dictionary
+                pkEXT = r.pop('ext')
+                
+                # Dump dictionary object
+                pkPath = os.path.join(pathStats, calculation, "{}.{}".format(modelnumber, pkEXT))
+                pkFile = open(pkPath, "wb")
+                with pkFile: pk.dump(r, pkFile)
+                
