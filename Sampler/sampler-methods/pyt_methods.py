@@ -204,15 +204,14 @@ def Initialize(modelnumber, rerun_model=False):
         # We flag to break out of loop cycle if there is a condition that ends inflation
         breakFlag = False if (acceptIfAny is not None or acceptIfAll is not None) else True
         
-        # If we aren't looking for a specific exit condition, then we
+        # If we aren't looking for a specific exit condition, then we compute extended BG evo
         if breakFlag is False:
-            backExtended = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
             
-            # Simply change this to return if int? All all flags *should" be handled
-            if type(backExtended) is tuple: return backExtended
+            back = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
             
-            # Get background
-            back, Nepsilon = backExtended
+            # Simply change this to return if int? All flags *should" be handled
+            if type(back) is tuple: return back
+            
             
         else:
             Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
@@ -230,7 +229,7 @@ def Initialize(modelnumber, rerun_model=False):
             if rejectIfAny is not None:
                 if np.any(np.logical_and(row[rejectIfAnyIdx] > rejectIfAnyMin, row[rejectIfAnyIdx] < rejectIfAnyMax)):
                     # bad
-                    return -46
+                    return -34
             
             if rejectIfAll is not None:
                 for d in rejectIfAll:
@@ -239,7 +238,7 @@ def Initialize(modelnumber, rerun_model=False):
                     max = rejectIfAll[d]['max']
                     if np.all(np.logical_and(row[idx] > min, row[idx] < max)):
                         # bad
-                        return -46
+                        return -34
                 
             if acceptIfAny is not None:
                 if np.any(np.logical_and(row[acceptIfAnyIdx] > acceptIfAnyMin, row[acceptIfAnyIdx] < acceptIfAnyMax)):
@@ -311,7 +310,7 @@ def Initialize(modelnumber, rerun_model=False):
     try:
         adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
     except IndexError:
-        return -11
+        return -21
     
     # Compute mass-matrix evolution from this point
     Mij_end = PyS.evolveMasses(back[adiabaticN_start:], pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)
@@ -376,6 +375,8 @@ def DemandSample(modelnumber):
     while ii != modelnumber:
     
         ii = Initialize(modelnumber)
+        
+        print ii
     
         # If fail flag received: log statistic
         if type(ii) is tuple:
@@ -403,52 +404,58 @@ def DemandSample(modelnumber):
 
 def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found : using rerun samples"""
-    
+
     # Get directory for sample stats log
     sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
-    
+
     # Flag defs.
     timeoutFlags = [
-        -10, -11, -12, -13 # end of inflation, background, 2pf, 3pf
+        -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
     ]
-    
+
     integratorFlags = [
-        -20, -21, -22, -23 # end of inflation, background, 2pf, 3pf
+        -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
     ]
-    
+
     samplerFlags = [
-        -30, -31, -32, -33, -34, -35 # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
     ]
-    
+
     allFlags = timeoutFlags + integratorFlags + samplerFlags
-    flagDict = {str(f) : 0 for f in allFlags}
-    
+    flagDict = {str(f): 0 for f in allFlags}
+
     # Start timer
     tstart = time.clock()
-    
+
     ii = -1
-    
+
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
-        
+    
         ii = Initialize(modelnumber, rerun_model=True)
-        
+    
+        print ii
+    
         # If fail flag received: log statistic
         if type(ii) is tuple:
             flagKey = str(ii[0])
             flagDict[flagKey] += 1
-        
+    
+        elif type(ii) is int and ii in allFlags:
+            flagKey = str(ii)
+            flagDict[flagKey] += 1
+    
         # If model number, sum number of iterations
         elif ii == modelnumber:
             tfinal = time.clock() - tstart
-            
+        
             flagDict['time'] = tfinal
-            
+        
             f = open(sample_path, "wb")
-            
+        
             with f:
-                pk.dump(log, f)
-                
+                pk.dump(flagDict, f)
+    
         else:
             raise KeyError, ii
 

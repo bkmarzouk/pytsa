@@ -426,7 +426,7 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 
 def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
-                       tols=np.array([1e-8, 1e-8]), tmax_bg=-1, flag_return=False):
+                       tols=np.array([1e-8, 1e-8]), tmax_bg=-1, flag_return=False, return_Neps=False):
     """ Simple iterative procedure to extend canonical background evolution past epsilon;
         differs from exit=True routine in backEvolve by attempting to re-integrate after integrator limit """
     
@@ -447,7 +447,7 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
 
     # If extended integration immediately fails, return background up until integrator limit
     if type(BG_epsilon) is tuple:
-        if flag_return: return Nepsilon
+        if flag_return: return BG_epsilon
         else: return BG_epsilon[1]
     
     # We will store extensions to the background evolution in the following list
@@ -481,15 +481,16 @@ def ExtendedBackEvolve(initial, params, MTE, Nstart=0, Next=1, adpt_step=4e-3,
     
     # If no extensions are found, simply
     if len(extensions) == 1:
-        return BG_epsilon, Nepsilon
+        if return_Neps: return BG_epsilon, Nepsilon
+        return BG_epsilon
     
     else:
         # Reconstruct extensions to 2d numpy array (as backEvolve)
         stacked = np.vstack((bg for bg in extensions))
         
         # return the background, as well as the e-folding where slow-roll was violated
-        return stacked, Nepsilon
-
+        if return_Neps: return stacked, Nepsilon
+        return stacked
 
 def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
