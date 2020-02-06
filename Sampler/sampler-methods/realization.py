@@ -9,37 +9,45 @@ class realization:
 
     def __init__(self, modelnumber, fields, velocities, parameters,
                  background, adiabatic, Nend, kExit, savelocation, overwrite=False):
-        """"""
+        """ Object tracks sample data; used as a ledger for ICs / params / results """
 
-        """ Record core model data for reproducibility """
+        # Core data (can rerun sample with this)
         self.modelnumber = modelnumber # Model number
         self.fields      = fields      # Field positions
         self.velocities  = velocities  # Field velocities
         self.parameters  = parameters  # Model parameters
         
-        """ Record background data which is recycled in observable tasks"""
+        # Background data (prevents recomputing)
         self.background  = background  # Background evolution
         self.Nend        = Nend        # Record end of inflation
         self.kExit       = kExit       # record momenta at horizon exit
 
-        """ Record results and classification data"""
+        # Results / write info.
         self.observables = {}          # Will be populated with results
         self.adiabatic   = adiabatic   # Adiabitic limit found
         self.savepath    = os.path.join(savelocation, "{}.sample".format(modelnumber))
-    
-        """ Save sample upon initialization"""
+
+        # luke
+        self.reject = False #  default is keep
+        
+        # Save object
         self.save_init(overwrite=overwrite)
+        
 
     def update_observables(self, obsdict, name_timer):
         """"""
-        
-        """ NEED TO ACCOUNT FOR USE_SAMPLES ROUTINE!!! """
+
+        rewriteObs = os.environ['PyTS_rewriteObs']
         
         """ We update the model's observable dictionary """
         for key in obsdict:
             if key != 'time':
-                assert key not in self.observables, "Realization already has observable data! {}".format(key)
+                if rewriteObs is 'False':
+                    assert key not in self.observables, "Realization already has observable data! {}".format(key)
                 self.observables[key] = obsdict[key]
+                
+                if self.observables[key] is None:
+                    self.reject = True
             
             else:
                 time_key = "{}_t".format(name_timer)
@@ -72,8 +80,8 @@ class realization:
         
         for key in lDefs:
             x, num = key[0], int(key[1:])
-            if x=="p": line[key] = self.parameters[num]
-            elif x=="f": line[key] = self.fields[num]
+            if   x=="p":  line[key] = self.parameters[num]
+            elif x=="f":  line[key] = self.fields[num]
             elif x =="v": line[key] = self.velocities[num]
             else: raise KeyError, "Unrecognized key: {}".format(key)
 

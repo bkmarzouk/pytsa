@@ -103,7 +103,7 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
 
     # write summary stats for background
     if use_samples is True:
-        if not os.path.exists(os.path.join(pathStats, "bg", "summary.txt")):
+        if not os.path.exists(os.path.join(pathStats, "summary_bg.pk")):
             w.bg_summary()
     else: w.bg_summary()
 
@@ -131,6 +131,7 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
     
     # Update samples with results from task pool
     print "\n-- Updating sample objects\n"
+    
     pool.map(w.update_samples, sample_range)
 
     # Close pool
@@ -138,6 +139,7 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
 
     # Write results file(s)
     print "\n-- Writing result files\n"
+    w.write_error_report()
     w.write_results(nF)
     print "\n-- All Complete.\n"
 
@@ -170,7 +172,7 @@ if __name__ == "__main__":
     # Add group for samples
     sampler_group = parser.add_mutually_exclusive_group(required=True)
 
-    sampler_group.add_argument("--n_samples", dest="n_samples", default=50, type=int,
+    sampler_group.add_argument("--n_samples", dest="n_samples", type=int,
                         help="Specify number of samples to obtain")
 
     # Flag to rerun computations from existing saved samples
@@ -211,6 +213,9 @@ if __name__ == "__main__":
     os.environ["tmax_bg"]  = str(args.tmax_bg)
     os.environ["tmax_2pf"] = str(args.tmax_2pf)
     os.environ["tmax_3pf"] = str(args.tmax_3pf)
+
+    # If using ensemble of samples, we want to allow dictionary key rewriting; hence we export flag
+    os.environ['PyTS_rewriteObs'] = str(args.use_samples)
 
     # Build pool via schwimmbad
     pool = schwimmbad.choose_pool(mpi=args.mpi, processes=args.n_cores)

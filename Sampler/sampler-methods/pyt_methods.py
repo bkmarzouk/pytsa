@@ -299,12 +299,11 @@ def Initialize(modelnumber, rerun_model=False):
     kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
     
     # Asses success by data type of momenta result
-    if type(kExit) not in [float, np.float, np.float32, np.float64]: return -31
+    if type(kExit) not in [float, np.float, np.float32, np.float64] or np.isnan(kExit) or np.isinf(kExit):
+        return -31
 
     # We now test for an adiabatic limit: We begin by assuming this is True, then test for violating conditions
     adiabatic = True
-
-    print "-- Searching for adiabatic limit: %05d" % modelnumber
     
     # Define number of efolds from end of inflation which should be adiabatic TODO: Wrap this into config. file
     
@@ -335,7 +334,8 @@ def Initialize(modelnumber, rerun_model=False):
             break
 
     # Record all sample data
-    new_sample(modelnumber, fvals, vvals, pvals, back_adj, adiabatic, Nend, kExit, pathSamples, rerun_model)
+    new_sample(modelnumber, fvals, vvals, pvals, back_adj, adiabatic,
+               Nend, kExit, pathSamples, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
     
@@ -572,8 +572,6 @@ def SpectralIndex(modelnumber):
     # Get timeout
     tmax_2pf = int(os.environ['tmax_2pf'])
     
-    print "Maxx time 2pf: {}".format(tmax_2pf)
-    
     # Unload sample data
     path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
     assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
@@ -609,6 +607,18 @@ def SpectralIndex(modelnumber):
 
     # Compute the corresponding momenta at horizon exit times
     kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
+    
+    for k in kExitrange:
+        if np.isnan(k) or np.isinf(k):
+            # Build null result file, dump and return error data
+            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+    
+            # Write binary file
+            twoPt_file = open(twoPt_savepath, "wb")
+            with twoPt_file:
+                pk.dump(twoPt_dict, twoPt_file)
+    
+            return {"mn": modelnumber, "flag": -31, "ext": "2pf"}
 
     # Check momenta are monotonically increasing
     assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)), kExitrange
@@ -738,7 +748,7 @@ def fNL(modelnumber, configName):
         return {"mn": modelnumber, "flag": -33, "ext": name}
 
     # Compute 3pt function
-    threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True).T
+    threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True)
 
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:
@@ -752,6 +762,9 @@ def fNL(modelnumber, configName):
             pk.dump(fNL_dict, fNL_file)
             
         return {"mn": modelnumber, "flag": threePt[0], "ext": name}
+    
+    # Transpose data into rows
+    threePt = threePt.T
 
     # Get power spectra and bispectrum for triangule
     Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
@@ -780,9 +793,9 @@ def computations(mn_calc):
     with warnings.catch_warnings(record=True) as w:
 
         if calculation == "masses":
-            print "-- Start masses: model %06d" % modelnumber
+            print "-- Start MAb: model %06d" % modelnumber
             r = Mij(modelnumber)
-            print "--   End masses: model %06d" % modelnumber
+            print "--   End MAb: model %06d" % modelnumber
 
         elif calculation == "2pf":
             print "-- Start 2pf: model %06d" % modelnumber
@@ -804,13 +817,16 @@ def computations(mn_calc):
             if calculation == "masses":
                 pass
             else:
+                
+                # Determine subdirectory for error records
+                if calculation == "2pf": subdir = calculation
+                else: subdir = "3pf"
+                
                 # Get / remove extension key from dictionary
                 pkEXT = r.pop('ext')
                 
                 # Dump dictionary object
-                pkPath = os.path.join(pathStats, calculation, "{}.{}".format(modelnumber, pkEXT))
-                
-                print pkPath
+                pkPath = os.path.join(pathStats, subdir, "{}.{}".format(modelnumber, pkEXT))
                 
                 pkFile = open(pkPath, "wb")
                 with pkFile: pk.dump(r, pkFile)

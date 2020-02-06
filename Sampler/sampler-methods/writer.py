@@ -27,6 +27,37 @@ def load_obs(pk_path):
     return obs
 
 
+def update_samples(modelnumber):
+
+    # Load sample
+    save_path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
+    f=open(save_path, "rb")
+    with f:
+        sample = pk.load(f)
+    assert sample.modelnumber == modelnumber
+
+    if len(os.listdir(path2pf)) > 0:
+        twoPt_path = os.path.join(path2pf, "{}.2pf".format(modelnumber))
+        obs = load_obs(twoPt_path)
+        sample.update_observables(obs, "2pf")
+
+    if len(os.listdir(path3pf)) > 0:
+        for d in fNLDict:
+            cname = d['name']
+            cpath = os.path.join(path3pf, "{m}.{c}".format(m=modelnumber, c=cname))
+            obs = load_obs(cpath)
+            sample.update_observables(obs, cname)
+
+    if len(os.listdir(pathMasses)) > 0:
+        Mij_obspath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
+        obs = load_obs(Mij_obspath)
+        sample.update_observables(obs, "masses")
+
+    os.remove(save_path)
+    f = open(save_path, "wb")
+    with f: pk.dump(sample, f)
+
+
 def bg_summary():
     
     # Build paths to pickled minor stats
@@ -72,73 +103,117 @@ def bg_summary():
         os.remove(sp)
         
     # Write single
-    f = open(os.path.join(pathStats, "bg", "summary.pk"), "wb")
+    f = open(os.path.join(pathStats, "summary_bg.pk"), "wb")
     
     with f: pk.dump(totDict, f)
     
-    #
-    # stats_file = open(os.path.join(pathStats, "summary.txt"), "w")
-    #
-    # error    = "-- Rejections summary:\n"
-    # short    = "Insufficient inflation:                {}\n".format(counters['short'])
-    # kexit    = "Failed to compute kExit:               {}\n".format(counters['kexit'])
-    # feoi     = "Integration error, findEndOfInflation: {}\n".format(counters['feoi'])
-    # back     = "Integration error, backEvolve:         {}\n".format(counters['back'])
-    # violated = "Model violation:                       {}\n".format(counters['violated'])
-    # timeout  = "Integration timout:                    {}\n".format(counters['timeout'])
-    # rejects  = "Total rejected samples:                {}\n\n".format(rej_tot)
-    #
-    # success  = "-- Ensemble overview:\n"
-    # tsa      = "Total number of attempted samples:     {}\n".format(counters['end'])
-    # tss      = "Total number of successful samples:    {}\n".format(counters['samples'])
-    # p_N      = "Probability of inflation:              {}\n".format(float(counters['samples']) / float(counters['end']))
-    # ttotal   = "Total time to build ensemble:          {} seconds\n".format(float(counters['time']))
-    # taverage = "Av. time to obtain successful sample:  {}\n".format(float(counters['time']/ float(counters['samples'])))
-    #
-    # lines = [error, short, kexit, feoi, back, violated, timeout, rejects, success, tsa, tss, p_N, ttotal, taverage]
-    #
-    # with stats_file as f:
-    #     for line in lines:
-    #         f.write(line)
-    #
     
+def write_error_report():
+    
+    # Build paths to pickled minor stats
+    twoptDir = os.path.join(pathStats, "2pf")
+    threeptDir = os.path.join(pathStats, "3pf")
+    
+    twopt_paths = [os.path.join(twoptDir, p) for p in os.listdir(twoptDir)]
+    threept_paths = [os.path.join(threeptDir, p) for p in os.listdir(threeptDir)]
+    
+    # Flag defs.
+    
+    timeoutFlags = [
+        -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
+    ]
+    
+    integratorFlags = [
+        -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
+    ]
+    
+    samplerFlags = [
+        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+    ]
+    
+    allFlags = timeoutFlags + integratorFlags + samplerFlags
+    allKeys = [str(f) for f in allFlags]
+    
+    totDict   = {k: 0 for k in allKeys}
 
-def update_samples(modelnumber):
+    # Combine 2pt error stats
+    for p in twopt_paths + threept_paths:
+    
+        f = open(p, "rb")
+        with f: s = pk.load(f)
+    
+        k = str(s['flag'])
+        totDict[k] += 1
 
-    # Load sample
-    save_path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
-    f=open(save_path, "rb")
-    with f:
-        sample = pk.load(f)
-    assert sample.modelnumber == modelnumber
+    for p in twopt_paths + threept_paths: os.remove(p)
 
-    if len(os.listdir(path2pf)) > 0:
-        twoPt_path = os.path.join(path2pf, "{}.2pf".format(modelnumber))
-        obs = load_obs(twoPt_path)
-        sample.update_observables(obs, "2pf")
+    f = open(os.path.join(pathStats, "summary_2pf_3pf.pk"), "wb")
+    with f: pk.dump(totDict, f)
 
-    if len(os.listdir(path3pf)) > 0:
-        for d in fNLDict:
-            cname = d['name']
-            cpath = os.path.join(path3pf, "{m}.{c}".format(m=modelnumber, c=cname))
-            obs = load_obs(cpath)
-            sample.update_observables(obs, cname)
+    g = open(os.path.join(pathStats, "summary_bg.pk"), "rb")
+    with g:
+        bgStats = pk.load(g)
+    
+    bgFailCounter = 0
+    totFailCounter = 0
+    
+    n_obtained = len(os.listdir(pathSamples))
+    
+    for k in allKeys:
+        bgFailCounter += bgStats[k]
+        totDict[k]    += bgStats[k]
+        totFailCounter += totDict[k]
+    
+    averageSampleTime = float(bgStats['time']) / float(n_obtained)
+    
+    sampleEfficiency = float(n_obtained) / float(n_obtained + bgFailCounter)
+    
+    lines = [
+    
+        "---- Sample rejection summary:\n\n",
+        
+        "-- Integration timeout:\n"
+        "Find end of inflation:             {}\n".format(totDict['-10']),
+        "Background evolution:              {}\n".format(totDict['-11']),
+        "Two-point function:                {}\n".format(totDict['-12']),
+        "Three-point function:              {}\n\n".format(totDict['-13']),
+        
+        "-- Integration error:\n"
+        "Find end of inflation:             {}\n".format(totDict['-20']),
+        "Background evolution:              {}\n".format(totDict['-21']),
+        "Two-point function:                {}\n".format(totDict['-22']),
+        "Three-point function:              {}\n\n".format(totDict['-23']),
+        
+        "-- Miscellaneous:\n",
+        "Inflation too short:               {}\n".format(totDict['-30']),
+        "Unable to find end of inflation:   {}\n".format(totDict['-35']),
+        "Unable to find momenta:            {}\n".format(totDict['-31']),
+        "Unable to find ICs (2pf):          {}\n".format(totDict['-32']),
+        "Unable to find ICs (3pf):          {}\n".format(totDict['-33']),
+        "Model violation:                   {}\n\n".format(totDict['-34']),
+        
+        "Total number of rejections:        {}\n\n".format(totFailCounter),
+        
+        "---- Probability of inflating (background-level):\n\n",
+        
+        "Sample efficiency:                 {}\n".format(sampleEfficiency),
+        "Total time to build ensemble:      {}\n".format(bgStats['time']),
+        "Average time to obtain sample:     {}\n".format(averageSampleTime)
+        
+    ]
 
-    if len(os.listdir(pathMasses)) > 0:
-        Mij_obspath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
-        obs = load_obs(Mij_obspath)
-        sample.update_observables(obs, "masses")
-
-    os.remove(save_path)
-    f = open(save_path, "wb")
-    with f: pk.dump(sample, f)
+    summary_file = open(os.path.join(pathRoot, "outputs", "sampling_summary.txt"), "w")
+    
+    with summary_file as f:
+        summary_file.writelines(lines)
+    
 
 def write_results(nF):
 
     headers = ('weight', 'like')
     paths   = [ os.path.join(pathSamples, m) for m in os.listdir(pathSamples)]
     labels  = []
-    latexs = []
+    latexs  = []
 
     ncols = 2
     
@@ -214,15 +289,19 @@ def write_results(nF):
         f = open(p, "rb")
         with f:
             s = pk.load(f)
+            
+            print dir(s)
+            
             d = s.line_dict()
 
-            if len(d) == ncols:
+            if s.reject is False:
                 if s.adiabatic is True:
                     dicts_adiabatic.append(d)
                 else:
                     dicts_evolving.append(d)
 
             else:
+                print "FAILED SAMPLE: {}".format(p)
                 failed_samples.append(p+"\n")
 
     f = open(os.path.join(pathRoot, "outputs", "r_adiabatic.txt"), "w")
