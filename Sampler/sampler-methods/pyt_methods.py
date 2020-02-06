@@ -572,6 +572,8 @@ def SpectralIndex(modelnumber):
     # Get timeout
     tmax_2pf = int(os.environ['tmax_2pf'])
     
+    print "Maxx time 2pf: {}".format(tmax_2pf)
+    
     # Unload sample data
     path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
     assert os.path.exists(path), "Unable to locate sample location: {}".format(path)
@@ -603,17 +605,13 @@ def SpectralIndex(modelnumber):
     # Compute two-point function
 
     # Define an efolding range 2-efolds above and below the exit time
-    Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 3, 4]]
+    Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 2, 3, 4]]
 
     # Compute the corresponding momenta at horizon exit times
     kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
-    
-    # Insert existing results from model initialization
-    Nrange.insert(2, Nend - Nexit)
-    kExitrange.insert(2, kExit)
 
     # Check momenta are monotonically increasing
-    assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1))
+    assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)), kExitrange
 
     # Get initial condition for each momenta
     ICsEvos = [PyS.ICsBM(subevo, kE, back, pvals, PyT) for kE in kExitrange]
@@ -621,20 +619,41 @@ def SpectralIndex(modelnumber):
     # Check initial conditions array(s)
     for item in ICsEvos:
         if item == (np.nan, np.nan):
+            
+            # Build null result file, dump and return error data
+            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+    
+            # Write binary file
+            twoPt_file = open(twoPt_savepath, "wb")
+            with twoPt_file:
+                pk.dump(twoPt_dict, twoPt_file)
+                
             return {"mn": modelnumber, "flag": -32, "ext": "2pf"}
 
     # Prescribe Nstart and Nend as evaluation times for 2pf run
     Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
     
     # Call sigEvolve to compute power spectra
-    twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True).T for NkBack in zip(
+    twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True) for NkBack in zip(
         Nevals, kExitrange, ICsEvos
     )]
     
     # If flag return for sigEvolve, return flag data
     for item in twoPt:
         if type(item) is tuple:
+            
+            # Build null result file, dump and return error data
+            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+    
+            # Write binary file
+            twoPt_file = open(twoPt_savepath, "wb")
+            with twoPt_file:
+                pk.dump(twoPt_dict, twoPt_file)
+                
             return {"mn": modelnumber, "flag": item[0], "ext": "2pf"}
+        
+    # Otherwise tranpose data
+    twoPt = [item.T for item in twoPt]
 
     # Log power spectra and momenta
     logPz = [np.log(xx[1][-1]) for xx in twoPt]
@@ -708,6 +727,14 @@ def fNL(modelnumber, configName):
     ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
     
     if ICs == (np.nan, np.nan):
+        # Build null results dict, dump and return error data
+        fNL_dict = {'{}'.format(name): None, 'time': None}
+    
+        # Save binary file
+        fNL_file = open(fNL_savepath, "wb")
+        with fNL_file:
+            pk.dump(fNL_dict, fNL_file)
+    
         return {"mn": modelnumber, "flag": -33, "ext": name}
 
     # Compute 3pt function
@@ -715,6 +742,15 @@ def fNL(modelnumber, configName):
 
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:
+        
+        # Build null results dict, dump and return error data
+        fNL_dict = {'{}'.format(name): None, 'time': None}
+    
+        # Save binary file
+        fNL_file = open(fNL_savepath, "wb")
+        with fNL_file:
+            pk.dump(fNL_dict, fNL_file)
+            
         return {"mn": modelnumber, "flag": threePt[0], "ext": name}
 
     # Get power spectra and bispectrum for triangule
@@ -773,6 +809,9 @@ def computations(mn_calc):
                 
                 # Dump dictionary object
                 pkPath = os.path.join(pathStats, calculation, "{}.{}".format(modelnumber, pkEXT))
+                
+                print pkPath
+                
                 pkFile = open(pkPath, "wb")
                 with pkFile: pk.dump(r, pkFile)
                 

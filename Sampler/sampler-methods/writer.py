@@ -30,7 +30,7 @@ def load_obs(pk_path):
 def bg_summary():
     
     # Build paths to pickled minor stats
-    bgd = os.path.join(pathStats, "bg")
+    bgd = os.path.join(pathStats, "bg") # bg dir
     stat_paths = [os.path.join(bgd, item) for item in os.listdir(bgd)]
     
     # Set counters dictionary (will sum minor stats)
@@ -53,8 +53,6 @@ def bg_summary():
     
     print "\n-- Writing background statistics\n"
     
-    rej_tot = 0
-    
     for sp in stat_paths:
     
         # unload binary file
@@ -73,7 +71,8 @@ def bg_summary():
         # remove minor stats data
         os.remove(sp)
         
-    f = open(os.path.join(pathStats, "bg", "summary.pk"), "rb")
+    # Write single
+    f = open(os.path.join(pathStats, "bg", "summary.pk"), "wb")
     
     with f: pk.dump(totDict, f)
     

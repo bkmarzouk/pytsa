@@ -33,6 +33,8 @@ class realization:
     def update_observables(self, obsdict, name_timer):
         """"""
         
+        """ NEED TO ACCOUNT FOR USE_SAMPLES ROUTINE!!! """
+        
         """ We update the model's observable dictionary """
         for key in obsdict:
             if key != 'time':
