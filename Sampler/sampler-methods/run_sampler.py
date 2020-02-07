@@ -10,7 +10,8 @@ import time, warnings
 
 
 # Navigate to local files
-pathLocalData = os.path.join(os.getcwd(), ".localdata")
+runDir = os.path.dirname(os.path.abspath(__file__))
+pathLocalData = os.path.join(runDir, ".localdata")
 sys.path.append(pathLocalData)
 import generator
 
