@@ -204,23 +204,58 @@ def Initialize(modelnumber, rerun_model=False):
         # We flag to break out of loop cycle if there is a condition that ends inflation
         breakFlag = False if (acceptIfAny is not None or acceptIfAll is not None) else True
         
-        # If we aren't looking for a specific exit condition, then we compute extended BG evo
+        # If we are looking for a specific exit condition, then we compute extended BG evo
         if breakFlag is False:
             
-            back = PyS.ExtendedBackEvolve(initial, pvals, PyT, tmax_bg=tmax_bg, flag_return=True)
+            # Integrate over extra-large window until integrator falls over / timeout
+            back = PyT.backEvolve(np.linspace(0, 2 * 1e4, 1e4), initial, pvals, tols, False, tmax_bg, True)
+
+            # Try and extend by a few more iterations with reduced-tols
+            extTols = tols *1e-1
+            tbgi = time.clock()
+            n_bg_iter = 2
+            for n in range(n_bg_iter):
+                EXT = PyT.backEvolve(
+                    np.linspace(back[-1][0], back[-1][0] + 2 * 1e4, 1e4),
+                    back[-1][1:], pvals, extTols, False, tmax_bg, True)
+                if len(EXT) > 1:
+                    back = np.vstack((back, EXT[1:]))
+                else: break
+            tbgf = time.clock()
             
+            # If too short and time taken exceeds max timers x n_iter, timeout flag
+            if back[-1][0] < minN and tbgf-tbgi > n_bg_iter*(tmax_bg)-0.5:
+                # timeout
+                return (-11, back[-1][0])
+            
+            # If too short and time taken below max timer x n_iter, integrator flag
+            elif back[-1][0] < minN and tbgf-tbgi < n_bg_iter*(tmax_bg)-0.5:
+                # int
+                return (-21, back[-1][0])
+            
+            # Simply too short
+            elif back[-1][0] < minN:
+                # minN
+                return (-30, back[-1][0])
+            
+            else:
+                pass
+                
+                
+
             # Simply change this to return if int? All flags *should" be handled
             if type(back) is tuple: return back
             
             
         else:
-            Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 12000, tmax_bg, True)
             
-            if type(Nend) is tuple: return Nend
-            
-            back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
+            # Integrate over extra-large window until eps > 1
+            back = PyT.backEvolve(np.linspace(0, 2*1e4, 1e6), initial, pvals, tols, True, tmax_bg, True)
             
             if type(back) is tuple: return back
+            
+            # If inflation is too short, may as well return flag now
+            if back[-1][0] < minN: return
         
         for row in back:
             
@@ -373,10 +408,11 @@ def DemandSample(modelnumber):
 
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
+        
     
         ii = Initialize(modelnumber)
-        
-        print ii
+
+        print flagDict, ii
     
         # If fail flag received: log statistic
         if type(ii) is tuple:
@@ -433,8 +469,6 @@ def DemandSample_rerun(modelnumber):
     while ii != modelnumber:
     
         ii = Initialize(modelnumber, rerun_model=True)
-    
-        print ii
     
         # If fail flag received: log statistic
         if type(ii) is tuple:

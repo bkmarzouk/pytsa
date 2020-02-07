@@ -290,7 +290,6 @@ def write_results(nF):
         with f:
             s = pk.load(f)
             
-            print dir(s)
             
             d = s.line_dict()
 

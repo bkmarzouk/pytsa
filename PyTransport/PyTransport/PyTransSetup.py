@@ -249,7 +249,7 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
     
     # Initialize curvature class instance: This will handle all symbolic computations requried
     """ TODO: add kwargs for simplifying curv. and pots. """
-    curv_instance = gravtools_pyt.curvatureObject(G, f, V, params=p, simpleGeometric=False, simplePotentials=False)
+    curv_instance = gravtools_pyt.curvatureObject(G, f, V, params=p, simpleGeometric=True, simplePotentials=False)
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
     

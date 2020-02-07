@@ -10,7 +10,7 @@ nP = 2
 f  = sym.symarray('f',nF)
 p  = sym.symarray('p',nP)
 s  = [sym.Rational(1,2) * f[i] ** 2 * p[i] ** 2 for i in range(2)]
-V  = sum(s)
+V  = sum(s) #+ sym.sin(f[0]**2)
 PyTransSetup.tol(1E-8,1E-8)
 PyTransSetup.potential(V,nF,nP,silent=False)
 PyTransSetup.compileName('2Quad', True)
