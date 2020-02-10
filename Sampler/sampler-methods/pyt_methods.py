@@ -180,19 +180,18 @@ def Initialize(modelnumber, rerun_model=False):
             Nepsilon = 0.9*Nepsilon[1]
             
         # Try and obtain fiducial background up until epsilon = 1
-        backFid = PyT.backEvolve(
-            np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, False, tmax_bg, True)
+        backFid = PyT.backEvolve(np.linspace(0, Nepsilon, 3*(int(Nepsilon)+1)), initial, pvals, tols, 1, tmax_bg, True)
         
         """ We will now attempt to extend the background by up to 100 efolds passed the epsilon definition
             Note that getting further than this is highly unlikely, since integration becomes hard
             Note that we increase desired tols by an order of magnitude to try and achieve this """
 
         backExt = PyT.backEvolve(
-            np.linspace(backFid[-1][0], backFid[-1][0]+100, 300), backFid[-1][1:], pvals,
-            tols*1e-1, False, tmax_bg, True)
+            np.linspace(backFid[-1][0], backFid[-1][0]+100, 300), backFid[-1][1:], pvals, tols*1e-1, 0, tmax_bg, True)
         
         # Combine arrays, omiting the first row of the extension since this will match the last of fid.
-        back = np.concatenate((backFid, backExt[1:]))
+        back = np.vstack((backFid, backExt[1:]))
+
         
         # We now will search through the background and look for Nend condition
         endIndex = len(back)

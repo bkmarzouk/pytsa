@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Fri Feb  7 19:17:27 2020
+// Package recompile attempted at: Mon Feb 10 19:59:29 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -535,10 +535,16 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     // Evolve background
     evolveB(N, y, yp, Cparams);
 
-    // If exit routine is false integrate target number of background steps as far as possible
-    if (exit == false){
 
-        // While N < Nend
+    cout << "EXIT  " << exit       << endl;
+    cout << "FLAGR " << flagReturn << endl;
+
+    // If exit routine is false integrate target number of background steps as far as possible
+    if (exit == 0){
+
+        cout << "Entering extended back routine" << endl;
+
+        // While N < Nmax
         while (ii < nt){
 
             // Record current time
@@ -602,7 +608,9 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     }
 
     // If exit is true, integrate up until \epsilon = 1 or N = Nend, whichever first
-    if (exit == true){
+    if (exit == 1){
+
+        cout << "Entering epsilon back routine" << endl;
 
         // Define vector values for step values and model params (used for computing epsilon)
         vector<double> vecy;
@@ -1099,7 +1107,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransdbraneDmax3_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTransdbraneDmax6_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1111,7 +1119,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransdbraneDmax3(void)    {        Py_InitModule3("PyTransdbraneDmax3", PyTransdbraneDmax3_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTransdbraneDmax6(void)    {        Py_InitModule3("PyTransdbraneDmax6", PyTransdbraneDmax6_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
