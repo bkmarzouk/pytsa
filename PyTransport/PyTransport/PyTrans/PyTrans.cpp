@@ -536,13 +536,10 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     evolveB(N, y, yp, Cparams);
 
 
-    cout << "EXIT  " << exit       << endl;
-    cout << "FLAGR " << flagReturn << endl;
-
     // If exit routine is false integrate target number of background steps as far as possible
     if (exit == 0){
 
-        cout << "Entering extended back routine" << endl;
+//        cout << "Entering extended back routine" << endl;
 
         // While N < Nmax
         while (ii < nt){
@@ -610,7 +607,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     // If exit is true, integrate up until \epsilon = 1 or N = Nend, whichever first
     if (exit == 1){
 
-        cout << "Entering epsilon back routine" << endl;
+//        cout << "Entering epsilon back routine" << endl;
 
         // Define vector values for step values and model params (used for computing epsilon)
         vector<double> vecy;
