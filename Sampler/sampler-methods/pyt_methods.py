@@ -52,15 +52,13 @@ from realization import realization as new_sample
 import record_stats
 
 
-
-def Initialize(modelnumber, rerun_model=False):
-    
-    tmax_bg = int(os.environ['tmax_bg'])
+def buildICPs(modelnumber, rerun_model=False):
+    """ Builds initial conditions & parameters, or retrieves them if in rerun mode"""
     
     if rerun_model is False:
         # Generate new sample with parameter & field priori
         n, fvals, vvals, pvals = genSample(modelnumber)
-
+    
     else:
         # Load an existing set of parameters & model priori
         model_path = os.path.join(saveloc, "samples", "{}.sample".format(modelnumber))
@@ -71,15 +69,12 @@ def Initialize(modelnumber, rerun_model=False):
             fvals = model.fields
             vvals = model.velocities
             pvals = model.parameters
-
-
-    # Cross-check the number of fields needed for the potential
-    nF = PyT.nF()
-    assert nF == len(fvals), "PyTransport module defined nF = {nF}, nF = {lF} != {nF}".format(nF=nF, lF=len(fvals))
-
+            
+            return np.concatenate(fvals, vvals)
+    
     # Compute potential based on the fields and model parameters
     V = PyT.V(fvals, pvals)
-
+    
     # If SR is in vvals, compute initial velocity value via slowroll equation
     if "SR" in vvals:
         
@@ -88,10 +83,11 @@ def Initialize(modelnumber, rerun_model=False):
         
         # Compute derivatices of the potential
         dV = PyT.dV(fvals, pvals)
-
+        
         # Compute velocities via slowroll equation
+        """ FIX THIS FOR NC MODELS """
         vvalsSR = -dV / np.sqrt(3 * V)
-
+        
         # For each velocity def.
         for jj in range(len(vvals)):
             
@@ -101,12 +97,19 @@ def Initialize(modelnumber, rerun_model=False):
             else:
                 # Otherwise force float-type to other array elements
                 vvals_[jj] = float(vvals[jj])
-                
+        
         # Redefine vvals
         vvals = vvals_
-
+    
     # Concatenate field and velocity values into initial conditions array
-    initial = np.concatenate((fvals, vvals))
+    return np.concatenate((fvals, vvals)), pvals
+
+
+def Initialize(modelnumber, rerun_model=False):
+    
+    tmax_bg = int(os.environ['tmax_bg'])
+    
+    initial, pvals = buildICPs(modelnumber, rerun_model)
 
     """ We have the following flags in place:
     
@@ -133,174 +136,153 @@ def Initialize(modelnumber, rerun_model=False):
     """
     
     acceptIfAnyPath = os.path.join(pathLocalData, "acceptIfAny.localdata")
-    rejectIfAnyPath = os.path.join(pathLocalData, "rejectIfAny.localdata")
     acceptIfAllPath = os.path.join(pathLocalData, "acceptIfAll.localdata")
+    
+    rejectIfAnyPath = os.path.join(pathLocalData, "rejectIfAny.localdata")
     rejectIfAllPath = os.path.join(pathLocalData, "rejectIfAll.localdata")
     
-    # Define canonical end to inflation if there are no field conditions to search through
-    canonical = not (os.path.exists(acceptIfAnyPath) or os.path.exists(rejectIfAnyPath)
-                     or os.path.exists(acceptIfAllPath) or os.path.exists(rejectIfAllPath))
+    # We define non-canonical conditions to end inflation, and those which violate inflation
+    endAnyNC = os.path.exists(acceptIfAnyPath) # NC end
+    endAllNC = os.path.exists(acceptIfAllPath)
+    
+    exitAnyNC = os.path.exists(rejectIfAnyPath) # NC violate
+    exitAllNC = os.path.exists(rejectIfAllPath)
+    
+    canonicalEnd = not (endAnyNC or endAllNC)
+    canonicalExit = not (exitAnyNC or exitAllNC)
 
-    # If we choose to end inflation with eps = 1
-    if canonical is True:
-        
-        breakFlag = True
-        
-        # Compute end of inflation
-        Nend = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg, True)
+    # if canonical end or not, suitable to start with cheap epsilon search
+    Nepsilon = PyT.findEndOfInflation(initial, pvals, tols, 0.0, 10000, tmax_bg, True)
 
-        # Integration fails / eternal
-        if type(Nend) is tuple: return Nend
+    # First we check models that end with SR violation
+    if canonicalEnd:
         
-        # Attempt computation of background
-        back = PyT.backEvolve(np.linspace(0, Nend, 1000), initial, pvals, tols, False, tmax_bg, True)
+        # Check for integration / time out error
+        if type(Nepsilon) is tuple:
+            return Nepsilon
         
-        # If not numpy array, background computation failed
-        if type(back) is tuple: return back
-
-        # Get number of rows in bg evo
-        rowCount = len(back)
-
-    else:
-        # Load model constriants
+        # Check for enough inflation
+        elif Nepsilon < minN:
+            return (-30, Nepsilon)
         
-        if os.path.exists(acceptIfAnyPath):
-            f = open(acceptIfAnyPath, "rb")
-            with f:
-                acceptIfAny = pk.load(f)
-                acceptIfAnyIdx = acceptIfAny['idx']
-                acceptIfAnyMin = acceptIfAny['min']
-                acceptIfAnyMax = acceptIfAny['max']
-                
-        else: acceptIfAny = None
-        
-        if os.path.exists(rejectIfAnyPath):
-            f = open(rejectIfAnyPath, "rb")
-            with f:
-                rejectIfAny = pk.load(f)
-                rejectIfAnyIdx = rejectIfAny['idx']
-                rejectIfAnyMin = rejectIfAny['min']
-                rejectIfAnyMax = rejectIfAny['max']
-                
-        else: rejectIfAny = None
-        
-        if os.path.exists(acceptIfAllPath):
-            f = open(acceptIfAllPath, "rb")
-            with f:
-                acceptIfAll = pk.load(f)
-                
-        else: acceptIfAll = None
-
-        if os.path.exists(rejectIfAllPath):
-            f = open(rejectIfAllPath, "rb")
-            with f:
-                rejectIfAll = pk.load(f)
-                
-        else: rejectIfAll = None
-        
-        # Start background row counter
-        rowCount = 0
-        
-        # We flag to break out of loop cycle if there is a condition that ends inflation
-        breakFlag = False if (acceptIfAny is not None or acceptIfAll is not None) else True
-        
-        # If we are looking for a specific exit condition, then we compute extended BG evo
-        if breakFlag is False:
-            
-            # Integrate over extra-large window until integrator falls over / timeout
-            back = PyT.backEvolve(np.linspace(0, 2 * 1e4, 1e4), initial, pvals, tols, False, tmax_bg, True)
-
-            # Try and extend by a few more iterations with reduced-tols
-            extTols = tols *1e-1
-            tbgi = time.clock()
-            n_bg_iter = 2
-            for n in range(n_bg_iter):
-                EXT = PyT.backEvolve(
-                    np.linspace(back[-1][0], back[-1][0] + 2 * 1e4, 1e4),
-                    back[-1][1:], pvals, extTols, False, tmax_bg, True)
-                if len(EXT) > 1:
-                    back = np.vstack((back, EXT[1:]))
-                else: break
-            tbgf = time.clock()
-            
-            # If too short and time taken exceeds max timers x n_iter, timeout flag
-            if back[-1][0] < minN and tbgf-tbgi > n_bg_iter*(tmax_bg)-0.5:
-                # timeout
-                return (-11, back[-1][0])
-            
-            # If too short and time taken below max timer x n_iter, integrator flag
-            elif back[-1][0] < minN and tbgf-tbgi < n_bg_iter*(tmax_bg)-0.5:
-                # int
-                return (-21, back[-1][0])
-            
-            # Simply too short
-            elif back[-1][0] < minN:
-                # minN
-                return (-30, back[-1][0])
-            
-            else:
-                pass
-                
-                
-
-            # Simply change this to return if int? All flags *should" be handled
-            if type(back) is tuple: return back
-            
-            
+        # Looks good, go compute background
         else:
+            back = PyT.backEvolve(
+                np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, False, tmax_bg, True)
+
+    # For models that don't end with SR violation
+    else:
+    
+        # Check for integration / time out error
+        if type(Nepsilon) is tuple:
             
-            # Integrate over extra-large window until eps > 1
-            back = PyT.backEvolve(np.linspace(0, 2*1e4, 1e6), initial, pvals, tols, True, tmax_bg, True)
+            # Instead, draw back farthest efold reached by 10% and try and compute fid. background
+            Nepsilon = 0.9*Nepsilon[1]
             
-            if type(back) is tuple: return back
-            
-            # If inflation is too short, may as well return flag now
-            if back[-1][0] < minN: return
+        # Try and obtain fiducial background up until epsilon = 1
+        backFid = PyT.backEvolve(
+            np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, True, tmax_bg, True)
         
+        """ We will now attempt to extend the background by up to 100 efolds passed the epsilon definition
+            Note that getting further than this is highly unlikely, since integration becomes hard
+            Note that we increase desired tols by an order of magnitude to try and achieve this """
+
+        backExt = PyT.backEvolve(
+            np.linspace(backFid[-1][0], backFid[-1][0]+100, 300), backFid[-1][1:], pvals,
+            tols*1e-1, True, tmax_bg, True)
+        
+        # Combine arrays, omiting the first row of the extension since this will match the last of fid.
+        back = np.concatenate((backFid, backExt[1:]))
+        
+        # We now will search through the background and look for Nend condition
+        endIndex = len(back)
+        foundEnd = False
+        
+        # Load conditions
+        if endAnyNC:
+            with open(acceptIfAnyPath, "rb") as f: acceptIfAny = pk.load(f)
+            acceptIfAnyIdx = acceptIfAny['idx']
+            acceptIfAnyMin = acceptIfAny['min']
+            acceptIfAnyMax = acceptIfAny['max']
+
+        if endAllNC:
+            with open(acceptIfAllPath, "rb") as f: acceptIfAll = pk.load(f)
+            acceptIfAllIdx = acceptIfAll['idx']
+            acceptIfAllMin = acceptIfAll['min']
+            acceptIfAllMax = acceptIfAll['max']
+        
+        for idx in range(len(back)):
+            
+            row = back[idx]
+            
+            if endAnyNC and np.any(
+                    np.logical_and(row[acceptIfAnyIdx] > acceptIfAnyMin, row[acceptIfAnyIdx] < acceptIfAnyMax)):
+                
+                endIndex = idx
+                Nend = row[0]
+                print "End of inflation condition found at N = {}".format(Nend)
+                foundEnd = True
+                break
+
+            if endAllNC and np.all(
+                    np.logical_and(row[acceptIfAllIdx] > acceptIfAllMin, row[acceptIfAllIdx] < acceptIfAllMax)):
+                endIndex = idx
+                Nend = row[0]
+                print "End of inflation condition found at N = {}".format(Nend)
+                foundEnd = True
+                break
+    
+        back = back[:endIndex]
+        
+    if canonicalExit is False:
+        
+        if exitAnyNC:
+            with open(rejectIfAnyPath, "rb") as f: rejectIfAnyPath = pk.load(f)
+            rejectIfAnyIdx = rejectIfAnyPath['idx']
+            rejectIfAnyMin = rejectIfAnyPath['min']
+            rejectIfAnyMax = rejectIfAnyPath['max']
+
+        if exitAllNC:
+            with open(rejectIfAllPath, "rb") as f: rejectIfAllPath = pk.load(f)
+            rejectIfAllIdx = rejectIfAllPath['idx']
+            rejectIfAllMin = rejectIfAllPath['min']
+            rejectIfAllMax = rejectIfAllPath['max']
+            
         for row in back:
-            
-            """ Check for violations """
-
-            if rejectIfAny is not None:
-                if np.any(np.logical_and(row[rejectIfAnyIdx] > rejectIfAnyMin, row[rejectIfAnyIdx] < rejectIfAnyMax)):
-                    # bad
-                    return -34
-            
-            if rejectIfAll is not None:
-                for d in rejectIfAll:
-                    idx = rejectIfAll[d]['idx']
-                    min = rejectIfAll[d]['min']
-                    max = rejectIfAll[d]['max']
-                    if np.all(np.logical_and(row[idx] > min, row[idx] < max)):
-                        # bad
-                        return -34
-                
-            if acceptIfAny is not None:
-                if np.any(np.logical_and(row[acceptIfAnyIdx] > acceptIfAnyMin, row[acceptIfAnyIdx] < acceptIfAnyMax)):
-                    # good
-                    breakFlag = True
-                    break
-                
-            if acceptIfAll is not None:
-                for d in acceptIfAll:
-                    idx = acceptIfAll[d]['idx']
-                    min = acceptIfAll[d]['min']
-                    max = acceptIfAll[d]['max']
-                    if np.all(np.logical_and(row[idx] > min, row[idx] < max)):
-                        # good
-                        breakFlag = True
-                        break
-                
-                if breakFlag: break
-                    
-            Nend = row[0]
-            rowCount += 1
     
-    if Nend < minN: return -30
-
-    if breakFlag is not True: return -34
-    
-    back = back[:rowCount]
+            if exitAnyNC and np.any(
+                    np.logical_and(row[rejectIfAnyIdx] > rejectIfAnyMin, row[rejectIfAnyIdx] < rejectIfAnyMax)):
+                Nend = row[0]
+                print "Violation of inflation condition found at N = {}".format(Nend)
+                
+                return -34, Nend
+                
+            if exitAllNC and np.all(
+                    np.logical_and(row[rejectIfAllIdx] > rejectIfAllMin, row[rejectIfAllIdx] < rejectIfAllMax)):
+                Nend = row[0]
+                print "Violation of inflation condition found at N = {}".format(Nend)
+                
+                return -34, Nend
+            
+    # Now perform the final check that the background
+    if canonicalEnd:
+        if Nend < minN:
+            return -30, Nend
+    else:
+        
+        Nend = back[-1][0]
+        
+        if Nend > minN and not foundEnd:
+            print "Eternal inflation with Nmax = {}".format(Nend)
+            return -35, Nend
+        
+        if Nend < minN and foundEnd:
+            print "Inflation too short with Nend = {}".format(Nend)
+            return -30, Nend
+        
+        if Nend < minN and not foundEnd:
+            print "Inferred integrator failure with Nmax = {}".format(Nend)
+            return -21, Nend
     
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
@@ -357,7 +339,7 @@ def Initialize(modelnumber, rerun_model=False):
         tachyon = item[1] < 0
         
         # Determine number of hubble scale heavier masses
-        rest_large = sum([eig >= 1 for eig in item[2:]]) == nF - 1
+        rest_large = sum([eig >= 1 for eig in item[2:]]) == PyT.nF() - 1
 
         # If there is no tachyon or the remaining masses aren't large for the portion of evolution
         if not (tachyon and rest_large):
@@ -368,7 +350,7 @@ def Initialize(modelnumber, rerun_model=False):
             break
 
     # Record all sample data
-    new_sample(modelnumber, fvals, vvals, pvals, back_adj, adiabatic,
+    new_sample(modelnumber, initial[:PyT.nF()], initial[PyT.nF():], pvals, back_adj, adiabatic,
                Nend, kExit, pathSamples, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
@@ -411,8 +393,6 @@ def DemandSample(modelnumber):
         
     
         ii = Initialize(modelnumber)
-
-        print flagDict, ii
     
         # If fail flag received: log statistic
         if type(ii) is tuple:
