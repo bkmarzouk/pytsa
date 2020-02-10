@@ -168,7 +168,7 @@ def Initialize(modelnumber, rerun_model=False):
         # Looks good, go compute background
         else:
             back = PyT.backEvolve(
-                np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, False, tmax_bg, True)
+                np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, True, tmax_bg, True)
 
     # For models that don't end with SR violation
     else:
@@ -181,7 +181,7 @@ def Initialize(modelnumber, rerun_model=False):
             
         # Try and obtain fiducial background up until epsilon = 1
         backFid = PyT.backEvolve(
-            np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, True, tmax_bg, True)
+            np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, False, tmax_bg, True)
         
         """ We will now attempt to extend the background by up to 100 efolds passed the epsilon definition
             Note that getting further than this is highly unlikely, since integration becomes hard
@@ -189,7 +189,7 @@ def Initialize(modelnumber, rerun_model=False):
 
         backExt = PyT.backEvolve(
             np.linspace(backFid[-1][0], backFid[-1][0]+100, 300), backFid[-1][1:], pvals,
-            tols*1e-1, True, tmax_bg, True)
+            tols*1e-1, False, tmax_bg, True)
         
         # Combine arrays, omiting the first row of the extension since this will match the last of fid.
         back = np.concatenate((backFid, backExt[1:]))
