@@ -30,5 +30,8 @@
 /PyTransport/PyTransport/PyTrans/lib/python2.7/site-packages/*
 !/PyTransport/PyTransport/PyTrans/lib/python2.7/site-packages/.gitkeep
 
+# Maintain cache directory (Not sure if this is requried)
+!/PyTransport/PyTransport/__pycache__/.gitkeep
+
 # Keep .gitignore
 !.gitignore
