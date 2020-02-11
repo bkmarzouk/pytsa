@@ -72,24 +72,17 @@ def buildICPs(modelnumber, rerun_model=False):
             
             return np.concatenate(fvals, vvals)
     
-    # Compute potential based on the fields and model parameters
-    V = PyT.V(fvals, pvals)
-    
     # If SR is in vvals, compute initial velocity value via slowroll equation
     if "SR" in vvals:
         
-        # Construct np float array
-        vvals_ = np.zeros(np.shape(vvals), dtype=float)
+        # Compute intial velocities from approximation
+        vvalsSR = PyT.dotfieldsSR(fvals, pvals)
         
-        # Compute derivatices of the potential
-        dV = PyT.dV(fvals, pvals)
-        
-        # Compute velocities via slowroll equation
-        """ FIX THIS FOR NC MODELS """
-        vvalsSR = -dV / np.sqrt(3 * V)
+        # Populate empty array with relevant values
+        vvals_ = np.zeros(PyT.nF())
         
         # For each velocity def.
-        for jj in range(len(vvals)):
+        for jj in range(PyT.nF()):
             
             #  If def. is SR, assign slow-roll velocity to float array
             if vvals[jj] == "SR":
@@ -100,7 +93,7 @@ def buildICPs(modelnumber, rerun_model=False):
         
         # Redefine vvals
         vvals = vvals_
-    
+        
     # Concatenate field and velocity values into initial conditions array
     return np.concatenate((fvals, vvals)), pvals
 
@@ -169,6 +162,8 @@ def Initialize(modelnumber, rerun_model=False):
         else:
             back = PyT.backEvolve(
                 np.linspace(0, Nepsilon, int(3*Nepsilon)), initial, pvals, tols, True, tmax_bg, True)
+            
+        Nend = Nepsilon
 
     # For models that don't end with SR violation
     else:
@@ -283,6 +278,9 @@ def Initialize(modelnumber, rerun_model=False):
         if Nend < minN and not foundEnd:
             print "Inferred integrator failure with Nmax = {}".format(Nend)
             return -21, Nend
+
+    # Track *actual* initial conditions prior to repositioning
+    initial_0 = initial
     
     # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
     if Nend > 70.0:
@@ -350,7 +348,7 @@ def Initialize(modelnumber, rerun_model=False):
             break
 
     # Record all sample data
-    new_sample(modelnumber, initial[:PyT.nF()], initial[PyT.nF():], pvals, back_adj, adiabatic,
+    new_sample(modelnumber, initial_0[:PyT.nF()], initial_0[PyT.nF():], pvals, back_adj, adiabatic,
                Nend, kExit, pathSamples, rerun_model)
 
     print "-- Generated sample: %05d" % modelnumber
