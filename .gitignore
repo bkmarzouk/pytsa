@@ -1,5 +1,5 @@
 # Ignore compiled python files everywhere
-**/.pyc
+*/.pyc
 
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature
@@ -14,8 +14,6 @@
 /Install/*
 !/Install/.gitkeep
 !/Install/2QuadSetup.py
-!/Install/NQuadGenerator.py
-!/Install/agarwal_dmax_6pt0.py
 
 # Ignore sampler builds, but keep directory
 /Sampler/sampler-builds/*
@@ -24,9 +22,9 @@
 # Ignore sampler configs (except for examples)
 /Sampler/sampler-configs/*
 !/Sampler/sampler-configs/.gitkeep
-!/Sampler/sampler-configs/agarwal.py
-!/Sampler/sampler-configs/dquad_example.py
-!/Sampler/sampler-configs/build_sampler.py
+!/Sampler/sampler-configs/EXAMPLE.py
+!/Sampler/sampler-configs/EXAMPLE_NC.py
+!/Sampler/sampler-configs/setupBuilds.py
 
 # Need to ignore files in 
 /PyTransport/PyTransport/PyTrans/lib/python2.7/site-packages/*
