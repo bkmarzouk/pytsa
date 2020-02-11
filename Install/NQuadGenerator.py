@@ -45,7 +45,7 @@ preamble = ["import os\n",
             "s  = [sym.Rational(1,2) * f[i] ** 2 * p[i] ** 2 for i in range({N})]\n".format(N=N),
             "V  = sum(s)\n",
             "PyTransSetup.tol(1E-8,1E-8)\n"
-            "PyTransSetup.potential(V,nF,nP,silent=False)\n",
+            "PyTransSetup.potential(V, nF, nP, simpleGeometric=True, simplePotentials=True, silent=False)\n",
             "PyTransSetup.compileName('{}Quad')".format(N)]
 
 

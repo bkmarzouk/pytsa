@@ -131,18 +131,18 @@ def compileName(name, NC=False):
                 # 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup\n')
                 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup\n')
     f.close()
+    
     filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
     f = open(filename, "r")
     lines = f.readlines()
     f.close()
+    
     f = open(filename, "w")
     for line in lines:
         if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith("//modDef\n"):
             f.write(line)
         if line.endswith("//FuncDef\n"):
-            f.write( #  NEED TO ADD massMatrix
-                # 'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
-                'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+            f.write('static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
         if line.endswith("//modDef\n"):
             f.write('     //modDef\n')
         if line.endswith("//initFunc\n"):
@@ -168,6 +168,16 @@ def compileName3(name, NC=False):
     dir = os.path.dirname(__file__)
     location = os.path.join(dir, 'PyTrans')
     filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
+    
+    if NC is True:
+        # There should exist a temporary file fom the calling 'potential'
+        curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
+        assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
+        
+        # Rename temporary curvature file with compilation name!
+        new_curv_path = curv_path.replace('TEMP', name)
+        os.rename(curv_path, new_curv_path)
+    
     f = open(filename1, "r")
     lines = f.readlines()
     f.close()
@@ -185,14 +195,13 @@ def compileName3(name, NC=False):
     f = open(filename, "r")
     lines = f.readlines()
     f.close()
+    
     f = open(filename, "w")
     for line in lines:
         if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith("//modDef\n"):
             f.write(line)
         if line.endswith("//FuncDef\n"):
-            f.write(
-#                'static PyMethodDef PyTrans' + name + '_methods[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs},  {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},   {NULL, NULL, 0, NULL}};//FuncDef\n')
-                'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+            f.write('static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
 
         if line.endswith("//modDef\n"):
             f.write(
@@ -229,7 +238,7 @@ def tol(rtol, atol):
     f = open(filename, "r")
 
 
-def potential(V, nF, nP, simple=False, G="canonical", silent=True):
+def potential(V, nF, nP, simpleGeometric=False, simplePotentials=False, G="canonical", silent=True):
     
     # Define symbols for fields and parameters
     f = sym.symarray('f', nF)
@@ -249,7 +258,9 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
     
     # Initialize curvature class instance: This will handle all symbolic computations requried
     """ TODO: add kwargs for simplifying curv. and pots. """
-    curv_instance = gravtools_pyt.curvatureObject(G, f, V, params=p, simpleGeometric=True, simplePotentials=False)
+    curv_instance = gravtools_pyt.curvatureObject(
+        G, f, V, params=p, simpleGeometric=simpleGeometric, simplePotentials=simplePotentials)
+    
     if not silent:
         print '[{time}] complete in {x} sec'.format(time=time.ctime(), x=time.clock() - timer)
     
@@ -263,7 +274,7 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
         print '[{time}] writing curvature expressions'.format(time=time.ctime())
 
     # Pass curvature instance to fieldmetric function: Will write PyTrans files
-    fieldmetric(G, nF, nP, simple=simple, silent=silent, curv_obj=curv_instance)
+    fieldmetric(G, nF, nP, simple=simpleGeometric, silent=silent, curv_obj=curv_instance)
     
     # Construct (flattened) symbolic arrays to hold 2st, 2nd and 3rd order derivatives
     vd = sym.symarray('vd', nF)
@@ -275,13 +286,7 @@ def potential(V, nF, nP, simple=False, G="canonical", silent=True):
     ddV_arr = curv_instance.ddV
     dddV_arr = curv_instance.dddV
     
-    # for i in range(nF):
-    #     vd[i] = dV_arr[i]
-    #     for j in range(nF):
-    #         vdd[i + j * nF] = ddV_arr[i, j]
-    #         for k in range(nF):
-    #             vddd[i + j * nF + k * nF * nF] = dddV_arr[i, j, k]
-    
+    # We then flatten these arrays and (hopefully) match indices for the cpp writer
     ddV_arr_flat = ddV_arr.flatten()
     dddV_arr_flat = dddV_arr.T.flatten() # Transpose of canonical matrix coords. + flatten seems to agree
     
@@ -426,10 +431,6 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
         Rm = Riemann('Rm', g)
     
     else:
-        # If curvature instance is passed, utilize precomputed objects
-        # gab = curv_obj.metric           # Get metric with covariant indices
-        # gAB = curv_obj.metric_inverse   # Get metric with contravariant indices
-        # gAb = curv_obj.metric_updown    # Get metric with mixed indices
         
         Ga  = curv_obj._christoffelSymbols
         Ri  = 0 # This isn't actually used...
