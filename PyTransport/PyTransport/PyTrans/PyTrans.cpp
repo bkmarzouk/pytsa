@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Mon Feb 10 19:59:29 2020
+// Package recompile attempted at: Tue Feb 11 17:06:34 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -432,6 +432,69 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     }
 }
 
+// Compute slowroll velocities
+static PyObject* MT_dotfieldsSR(PyObject* self, PyObject *args)
+{
+
+    // Initialize python array objects
+    PyArrayObject *fields, *params, *dfSR_out;
+
+    // initialize corresponding cpp objects
+    double *Cfields, *Cparams;
+
+    // Parse python args
+    if (!PyArg_ParseTuple(args, "O!O!",&PyArray_Type, &fields, &PyArray_Type, &params)){
+        return NULL;
+    }
+
+    // Get model
+    model mm;
+    int nF=mm.getnF();
+    int nP = mm.getnP();
+
+    // Cross check number of fields / params passed
+    if (nF!=size_pyvector(fields)) {
+        cout<< "\n \n \n field space array not of correct length \n \n \n";
+        Py_RETURN_NONE;
+    }
+    if (nP!=size_pyvector(params)) {
+        cout<< "\n \n \n parameters array not of correct length \n \n \n";
+        Py_RETURN_NONE;
+    }
+
+    // Translate Python arrays into C arrays
+    Cfields = pyvector_to_Carray(fields);
+    Cparams = pyvector_to_Carray(params);
+
+    // Now translate into C vectors
+    vector<double> Cvec_fields;
+    vector<double> Cvec_params;
+    Cvec_fields = vector<double>(Cfields, Cfields+nF);
+    Cvec_params = vector<double>(Cparams, Cparams+nP);
+
+
+    // Now we can compute the slowroll values using the vector obj.
+    vector<double> CdfSR = mm.dfSR(Cvec_fields, Cvec_params);
+
+
+    // Construct numpy output object
+    npy_intp dims[1];
+    dims[0] = nF;
+    dfSR_out = (PyArrayObject*) PyArray_SimpleNew(1, dims, NPY_DOUBLE);
+
+    // Assign pointer to python object
+    double * CdfSR_out;
+    CdfSR_out = (double *) PyArray_DATA(dfSR_out);
+
+    // Populate array with SR vals
+    for (int ii = 0; ii < nF; ii++){
+        CdfSR_out[ii] = CdfSR[ii];
+    }
+
+    // Return python object
+    return PyArray_Return(dfSR_out);
+
+}
 
 // function to calculate background evolution
 static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
@@ -1104,7 +1167,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransdbraneDmax6_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTrans2Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1116,7 +1179,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTransdbraneDmax6(void)    {        Py_InitModule3("PyTransdbraneDmax6", PyTransdbraneDmax6_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTrans2Quad(void)    {        Py_InitModule3("PyTrans2Quad", PyTrans2Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

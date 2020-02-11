@@ -180,7 +180,8 @@ def Initialize(modelnumber, rerun_model=False):
             Nepsilon = 0.9*Nepsilon[1]
             
         # Try and obtain fiducial background up until epsilon = 1
-        backFid = PyT.backEvolve(np.linspace(0, Nepsilon, 3*(int(Nepsilon)+1)), initial, pvals, tols, 1, tmax_bg, True)
+        backFid = PyT.backEvolve(
+            np.linspace(0, Nepsilon, 3*(int(Nepsilon)+1)), initial, pvals, tols, 0, tmax_bg, True)
         
         """ We will now attempt to extend the background by up to 100 efolds passed the epsilon definition
             Note that getting further than this is highly unlikely, since integration becomes hard

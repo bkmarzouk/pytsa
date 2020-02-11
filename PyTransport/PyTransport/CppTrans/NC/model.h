@@ -161,6 +161,55 @@ public:
         return addot;
     }
 
+    // function returns the slow-roll approximation for velocities
+    vector<double> dfSR(vector<double> fields, vector<double> p){
+
+        // We build a fieldsdotfields vector with zero velocities (this is the canonical object passed to other funcs)
+        vector<double> fdf(2*nF);
+
+        for (int ii=0; ii<2*nF; ii++){
+            if (ii < nF){
+                fdf[ii] = fields[ii];
+            }
+            else{
+                fdf[ii] = 0;
+            }
+        }
+
+        // Now we compute the potential and first potential derivative
+        double Vi = pot.V(fdf, p);
+        vector<double> dVi = pot.dV(fdf, p);
+
+        // Field metric
+		vector<double> FMi = fmet.fmetric(fdf,p);
+
+        // Build array of dV cotnracted with metric
+        vector<double> GV(nF);
+
+        for (int ii = 0; ii < nF; ii++){
+            GV[ii] = 0;
+            for (int jj = 0; jj < nF; jj++){
+                GV[ii] -= FMi[ii*2*nF + jj]*dVi[jj];
+            }
+        }
+
+        // Build vector for slow roll values
+        vector<double> dotfieldsSR(nF);
+
+        if (Vi < 0){
+            cout << "\n \n \n Warning: Potential < 0 is not valid for SR approximation, returning 0 \n \n \n"<<endl;
+            for (int ii=0;ii<nF;ii++){
+                dotfieldsSR[ii] = 0;
+            }
+        }
+        else{
+            for (int ii=0;ii<nF;ii++){
+                dotfieldsSR[ii] = GV[ii]/sqrt(3*Vi);
+            }
+        }
+
+        return dotfieldsSR;
+    }
 
     // function returns mass-squared-matrix
     vector<double> Mij(vector<double> fdf, vector<double> p, bool hessianApprox, bool covariantExpression)
@@ -172,8 +221,7 @@ public:
         vector<double> f(nF);
         vector<double> v(nF);
 
-        for(int ii = 0; ii < nF; ii++)
-        {
+        for(int ii = 0; ii < nF; ii++){
             f[ii] = fdf[ii];
             v[ii] = fdf[ii + nF];
         }
