@@ -49,7 +49,6 @@ with fNLFile: fNLDict = pk.load(fNLFile)
 # Import sample generator & other useful class structures
 from generator import genSample
 from realization import realization as new_sample
-import record_stats
 
 
 def buildICPs(modelnumber, rerun_model=False):
