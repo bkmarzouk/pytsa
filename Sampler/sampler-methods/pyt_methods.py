@@ -618,10 +618,10 @@ def SpectralIndex(modelnumber):
     # Begin timer
     ti = time.clock()
 
-    # We will compute the 2pf based on momenta that horizon exit 3-efolds about k pivot
+    # We will compute the 2pf based on momenta that horizon exit 1.2-efolds about k pivot
     Npivot = Nend - Nexit
-    Nscatter = 1.5
-    Nsteps = 5
+    Nscatter = 0.6
+    Nsteps = 2
     DeltaN = [Npivot - Nscatter + ii*Nscatter/float(Nsteps) for ii in range(Nsteps*2 + 1)]
 
     kVals = np.array([])
@@ -680,7 +680,7 @@ def SpectralIndex(modelnumber):
             with twoPt_file:
                 pk.dump(twoPt_dict, twoPt_file)
                 
-            return {"mn": modelnumber, "flag": item[0], "ext": "2pf"}
+            return {"mn": modelnumber, "flag": twoPf[0], "ext": "2pf"}
         
         pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
         
@@ -691,8 +691,8 @@ def SpectralIndex(modelnumber):
     nsSpline = twoPtSpline.derivative()
     alphaSpline = nsSpline.derivative()
     
-    ns_ = lambda k: nsSpline(np.log(k)/kPivot) + 4.0
-    alpha_ = lambda k: alphaSpline(np.log(k)/kPivot)
+    ns_ = lambda k: nsSpline(np.log(k/kPivot)) + 4.0
+    alpha_ = lambda k: alphaSpline(np.log(k/kPivot))
     
     ns = ns_(kPivot)
     alpha = alpha_(kPivot)
@@ -852,3 +852,4 @@ def computations(mn_calc):
                 pkFile = open(pkPath, "wb")
                 with pkFile: pk.dump(r, pkFile)
                 
+

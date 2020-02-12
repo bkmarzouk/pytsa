@@ -77,7 +77,7 @@ def ICsBM(NBMassless, k, back, params, MTE):
             w, v = np.linalg.eig(MTE.massMatrix(back[jj, 1:1 + 2*nF], params))
             eigen = np.max(np.real(w))
             
-            massEff = -k ** 2 * np.exp(-2.0 * back[jj, 0])/MTE.H(back[jj, 1:], params) + eigen
+            massEff = -(k/MTE.H(back[jj, 1:], params))**2 * np.exp(-2.0 * back[jj, 0]) + eigen
             jj = jj + 1
             
         except np.linalg.LinAlgError:
