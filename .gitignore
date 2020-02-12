@@ -1,5 +1,5 @@
 # Ignore compiled python files everywhere
-*/.pyc
+*.pyc
 
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature

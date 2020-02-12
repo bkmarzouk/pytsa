@@ -618,16 +618,19 @@ def SpectralIndex(modelnumber):
     # Begin timer
     ti = time.clock()
 
-    # Compute two-point function
+    # We will compute the 2pf based on momenta that horizon exit 3-efolds about k pivot
+    Npivot = Nend - Nexit
+    Nscatter = 1.5
+    Nsteps = 5
+    DeltaN = [Npivot - Nscatter + ii*Nscatter/float(Nsteps) for ii in range(Nsteps*2 + 1)]
 
-    # Define an efolding range 2-efolds above and below the exit time
-    Nrange = [Nend - Nexit - 2.0 + float(i) for i in [0, 1, 2, 3, 4]]
-
-    # Compute the corresponding momenta at horizon exit times
-    kExitrange = [PyS.kexitN(N, back, pvals, PyT) for N in Nrange]
-    
-    for k in kExitrange:
-        if np.isnan(k) or np.isinf(k):
+    kVals = np.array([])
+    for NN in DeltaN:
+        
+        k = PyS.kexitN(NN, back, pvals, PyT)
+        
+        if np.isinf(k) or np.isnan(k):
+            
             # Build null result file, dump and return error data
             twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
     
@@ -637,16 +640,23 @@ def SpectralIndex(modelnumber):
                 pk.dump(twoPt_dict, twoPt_file)
     
             return {"mn": modelnumber, "flag": -31, "ext": "2pf"}
+        
+        kVals = np.append(kVals, k)
 
     # Check momenta are monotonically increasing
-    assert all(kExitrange[i]<kExitrange[i+1] for i in range(len(kExitrange)-1)), kExitrange
+    assert all(kVals[i]<kVals[i+1] for i in range(len(kVals)-1)), kVals
 
-    # Get initial condition for each momenta
-    ICsEvos = [PyS.ICsBM(subevo, kE, back, pvals, PyT) for kE in kExitrange]
-
-    # Check initial conditions array(s)
-    for item in ICsEvos:
-        if item == (np.nan, np.nan):
+    # Get pivot scale
+    kPivot = kVals[Nsteps]
+    
+    # Build power spectra values
+    pZetaVals = np.array([])
+    for k in kVals:
+        
+        # Get ICs from massless condition
+        Nstart, ICs = PyS.ICsBM(subevo, k, back, pvals, PyT)
+        
+        if type(ICs) != np.ndarray and np.isnan(ICs):
             
             # Build null result file, dump and return error data
             twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
@@ -658,17 +668,9 @@ def SpectralIndex(modelnumber):
                 
             return {"mn": modelnumber, "flag": -32, "ext": "2pf"}
 
-    # Prescribe Nstart and Nend as evaluation times for 2pf run
-    Nevals = [np.array([Nstart[0], Nend]) for Nstart in ICsEvos]
-    
-    # Call sigEvolve to compute power spectra
-    twoPt = [PyT.sigEvolve(NkBack[0], NkBack[1], NkBack[2][1], pvals, tols, False, tmax_2pf, True) for NkBack in zip(
-        Nevals, kExitrange, ICsEvos
-    )]
-    
-    # If flag return for sigEvolve, return flag data
-    for item in twoPt:
-        if type(item) is tuple:
+        twoPf = PyT.sigEvolve(np.array([Nstart, Nend]), k, ICs, pvals, tols, False, tmax_2pf, True)
+        
+        if type(twoPf) is tuple:
             
             # Build null result file, dump and return error data
             twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
@@ -680,19 +682,20 @@ def SpectralIndex(modelnumber):
                 
             return {"mn": modelnumber, "flag": item[0], "ext": "2pf"}
         
-    # Otherwise tranpose data
-    twoPt = [item.T for item in twoPt]
-
-    # Log power spectra and momenta
-    logPz = [np.log(xx[1][-1]) for xx in twoPt]
-    logkE = [np.log(kE) for kE in kExitrange]
-
-    # Compute spectral index and running via spline derivatives of logged values
-    ns = UnivariateSpline(
-        logkE, logPz, k=4, s=1e-15).derivative()(np.log(kExitrange[2])) + 4.
+        pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
+        
+    twoPtSpline = UnivariateSpline(
+        np.log(kVals/kPivot), np.log(pZetaVals), k=4
+    )
     
-    alpha = UnivariateSpline(
-        logkE, logPz, k=4, s=1e-15).derivative(2)(np.log(kExitrange[2])) + 0.
+    nsSpline = twoPtSpline.derivative()
+    alphaSpline = nsSpline.derivative()
+    
+    ns_ = lambda k: nsSpline(np.log(k)/kPivot) + 4.0
+    alpha_ = lambda k: alphaSpline(np.log(k)/kPivot)
+    
+    ns = ns_(kPivot)
+    alpha = alpha_(kPivot)
 
     # End calculation timer and build results dictionary
     twoPt_dict = {'ns': ns, 'alpha': alpha, 'time': time.clock() - ti}
@@ -752,9 +755,9 @@ def fNL(modelnumber, configName):
     # Compute three-point function
 
     # Compute initial conditions
-    ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
+    Nstart, ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
     
-    if ICs == (np.nan, np.nan):
+    if type(ICs) != np.ndarray and np.isnan(ICs):
         # Build null results dict, dump and return error data
         fNL_dict = {'{}'.format(name): None, 'time': None}
     
@@ -766,7 +769,7 @@ def fNL(modelnumber, configName):
         return {"mn": modelnumber, "flag": -33, "ext": name}
 
     # Compute 3pt function
-    threePt = PyT.alphaEvolve(np.array([ICs[0], Nend]), k1, k2, k3, ICs[1], pvals, tols, True, tmax_3pf, True)
+    threePt = PyT.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, pvals, tols, True, tmax_3pf, True)
 
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:

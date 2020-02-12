@@ -71,12 +71,13 @@ def ICsBM(NBMassless, k, back, params, MTE):
     jj = 0
     while (massEff < 0 and jj < np.size(back[:, 0]) - 1):
         
-        # Note we have changed this to compute the canonical form of the full mass matrix
+        # Note we have changed this to compute the canonical form of the full mass matrix, which is normalized by H^2
+        # Hence we also must include this factor with the momenta term
         try:
             w, v = np.linalg.eig(MTE.massMatrix(back[jj, 1:1 + 2*nF], params))
             eigen = np.max(np.real(w))
             
-            massEff = -k ** 2 * np.exp(-2.0 * back[jj, 0]) + eigen
+            massEff = -k ** 2 * np.exp(-2.0 * back[jj, 0])/MTE.H(back[jj, 1:], params) + eigen
             jj = jj + 1
             
         except np.linalg.LinAlgError:
@@ -164,7 +165,7 @@ def pSpectra(kA, back, params, NB, tols, MTE):
             t = np.linspace(Nstart, back[-1, 0], 10)
             # run solver for this triangle
             twoPt = MTE.sigEvolve(t, k, backExitMinus, params, tols,
-                                  True)  # all data from three point run goes into threePt array
+                                  True, tmax_2pf, flagReturn)  # all data from three point run goes into threePt array
         zzOut = np.append(zzOut, twoPt[-1, 1])
         times = np.append(times, timeit.default_timer() - start_time)
     
