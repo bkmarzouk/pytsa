@@ -214,7 +214,6 @@ def Initialize(modelnumber, rerun_model=False):
                 
                 endIndex = idx
                 Nend = row[0]
-                print "End of inflation condition found at N = {}".format(Nend)
                 foundEnd = True
                 break
 
@@ -222,7 +221,6 @@ def Initialize(modelnumber, rerun_model=False):
                     np.logical_and(row[acceptIfAllIdx] > acceptIfAllMin, row[acceptIfAllIdx] < acceptIfAllMax)):
                 endIndex = idx
                 Nend = row[0]
-                print "End of inflation condition found at N = {}".format(Nend)
                 foundEnd = True
                 break
     
@@ -247,14 +245,12 @@ def Initialize(modelnumber, rerun_model=False):
             if exitAnyNC and np.any(
                     np.logical_and(row[rejectIfAnyIdx] > rejectIfAnyMin, row[rejectIfAnyIdx] < rejectIfAnyMax)):
                 Nend = row[0]
-                print "Violation of inflation condition found at N = {}".format(Nend)
                 
                 return -34, Nend
                 
             if exitAllNC and np.all(
                     np.logical_and(row[rejectIfAllIdx] > rejectIfAllMin, row[rejectIfAllIdx] < rejectIfAllMax)):
                 Nend = row[0]
-                print "Violation of inflation condition found at N = {}".format(Nend)
                 
                 return -34, Nend
             
@@ -267,15 +263,12 @@ def Initialize(modelnumber, rerun_model=False):
         Nend = back[-1][0]
         
         if Nend > minN and not foundEnd:
-            print "Eternal inflation with Nmax = {}".format(Nend)
             return -35, Nend
         
         if Nend < minN and foundEnd:
-            print "Inflation too short with Nend = {}".format(Nend)
             return -30, Nend
         
         if Nend < minN and not foundEnd:
-            print "Inferred integrator failure with Nmax = {}".format(Nend)
             return -21, Nend
 
     # Track *actual* initial conditions prior to repositioning
