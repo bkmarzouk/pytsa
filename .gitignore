@@ -33,5 +33,9 @@
 # Maintain cache directory (Not sure if this is requried)
 !/PyTransport/PyTransport/__pycache__/.gitkeep
 
+# Ignore .h header files that are generated from proto
+/PyTransport/PyTransport/CppTrans/fieldmetric.h
+/PyTransport/PyTransport/CppTrans/potential.h
+
 # Keep .gitignore
 !.gitignore

@@ -78,21 +78,17 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
     
 
     # Print configuration to command line
-    print "-- Starting sampling routine: {}".format(transportDict['transportModule'])
+    print "\n\n-- Starting sampling routine: {}".format(transportDict['transportModule'])
     if run_2pf: print "-- Computing 2pt data"
     if run_3pf: print "-- Computing 3pt data"
-    
-
-    # Get number of fields and model parameters
-    nF, nP = PyT.nF(), PyT.nP()
 
 
-    print "\n-- Initializing ensemble"
+    print "\n\n\n\n-- Initializing ensemble"
 
 
     # Run existing sample data
     if use_samples is True:
-        print "----- Loading ensemble"
+        print "----- Loading ensemble\n\n"
         
         # Need to undo compression to use samples again
         w.compress_samples(undo=True)
@@ -101,7 +97,7 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
         
     # Build ensemble from scratch
     else:
-        print "----- Building ensemble"
+        print "----- Building ensemble\n\n"
         sample_range = range(n_samples)
         pool.map(pytm.DemandSample, sample_range)
         
