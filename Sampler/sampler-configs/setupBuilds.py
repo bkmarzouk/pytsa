@@ -386,9 +386,6 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         # define core paths for directory structure
         self.pytpath = pytpath
         self.root = os.path.join(self.saveLocation, self.name)
-        self.twopt_dir = os.path.join(self.root, "2pf")
-        self.threept_dir = os.path.join(self.root, "3pf")
-        self.mass_dir = os.path.join(self.root, "masses")
         self.stats_dir = os.path.join(self.root, "stats")
         self.stats_dir_bg = os.path.join(self.stats_dir, "bg")
         self.stats_dir_2pf = os.path.join(self.stats_dir, "2pf")
@@ -402,7 +399,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.methods_dir = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods"))
         
         # Build paths as required, subject to whether the model file is being updated
-        for item in [self.root, self.twopt_dir, self.threept_dir, self.mass_dir, self.stats_dir, self.stats_dir_bg,
+        for item in [self.root, self.stats_dir, self.stats_dir_bg,
                      self.stats_dir_2pf, self.stats_dir_3pf, self.samples_dir, self.outputs_dir, self.localdata_dir]:
             
             if update is False:
@@ -526,9 +523,6 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         envDict = {
             'PyTS_pathPyT'       : self.pytpath,
             'PyTS_pathRoot'      : self.root,
-            'PyTS_path2pf'       : self.twopt_dir,
-            'PYTS_path3pf'       : self.threept_dir,
-            'PyTS_pathMasses'    : self.mass_dir,
             'PyTS_pathSamples'   : self.samples_dir,
             'PyTS_pathStats'     : self.stats_dir,
             'PyTS_pathLocalData' : self.localdata_dir,

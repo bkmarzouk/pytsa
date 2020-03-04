@@ -7,11 +7,11 @@ import shutil
 
 # Retrieve paths from environment variables
 envKeys = [
-    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf', 'PYTS_path3pf', 'PyTS_pathMasses', 'PyTS_pathSamples',
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_pathSamples',
     'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods', 'PyTS_pathLocalData'
 ]
 
-pathPyT, pathRoot, path2pf, path3pf, pathMasses, \
+pathPyT, pathRoot, \
 pathSamples, pathStats, pathClasses, pathMethods, pathLocalData = [os.environ[eK] for eK in envKeys]
 
 
@@ -27,35 +27,35 @@ def load_obs(pk_path):
     return obs
 
 
-def update_samples(modelnumber):
+def load_pk(pk_path):
+    """ Wrapper for safe-load of binary files """
+    f = open(pk_path, "rb")
+    with f: obj = pk.load(f)
+    return obj
 
-    # Load sample
-    save_path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
-    f=open(save_path, "rb")
-    with f:
-        sample = pk.load(f)
+
+def rewrite_pk(pk_obj, pk_path):
+    """ Wrapper for safe-rewrite of binary files """
+    assert os.path.exists(pk_path), "Cannot rewrite non-existing file: {}".format(pk_path)
+    os.remove(pk_path)
+    f = open(pk_path, "wb")
+    with f: pk.dump(pk_obj, pk_path)
+
+
+def update_sample(modelnumber, obsDict, timerSubscript):
+    
+    pathFullSample = os.path.join(pathSamples, "{}.sample".format(modelnumber))
+    
+    sample = load_pk(pathFullSample)
+    
     assert sample.modelnumber == modelnumber
+    
+    sample.update_observables(obsDict, timerSubscript)
+    
+    rewrite_pk(sample, pathFullSample)
 
-    if len(os.listdir(path2pf)) > 0:
-        twoPt_path = os.path.join(path2pf, "{}.2pf".format(modelnumber))
-        obs = load_obs(twoPt_path)
-        sample.update_observables(obs, "2pf")
 
-    if len(os.listdir(path3pf)) > 0:
-        for d in fNLDict:
-            cname = d['name']
-            cpath = os.path.join(path3pf, "{m}.{c}".format(m=modelnumber, c=cname))
-            obs = load_obs(cpath)
-            sample.update_observables(obs, cname)
 
-    if len(os.listdir(pathMasses)) > 0:
-        Mij_obspath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
-        obs = load_obs(Mij_obspath)
-        sample.update_observables(obs, "masses")
-
-    os.remove(save_path)
-    f = open(save_path, "wb")
-    with f: pk.dump(sample, f)
 
 
 def bg_summary():
@@ -82,7 +82,7 @@ def bg_summary():
     allKeys = [str(f) for f in allFlags] + ["time"]
     totDict = {k: 0 for k in allKeys}
     
-    print "\n-- Writing background statistics\n"
+    print "\n\n-- Writing background statistics\n\n"
     
     for sp in stat_paths:
     
@@ -206,9 +206,72 @@ def write_error_report():
     
     with summary_file as f:
         summary_file.writelines(lines)
-    
 
-def write_results(nF):
+
+def compress_samples(undo=False):
+    """ Wraps all sample objects into single-large binary file.
+    Large storage is usually preferred on scratch systems. """
+    
+    # If undo is True, the reverse procedure will be performed
+    if undo is False:
+        
+        # Get full path definitions for samples
+        sample_paths = [
+            os.path.join(pathSamples, item) for item in os.listdir(pathSamples)
+        ]
+        
+        # Open file to dump all samples to single binary object
+        ensemblePickles = open(os.path.join(pathSamples, "ensemble.samples"), "wb")
+        
+        # With file handler
+        with ensemblePickles:
+            # For each item in the sample paths
+            for item in sample_paths:
+                # Open the sample file
+                samplePickle = open(item, "rb")
+                
+                # Load the sample
+                with samplePickle:
+                    sample = pk.load(samplePickle)
+                
+                # Dump to the ensemble
+                pk.dump(sample, ensemblePickles)
+                
+                # Remove single sample object
+                os.remove(item)
+
+    else:
+        # open ensemble pickle file
+        ensemblePickles = open(os.path.join(pathSamples, "ensemble.samples"), "rb")
+        
+        # Start sample count
+        sampleCounter = 0
+        
+        try:
+            
+            print "\n\n-- Unpacking ensemble samples\n\n"
+            
+            with ensemblePickles:
+                
+                # Keep unloading files until an EOFError is raise
+                while True:
+                    
+                    s = pk.load(ensemblePickles)
+                    
+                    modelnumber = s.modelnumber
+                    
+                    # Write with standard syntax as before
+                    samplePickle = open(os.path.join(pathSamples, "{}.sample").format(modelnumber), "wb")
+                    
+                    with samplePickle: pk.dump(s, samplePickle)
+                    
+                    sampleCounter += 1
+                
+        except EOFError:
+            print "\n\n-- Unpack complete: {} samples\n\n".format(sampleCounter)
+            os.remove(os.path.join(pathSamples, "ensemble.samples"))
+
+def write_results():
 
     headers = ('weight', 'like')
     paths   = [ os.path.join(pathSamples, m) for m in os.listdir(pathSamples)]
@@ -225,7 +288,7 @@ def write_results(nF):
     vkeys = []
     pkeys = []
     for k in sorted(latexDefs.keys()):
-        if k.startswith("f"): fkeys.append(k)
+        if   k.startswith("f"): fkeys.append(k)
         elif k.startswith("v"): vkeys.append(k)
         elif k.startswith("p"): pkeys.append(k)
         else: raise KeyError, k
@@ -237,87 +300,101 @@ def write_results(nF):
         labels.append(key)
         ncols += 1
         latexs.append(latexDefs[key])
-        
-    # Since dictionary items will be read in arbitrary order, resort list based on param number
     
+    # The dictionary of observables associated with any gifven sample is expected to be representative
+    f = open(paths[0], "rb")
+    with f: s0 = pk.load(f)
+    
+    obsKeys = s0.observables.keys()
+    
+    nF = len(s0.fields)
+    
+    # Define all possible keys
+    possibleKeys  = ["m{}".format(ii) for ii in range(nF)] + ["T_masses"]
+    possibleLaTeX = ["m_{}^2/H^2".format(ii) for ii in range(nF)] + ["T_{M^A_B}"]
 
-    if len(os.listdir(path2pf)) > 0:
-        labs = ["ns", "alpha", "2pf_t"]
-        lats = ["n_s", "\\alpha", "T_{2pf}"]
-
-        for item in labs:
-            headers+=(item,)
-            labels.append(item)
-            ncols+=1
-
-        for item in lats: latexs.append(item)
-
-
-    if len(os.listdir(path3pf)) > 0:
+    possibleKeys  += ["ns", "alpha", "T_2pf"]
+    possibleLaTeX += ["n_s", "\\alpha", "T_{n_s}"]
+    
+    fNLFile = open(os.path.join(pathLocalData, "fNL.localdata"), "rb")
+    with fNLFile:
+        configDefs = pk.load(fNLFile)
         
-        for d in fNLDict:
-            labs = [d['name'], "{}_t".format(d['name'])]
-            lats = ["f_{NL}"+"^{}".format(d['name']),
-                    "T_{}".format("{"+d['name']+"}") ]
-
-            for item in labs:
-                headers+=(item,)
-                labels.append(item)
-                ncols+=1
-
-            for item in lats: latexs.append(item)
-
-    if len(os.listdir(pathMasses)) > 0:
+    for cD in configDefs:
+        possibleKeys.append(cD['name'])
+        possibleKeys.append("T_{}".format(cD['name']))
         
-        for i in range(nF):
-            headers+=("m{}".format(i), )
-            labels.append("m{}".format(i))
-            latexs.append("m_{}^2/H^2".format(i))
-            ncols+=1
-            
-        headers+=("masses_t",)
-        labels.append("masses_t")
-        latexs.append("T_{M}")
-        ncols+=1
+        possibleLaTeX.append(cD['latex'])
+        possibleLaTeX.append("T_" + "{f_{NL}^{" + cD['name'] + "}}")
+    
+    for k in possibleKeys:
+        if k in obsKeys:
+            headers += (k,)
+            labels.append(k)
+            ncols += 1
+            latexs.append(possibleLaTeX[possibleKeys.index(k)])
 
-
+    # We will write 3 results files that contain all, evolving and adiabatic samples
+    dicts_all       = []
     dicts_evolving  = []
     dicts_adiabatic = []
     failed_samples  = []
 
+    # Iterate over all sample paths
     for p in paths:
+        
+        # Open sample
         f = open(p, "rb")
+        
+        # With handler
         with f:
+            
+            # load binary file and get sample line from method
             s = pk.load(f)
-            
-            
             d = s.line_dict()
 
+            # If the sample hasn't been rejected on account of failed computation(s)
             if s.reject is False:
+                
+                # Add to 'all' results
+                dicts_all.append(d)
+                
+                # If adiabatic, add to adiabatic results
                 if s.adiabatic is True:
                     dicts_adiabatic.append(d)
+                # Otherwise add to evolving results
                 else:
                     dicts_evolving.append(d)
 
+            # Record failed sample model number
             else:
-                print "FAILED SAMPLE: {}".format(p)
                 failed_samples.append(p+"\n")
 
-    f = open(os.path.join(pathRoot, "outputs", "r_adiabatic.txt"), "w")
-    g = open(os.path.join(pathRoot, "outputs", "r_evolving.txt" ), "w")
+    p = open(os.path.join(pathRoot, "outputs", "adiabatic.txt"), "w")
+    q = open(os.path.join(pathRoot, "outputs", "evolving.txt" ), "w")
+    r = open(os.path.join(pathRoot, "outputs", "all.txt"), "w")
 
-    with f:
-        w = csv.DictWriter(f, headers, delimiter=' ')
-        for d in dicts_adiabatic:
-            w.writerow(d)
+    for h_r in zip([p, q, r], [dicts_adiabatic, dicts_evolving, dicts_all]):
+        
+        handler, dicts_results = h_r
+        
+        with handler:
+            w = csv.DictWriter(handler, headers, delimiter=' ')
+            for d in dicts_results:
+                w.writerow(d)
 
-    with g:
-        v = csv.DictWriter(g, headers, delimiter=' ')
-        for d in dicts_evolving:
-            v.writerow(d)
+    for pfile in [open(os.path.join(pathRoot, "outputs", "{}.paramnames").format(fname), "w")
+                for fname in ["adiabatic", "evolving", "all"]]:
+        
+        with pfile:
+            w = csv.DictWriter(pfile, ('label', 'LaTeX'), delimiter = ' ')
+            for lab_lat in zip(labels, latexs):
+                lab, lat = lab_lat
+                w.writerow({'label': lab, 'LaTeX': lat})
+    
 
-    pfile1 = os.path.join(pathRoot, "outputs", "r_adiabatic.paramnames")
-    pfile2 = os.path.join(pathRoot, "outputs", "r_evolving.paramnames")
+    pfile1 = os.path.join(pathRoot, "outputs", "adiabatic.paramnames")
+    pfile2 = os.path.join(pathRoot, "outputs", "evolving.paramnames")
     h = open(pfile1, "w")
     headers = ('label', 'LaTeX')
     with h:
@@ -330,3 +407,5 @@ def write_results(nF):
     i = open(os.path.join(pathRoot, "outputs", "failed.txt"), "w")
     with i:
         i.writelines(failed_samples)
+
+    compress_samples()

@@ -24,13 +24,13 @@ with envFile: envDict = pk.load(envFile)
 
 # Define set of requried keys, export to environment & define system paths
 envKeys = [
-    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf', 'PYTS_path3pf',
-    'PyTS_pathMasses', 'PyTS_pathSamples', 'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods'
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_pathSamples',
+    'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods'
 ]
 
 for eK in envKeys + ['PyTS_pathLocalData']: os.environ[eK] = envDict[eK]
 
-pathPyT, pathRoot, path2pf, path3pf, pathMasses, \
+pathPyT, pathRoot, \
 pathSamples, pathStats, pathClasses, pathMethods = [envDict[eK] for eK in envKeys]
 
 
@@ -93,6 +93,10 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
     # Run existing sample data
     if use_samples is True:
         print "----- Loading ensemble"
+        
+        # Need to undo compression to use samples again
+        w.compress_samples(undo=True)
+        
         sample_range = [int(os.path.splitext(item)[0]) for item in os.listdir(pathSamples)]
         
     # Build ensemble from scratch
@@ -109,40 +113,34 @@ def main(pool, n_samples, run_2pf, run_3pf, use_samples):
     else: w.bg_summary()
 
 
-    # Generate task pool from specs. in configuration file
-    taskpool = []
+    # Generate task pool(s) from specs. in configuration file
+    taskpools = {'masses': []} if use_samples is False else {}  # Horizon crossing masses (Generated automatically)
+    if run_2pf: taskpools['2pf'] = []                           # 2pt function data
+    if run_3pf:                                                 # 3pt function data
+        for d in fNLDict: taskpools[d['name']] = []             # -> 3pt configurations
 
     # Each task is defined via a model number and key for task execution
     for i in sample_range:
-
-        task = i, "masses"
-        taskpool.append(task)
-
-        if run_2pf is True:
-            task = i, "2pf"
-            taskpool.append(task)
-
-        if run_3pf is True:
-            for d in fNLDict:
-                task = i, d['name']
-                taskpool.append(task)
-
-    # Map task pool to computation handler
-    pool.map(pytm.computations, taskpool)
+        for key in taskpools:
+            task = i, key
+            taskpools[key].append(task)
     
-    # Update samples with results from task pool
-    print "\n-- Updating sample objects\n"
-    
-    pool.map(w.update_samples, sample_range)
+    # Now we map individual task pools to processors, updating the sample objects on the fly
+    for key in taskpools:
+        
+        print "\n\n-- START ensemble tasks: {}\n\n".format(key)
+        pool.map(pytm.computations, taskpools[key])
+        print "\n\n-- END ensemble tasks: {}\n\n".format(key)
+
 
     # Close pool
     pool.close()
 
     # Write results file(s)
-    print "\n-- Writing result files\n"
+    print "\n\n-- Writing result files\n\n"
     w.write_error_report()
-    w.write_results(nF)
-    print "\n-- All Complete.\n"
+    w.write_results()
+    print "\n\n-- All Complete.\n\n"
 
 
 if __name__ == "__main__":

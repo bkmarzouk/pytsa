@@ -12,11 +12,11 @@ import warnings
 
 # Retrieve paths from environment variables
 envKeys = [
-    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_path2pf', 'PYTS_path3pf', 'PyTS_pathMasses', 'PyTS_pathSamples',
+    'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_pathSamples',
     'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods', 'PyTS_pathLocalData'
 ]
 
-pathPyT, pathRoot, path2pf, path3pf, pathMasses, \
+pathPyT, pathRoot, \
 pathSamples, pathStats, pathClasses, pathMethods, pathLocalData = [os.environ[eK] for eK in envKeys]
 
 
@@ -50,6 +50,9 @@ with fNLFile: fNLDict = pk.load(fNLFile)
 from generator import genSample
 from realization import realization as new_sample
 
+sys.path.append(pathMethods)
+from writer import update_sample
+
 
 def buildICPs(modelnumber, rerun_model=False):
     """ Builds initial conditions & parameters, or retrieves them if in rerun mode"""
@@ -69,7 +72,7 @@ def buildICPs(modelnumber, rerun_model=False):
             vvals = model.velocities
             pvals = model.parameters
             
-            return np.concatenate(fvals, vvals)
+            return np.concatenate(fvals, vvals), pvals
     
     # If SR is in vvals, compute initial velocity value via slowroll equation
     if "SR" in vvals:
@@ -486,9 +489,6 @@ def Mij(modelnumber):
 
     # Transport background for col evolution rather than row evolution
     backT = back.T
-    
-    # Build save path for mass-matrix eigenvalues
-    Mij_savepath = os.path.join(pathMasses, "{}.masses".format(modelnumber))
 
     # Get number of fields
     nF = PyT.nF()
@@ -568,12 +568,10 @@ def Mij(modelnumber):
         Mij_eig['m{}'.format(i)] = Mij[i]
 
     # End timer
-    Mij_eig['time'] = time.clock() - ti
+    Mij_eig['T_masses'] = time.clock() - ti
 
-    # Write binary file
-    Mij_file = open(Mij_savepath, "wb")
-    with Mij_file:
-        pk.dump(Mij_eig, Mij_file)
+    # Update sample observables
+    sample.update_observables(Mij_eig)
         
     return 0
         
@@ -601,12 +599,6 @@ def SpectralIndex(modelnumber):
     
     assert Nend is not None, "Nend = None should not be a saved sample"
     pvals = np.asarray(sample.parameters)
-    
-    # Get exit time momenta
-    kExit = sample.kExit
-
-    # Build path for two-point function result
-    twoPt_savepath = os.path.join(path2pf, "{}.2pf".format(modelnumber))
 
     # Begin timer
     ti = time.clock()
@@ -624,13 +616,11 @@ def SpectralIndex(modelnumber):
         
         if np.isinf(k) or np.isnan(k):
             
-            # Build null result file, dump and return error data
-            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+            # Build null result file
+            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
     
-            # Write binary file
-            twoPt_file = open(twoPt_savepath, "wb")
-            with twoPt_file:
-                pk.dump(twoPt_dict, twoPt_file)
+            # Update sample
+            sample.update_observables(twoPt_dict)
     
             return {"mn": modelnumber, "flag": -31, "ext": "2pf"}
         
@@ -651,13 +641,11 @@ def SpectralIndex(modelnumber):
         
         if type(ICs) != np.ndarray and np.isnan(ICs):
             
-            # Build null result file, dump and return error data
-            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+            # Build null result file
+            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
     
-            # Write binary file
-            twoPt_file = open(twoPt_savepath, "wb")
-            with twoPt_file:
-                pk.dump(twoPt_dict, twoPt_file)
+            # Update sample
+            sample.update_observables(twoPt_dict)
                 
             return {"mn": modelnumber, "flag": -32, "ext": "2pf"}
 
@@ -665,13 +653,11 @@ def SpectralIndex(modelnumber):
         
         if type(twoPf) is tuple:
             
-            # Build null result file, dump and return error data
-            twoPt_dict = {'ns': None, 'alpha': None, 'time': None}
+            # Build null result file
+            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
     
-            # Write binary file
-            twoPt_file = open(twoPt_savepath, "wb")
-            with twoPt_file:
-                pk.dump(twoPt_dict, twoPt_file)
+            # Update sample
+            sample.update_observables(twoPt_dict)
                 
             return {"mn": modelnumber, "flag": twoPf[0], "ext": "2pf"}
         
@@ -690,13 +676,11 @@ def SpectralIndex(modelnumber):
     ns = ns_(kPivot)
     alpha = alpha_(kPivot)
 
-    # End calculation timer and build results dictionary
-    twoPt_dict = {'ns': ns, 'alpha': alpha, 'time': time.clock() - ti}
+    # End calculation timer and build results dictionaryobs_
+    twoPt_dict = {'ns': ns, 'alpha': alpha, 'T_2pf': time.clock() - ti}
 
-    # Write binary file
-    twoPt_file = open(twoPt_savepath, "wb")
-    with twoPt_file:
-        pk.dump(twoPt_dict, twoPt_file)
+    # Update sample observables
+    sample.update_observables(twoPt_dict)
 
     return 0
 
@@ -731,9 +715,6 @@ def fNL(modelnumber, configName):
     kExit = sample.kExit
     pvals = np.asarray(sample.parameters)
 
-    # Build savee path
-    fNL_savepath = os.path.join(path3pf, "{num}.{ext}".format(num=modelnumber, ext=name))
-
     # Begin timer
     ti = time.clock()
 
@@ -751,13 +732,12 @@ def fNL(modelnumber, configName):
     Nstart, ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
     
     if type(ICs) != np.ndarray and np.isnan(ICs):
-        # Build null results dict, dump and return error data
-        fNL_dict = {'{}'.format(name): None, 'time': None}
-    
-        # Save binary file
-        fNL_file = open(fNL_savepath, "wb")
-        with fNL_file:
-            pk.dump(fNL_dict, fNL_file)
+        
+        # Build result dictionary
+        threePt_Dict = {'{}'.format(name): None, 'T_{}'.format(configName): None}
+
+        # Update sample observables
+        sample.update_observables(threePt_Dict)
     
         return {"mn": modelnumber, "flag": -33, "ext": name}
 
@@ -766,14 +746,12 @@ def fNL(modelnumber, configName):
 
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:
-        
-        # Build null results dict, dump and return error data
-        fNL_dict = {'{}'.format(name): None, 'time': None}
-    
-        # Save binary file
-        fNL_file = open(fNL_savepath, "wb")
-        with fNL_file:
-            pk.dump(fNL_dict, fNL_file)
+
+        # Build result dictionary
+        threePt_Dict = {'{}'.format(name): None, 'T_{}'.format(configName): None}
+
+        # Update sample observables
+        sample.update_observables(threePt_Dict)
             
         return {"mn": modelnumber, "flag": threePt[0], "ext": name}
     
@@ -787,12 +765,10 @@ def fNL(modelnumber, configName):
     fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
 
     # Build result dictionary
-    fNL_dict = {'{}'.format(name): fNL, 'time': time.clock() - ti}
+    threePt_Dict = {'{}'.format(name): fNL, 'T_{}'.format(configName): time.clock() - ti}
 
-    # Save binary file
-    fNL_file = open(fNL_savepath, "wb")
-    with fNL_file:
-        pk.dump(fNL_dict, fNL_file)
+    # Update sample observables
+    sample.update_observables(threePt_Dict)
         
     return 0
         
@@ -804,7 +780,7 @@ def computations(mn_calc):
     modelnumber, calculation = mn_calc
 
     # Prevent computation fails from hanging via catch_warnings
-    with warnings.catch_warnings(record=True) as w:
+    with warnings.catch_warnings(record=True):
 
         if calculation == "masses":
             print "-- Start MAb: model %06d" % modelnumber
@@ -826,10 +802,10 @@ def computations(mn_calc):
         
         if r != 0:
             
-            # To do: Add error stats for mass-matrix. Though this should be stable.
+            # TODO: Add error stats for mass-matrix. Though this should be stable.
             
-            if calculation == "masses":
-                pass
+            if calculation == "masses": pass
+            
             else:
                 
                 # Determine subdirectory for error records
@@ -844,5 +820,3 @@ def computations(mn_calc):
                 
                 pkFile = open(pkPath, "wb")
                 with pkFile: pk.dump(r, pkFile)
-                
-
