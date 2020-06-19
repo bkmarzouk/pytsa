@@ -227,7 +227,7 @@ class curvatureObject:
             ])
         
         # Return Christoffel symbol with simplification
-        if self.simpleG: sym.simplify(gamma)
+        if self.simpleG: gamma = sym.simplify(gamma)
         
         return gamma
         
