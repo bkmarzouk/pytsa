@@ -23,10 +23,12 @@ class curvatureObject:
         # Keep track of parameters, if we wish
         if params is not None: self.params = list(params)
         else: self.params = None
+
+	print len(coords), self.nC
         
         # If canonical, assume Kronecker-delta, i.e. identity matrix representation for the metric
         if metric == "canonical" or metric is None or metric == 0:
-            self.metric = Matrix.diag(np.ones(len(coords)))  # G_{IJ} = \delta_{IJ}
+            self.metric = sym.eye(self.nC)  # G_{IJ} = \delta_{IJ}
             self.canonical = True
         else:
             
