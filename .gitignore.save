@@ -1,9 +1,6 @@
 # Ignore compiled python files everywhere
 *.pyc
 
-# Ignore .idea
-/.idea/
-
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature
 /PyTransport/PyTransport/PyTrans/CurvatureRecords/*
@@ -36,9 +33,7 @@
 # Maintain cache directory (Not sure if this is requried)
 !/PyTransport/PyTransport/__pycache__/.gitkeep
 
-# Ignore .h header files that are generated from proto
-/PyTransport/PyTransport/CppTrans/fieldmetric.h
-/PyTransport/PyTransport/CppTrans/potential.h
+# Ignore .h header files that are generated from prot/PyTransport/PyTransport/CppTrans
 
 # Keep .gitignore
 !.gitignore
