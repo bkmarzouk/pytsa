@@ -2,7 +2,7 @@
 *.pyc
 
 # Ignore .idea
-/.idea/
+/.idea/*
 
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature
