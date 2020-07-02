@@ -26,7 +26,7 @@ import platform
 import os
 import shutil
 import time
-from gravipy import *
+# from gravipy import *
 import pickle as pk
 import gravtools_pyt
 

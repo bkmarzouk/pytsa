@@ -3,7 +3,7 @@ import os, sys, numpy as np, importlib, shutil, pickle as pk
 pytpath = (
     os.path.abspath(
         os.path.join(
-            os.getcwd(), "../..", "PyTransport", "PyTransport"
+            os.path.dirname(__file__), "../..", "PyTransport", "PyTransport"
         )
     )
 )
@@ -381,7 +381,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         if self.saveLocation != "default":
             assert os.path.exists(self.saveLocation), "Savelocation does not exist: {}".format(self.saveLocation)
         else:
-            self.saveLocation = os.path.abspath(os.path.join(os.getcwd(), "../sampler-builds"))
+            self.saveLocation = os.path.abspath(os.path.join(os.path.dirname(__file__), "../sampler-builds"))
         
         # define core paths for directory structure
         self.pytpath = pytpath
@@ -395,8 +395,8 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.localdata_dir = os.path.join(self.root, ".localdata")
         
         # Add additional locations of classes and methods
-        self.classes_dir = os.path.abspath(os.path.join(os.getcwd(), "../classes"))
-        self.methods_dir = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods"))
+        self.classes_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../classes"))
+        self.methods_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../sampler-methods"))
         
         # Build paths as required, subject to whether the model file is being updated
         for item in [self.root, self.stats_dir, self.stats_dir_bg,
@@ -492,7 +492,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
             for line in import_lines + func_lines: f.writelines(line)
         
         # Define paths to copy sampler routine to local model directory
-        runSamplerPath_keep = os.path.abspath(os.path.join(os.getcwd(), "../sampler-methods/run_sampler.py"))
+        runSamplerPath_keep = os.path.abspath(os.path.join(os.path.dirname(__file__), "../sampler-methods/run_sampler.py"))
         runSamplerPath_copy = os.path.join(self.root, "run_sampler.py")
         
         if update is False:

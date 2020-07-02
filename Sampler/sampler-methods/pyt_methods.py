@@ -386,6 +386,7 @@ def DemandSample(modelnumber):
         
     
         ii = Initialize(modelnumber)
+
     
         # If fail flag received: log statistic
         if type(ii) is tuple:

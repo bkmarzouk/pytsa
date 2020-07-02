@@ -20,10 +20,10 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/evolve.h"//evolve
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/moments.h"//moments
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/model.h"//model
-#include"/home/kareem/PyT-Sample/PyTransport/PyTransport/CppTrans/stepper/rkf45.hpp"//stepper
+#include"/lustre/scratch/astro/bkm25/d3brane/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/evolve.h"//evolve
+#include"/lustre/scratch/astro/bkm25/d3brane/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/moments.h"//moments
+#include"/lustre/scratch/astro/bkm25/d3brane/PyT-Sample/PyTransport/PyTransport/CppTrans/NC/model.h"//model
+#include"/lustre/scratch/astro/bkm25/d3brane/PyT-Sample/PyTransport/PyTransport/CppTrans/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
 #include <math.h>
@@ -38,7 +38,7 @@
 using namespace std;
 
 // The line below is updated evey time the moduleSetup file is run.
-// Package recompile attempted at: Wed Mar  4 14:44:24 2020
+// Package recompile attempted at: Tue Jun 30 17:26:41 2020
 
 
 // Changes python array into C array (or rather points to pyarray data)
@@ -1167,7 +1167,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTrans2Quad_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTransd3brane_deltamax_3pt005_all_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1179,7 +1179,7 @@ extern "C" {
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-void initPyTrans2Quad(void)    {        Py_InitModule3("PyTrans2Quad", PyTrans2Quad_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
+void initPyTransd3brane_deltamax_3pt005_all(void)    {        Py_InitModule3("PyTransd3brane_deltamax_3pt005_all", PyTransd3brane_deltamax_3pt005_all_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

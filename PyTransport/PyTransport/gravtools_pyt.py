@@ -67,7 +67,7 @@ class curvatureObject:
         # Consistency check: Product of G * G^-1 = Identity
         identity_matrix = self.metric * self.metric_inverse
         identity_matrix = sym.simplify(identity_matrix)
-        assert identity_matrix == sym.Matrix.diag([1 for c in self.coords]), "G * G^-1 != I: {}".format(identity_matrix)
+        assert identity_matrix == sym.eye(self.nC), "G * G^-1 != I: {}".format(identity_matrix)
 
         # We now generate the matrix format that is ready by PyTransport backend
 
