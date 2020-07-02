@@ -354,7 +354,51 @@ def Initialize(modelnumber, rerun_model=False):
     return modelnumber
 
 
-def DemandSample(modelnumber):
+def updateStats(modelnumber, flagKey=None, timeEnd=None):
+    """ Rewrites stats object during demand sample routine """
+
+    # Get directory for sample stats log
+    sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
+    
+    if os.path.exists(sample_path):
+        with open(sample_path, "r") as f:
+            flagDict = pk.load(f)
+        pathExists=True
+    
+    else:
+        pathExists=False
+        
+        # Flag defs.
+        timeoutFlags = [
+            -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
+        ]
+    
+        integratorFlags = [
+            -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
+        ]
+    
+        samplerFlags = [
+            -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+        ]
+    
+        allFlags = timeoutFlags + integratorFlags + samplerFlags
+        flagDict = {str(f): 0 for f in allFlags}
+    
+    if flagKey in flagDict:
+        flagDict[flagKey] += 1
+    elif flagKey is None and timeEnd is not None:
+        flagDict['time'] = timeEnd
+    else:
+        raise KeyError, flagKey
+    
+    if pathExists:
+        os.remove(sample_path)
+    
+    with open(sample_path, "w") as f:
+        pk.dump(flagDict, f)
+    
+
+def DemandSample(modelnumber, rerun=False):
     """ Repeat initialization until successful sample is found """
 
     # Get directory for sample stats log
@@ -385,87 +429,88 @@ def DemandSample(modelnumber):
     while ii != modelnumber:
         
     
-        ii = Initialize(modelnumber)
+        ii = Initialize(modelnumber, rerun_model=rerun)
 
     
         # If fail flag received: log statistic
         if type(ii) is tuple:
             flagKey = str(ii[0])
-            flagDict[flagKey] += 1
+            timeEnd = None
+            # flagDict[flagKey] += 1
             
         elif type(ii) is int and ii in allFlags:
             flagKey = str(ii)
-            flagDict[flagKey] += 1
+            timeEnd = None
+            # flagDict[flagKey] += 1
     
         # If model number, sum number of iterations
         elif ii == modelnumber:
-            tfinal = time.clock() - tstart
-        
-            flagDict['time'] = tfinal
-        
-            f = open(sample_path, "wb")
-        
-            with f:
-                pk.dump(flagDict, f)
-    
+            flagKey = None
+            timeEnd = time.clock() - tstart
+
         else:
-            raise KeyError, ii
+            raise ValueError, modelnumber
+        
+        updateStats(modelnumber, flagKey=flagKey, timeEnd=timeEnd)
+        
         
 
 def DemandSample_rerun(modelnumber):
     """ Repeat initialization until successful sample is found : using rerun samples"""
 
-    # Get directory for sample stats log
-    sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
 
-    # Flag defs.
-    timeoutFlags = [
-        -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
-    ]
-
-    integratorFlags = [
-        -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
-    ]
-
-    samplerFlags = [
-        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
-    ]
-
-    allFlags = timeoutFlags + integratorFlags + samplerFlags
-    flagDict = {str(f): 0 for f in allFlags}
-
-    # Start timer
-    tstart = time.clock()
-
-    ii = -1
-
-    # If successful sample generation, the model number is returned
-    while ii != modelnumber:
-    
-        ii = Initialize(modelnumber, rerun_model=True)
-    
-        # If fail flag received: log statistic
-        if type(ii) is tuple:
-            flagKey = str(ii[0])
-            flagDict[flagKey] += 1
-    
-        elif type(ii) is int and ii in allFlags:
-            flagKey = str(ii)
-            flagDict[flagKey] += 1
-    
-        # If model number, sum number of iterations
-        elif ii == modelnumber:
-            tfinal = time.clock() - tstart
-        
-            flagDict['time'] = tfinal
-        
-            f = open(sample_path, "wb")
-        
-            with f:
-                pk.dump(flagDict, f)
-    
-        else:
-            raise KeyError, ii
+    DemandSample(modelnumber, rerun=True)
+    #
+    # # Get directory for sample stats log
+    # sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
+    #
+    # # Flag defs.
+    # timeoutFlags = [
+    #     -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
+    # ]
+    #
+    # integratorFlags = [
+    #     -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
+    # ]
+    #
+    # samplerFlags = [
+    #     -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+    # ]
+    #
+    # allFlags = timeoutFlags + integratorFlags + samplerFlags
+    # flagDict = {str(f): 0 for f in allFlags}
+    #
+    # # Start timer
+    # tstart = time.clock()
+    #
+    # ii = -1
+    #
+    # # If successful sample generation, the model number is returned
+    # while ii != modelnumber:
+    #
+    #     ii = Initialize(modelnumber, rerun_model=True)
+    #
+    #
+    #     # If fail flag received: log statistic
+    #     if type(ii) is tuple:
+    #         flagKey = str(ii[0])
+    #         timeEnd = None
+    #         # flagDict[flagKey] += 1
+    #
+    #     elif type(ii) is int and ii in allFlags:
+    #         flagKey = str(ii)
+    #         timeEnd = None
+    #         # flagDict[flagKey] += 1
+    #
+    #     # If model number, sum number of iterations
+    #     elif ii == modelnumber:
+    #         flagKey = None
+    #         timeEnd = time.clock() - tstart
+    #
+    #     else:
+    #         raise ValueError, modelnumber
+    #
+    #     updateStats(modelnumber, flagKey=flagKey, time=timeEnd)
 
 
 def Mij(modelnumber):
