@@ -226,6 +226,8 @@ def Initialize(modelnumber, rerun_model=False):
                 Nend = row[0]
                 foundEnd = True
                 break
+                
+        endIndex = min(endIndex +1, len(back))
     
         back = back[:endIndex]
         
