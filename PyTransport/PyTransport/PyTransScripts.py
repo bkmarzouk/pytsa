@@ -16,17 +16,18 @@
 
 # python code contains some useful scripts to use with the compiled PyTrans module.
 
-import numpy as np
-from scipy import interpolate
-import timeit
-import sys
-from gravtools_pyt import curvatureObject
+import gc
 import os
 import pickle as pk
-import gc
+import sys
+import timeit
 
-from scipy.interpolate import UnivariateSpline as US
+import numpy as np
 import sympy as sym
+from gravtools_pyt import curvatureObject
+from scipy import interpolate
+from scipy.interpolate import UnivariateSpline
+from scipy.optimize import minimize_scalar
 
 
 # this script finds initial conditions at least NBMassless e-folds before the massless point
@@ -41,7 +42,7 @@ def unPackAlp(threePtOut, MTE):
     sig1R = threePtOut[:, 1 + 4 + 2 * nF:1 + 4 + 2 * nF + 2 * nF * 2 * nF]
     sig2R = threePtOut[:, 1 + 4 + 2 * nF + 2 * nF * 2 * nF:1 + 4 + 2 * nF + 2 * 2 * nF * 2 * nF]
     sig3R = threePtOut[:, 1 + 4 + 2 * nF + 2 * 2 * nF * 2 * nF:1 + 4 + 2 * nF + 3 * 2 * nF * 2 * nF]
-    alp = threePtOut[:, 1 + 4 + 2 * nF + 6 * 2 * nF * 2 * nF:]
+    alpha = threePtOut[:, 1 + 4 + 2 * nF + 6 * 2 * nF * 2 * nF:]
     
     return zetaMs, np.reshape(sig1R, (np.size(threePtOut[:, 0]), 2 * nF, 2 * nF)), np.reshape(sig2R, (
         np.size(threePtOut[:, 0]), 2 * nF, 2 * nF)), np.reshape(sig3R,
@@ -62,51 +63,194 @@ def unPackSig(twoPtOut, MTE):
     return zeta, np.reshape(sig, (np.size(twoPtOut[:, 0]), 2 * nF, 2 * nF))
 
 
-def ICsBM(NBMassless, k, back, params, MTE):
-    nF = np.size(back[0, 1:]) // 2
-    massEff = -1;
+def rescaleBack(bg, Nr=70.0):
+    """
     
-    # calculate the element of back for which -k^2/a^2 + M^2 for M the largest eigenvalue of the full mass-matrix
+    Repositions background evolution to begin Nr efolds before the end of inflation.
+    Helps avoid momenta growing exponentially large.
+    
+    If Nr exceeds the length of inflation, the original background is returned.
+    
+    """
+    
+    # Get final efold of background evolution
+    Nend = bg[-1][0]
+    Nstart = bg[0][0]
+    
+    # If background evolution is sufficiently long
+    if (Nend - Nstart) > Nr:
+        
+        # Copy final row of evolution
+        out = np.copy(bg[-1])
+        
+        # Iterate over back steps from last to first
+        for row in np.flipud(bg[:-1]):
+            
+            # Compute difference between current efold and end of inflation
+            dN = Nend - row[0]
+            
+            # Stack ontop of output array
+            out = np.vstack((row, out))
+            
+            # If dN has reached the target reposition
+            if dN > Nr:
+                # Stop background repositioning, and redefine N efolution to start at zero from this point
+                out[:, 0] -= out[0][0]
+                
+                break
+    else:
+        out = bg
+    
+    # Cross check final field values haven't changed
+    assert np.all(out[-1][1:] == bg[-1][1:]), [out[-1][1:], bg[-1][1:]]
+    
+    # Finally, we check that the background hasn't been too finely sampled, s.t back[ii] == back[ii+1]
+    killRows = np.array([
+        ii for ii in range(len(out) - 1) if np.all(out[ii] == out[ii + 1])
+    ])
+    
+    killRows = killRows[::-1]
+    
+    for ii in killRows:
+        out = np.delete(out, ii, axis=0)
+    
+    return out
 
-    jj = 0
-    while (massEff < 0 and jj < np.size(back[:, 0]) - 1):
+
+def ICsBM(NBMassless, k, back, params, MTE, optimize=True):
+    """
+    
+    Computes initial conditions subject to NBMassless efolds before massless condition is realised.
+    
+    Massless condition: m^2 = (k/a)^2 : m is larges eigenvalue of the mass-squared matrix
+    
+    optimize runs a spline based estimate of the massless condition
+    
+    """
+    
+    # If running optimization, we need to make sure we don't have N_{ii} = N_{ii+1}, s.t.
+    # we build splines from strictly monotonic sequences
+    evoN = back.T[0]
+    
+    if optimize:
+        killRows = np.array([ii for ii in range(len(back) - 1) if back.T[0][ii] == back.T[0][ii + 1]])
+        killRows = killRows[::-1]
+        for ii in killRows:
+            back = np.delete(back, ii, axis=0)
+    
+    # Get eigenvalue evolution
+    evoEigs = evolveMasses(back, params, MTE)  # mi^2 / H^2
+    
+    # get fields-dotfields evolution
+    evoFields = back[:, 1:]
+    Nmassless = None
+    
+    # Initialize empty arrays for splin-point calculation
+    _Nr = np.array([0, 0, 0], dtype=float)
+    _mEffr = np.array([0, 0, 0], dtype=float)
+    
+    for ii in range(len(back) - 1):
         
-        # Note we have changed this to compute the canonical form of the full mass matrix, which is normalized by H^2
-        # Hence we also must include this factor with the momenta term
-        try:
-            w, v = np.linalg.eig(MTE.massMatrix(back[jj, 1:1 + 2*nF], params))
-            eigen = np.max(np.real(w))
-            
-            massEff = -(k/MTE.H(back[jj, 1:], params))**2 * np.exp(-2.0 * back[jj, 0]) + eigen
-            jj = jj + 1
-            
-        except np.linalg.LinAlgError:
-            print ("\n\n\n\n linalg error in Mij eigenvalues \n\n\n\n")
-            return np.nan, np.nan
+        # Get N, eigs and field vals. at background step
+        N, eigs, fieldsdotfields = evoN[ii], evoEigs[ii], evoFields[ii]
         
-    if jj == np.size(back[:, 0]):
-        print ("\n\n\n\n warning massless condition not found \n\n\n\n")
+        # Compute effective mass
+        mEff = np.max(eigs) - (k * np.exp(-N) / MTE.H(fieldsdotfields, params)) ** 2
+        
+        # Maintin 3x3 array of spline data, permuting, then replacing the last (column) element with the current value
+        _mEffr = np.roll(_mEffr, -1)
+        _Nr = np.roll(_Nr, -1)
+        _mEffr[-1] = mEff
+        _Nr[-1] = N
+        
+        # When mEff turns over to a non-negative value
+        if not mEff < 0:
+            # Define this to be the massless efold
+            Nmassless = N
+            
+            # Append one further time step of data to the arrays used for spline calculation
+            N, eigs, fieldsdotfields = evoN[ii + 1], evoEigs[ii + 1], evoFields[ii + 1]
+            mEff = np.max(eigs) - (k * np.exp(-N) / MTE.H(fieldsdotfields, params)) ** 2
+            _mEffr = np.append(_mEffr, mEff)
+            _Nr = np.append(_Nr, N)
+            
+            break
+    
+    if optimize:
+        # Build spline of effective mass as a function of N
+        m_N_spline = UnivariateSpline(_Nr, _mEffr, k=3)
+        
+        # We want to find the N that gives an effective mass of zero. This is achived by minimizing
+        # the abs val. of the spline function
+        minfunc = lambda N: abs(m_N_spline(N))
+        Nmassless = minimize_scalar(minfunc).x  # .x evaluates result
+    
+    Nstart = evoN[0]
+    
+    if Nmassless is None:
+        print ("\n\n\n\n massless condition not found \n\n\n\n")
         return np.nan, np.nan
     
-    NMassless = back[jj - 2, 0]
-    ll = 0
-    Ncond = -1.
-    while (Ncond < 0.0 and ll < np.size(back[:, 0]) - 1):
-        Ncond = back[ll, 0] - (NMassless - NBMassless)
-        ll = ll + 1
-    
-    if ll == np.size(back[:, 0]) or (NMassless - back[0, 0]) < NBMassless:
-        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+    if Nmassless - NBMassless < Nstart:
+        print ("\n\n\n\n Insufficient background to compute NB efolds before massless \n\n\n\n")
         return np.nan, np.nan
     
-    NexitMinus = back[ll - 2, 0]
-    backExitMinus = back[ll - 2, 1:]
+    # We now find the background data NBMassless efolds before the massless condition.
     
-    return NexitMinus, backExitMinus
+    icsN = None
+    icsFields = None
+    
+    # Initialize arrays for spline based calculation
+    _icsFieldsr = np.vstack((np.zeros(3, dtype=float) for ii in range(2 * MTE.nF())))
+    _icsNr = np.zeros(3, dtype=float)
+    _Neffr = np.zeros(3, dtype=float)
+    
+    # Iterate over background steps
+    for ii in range(len(evoN) - 1):
+        
+        # Unpack N and field-dot-fields
+        N, fieldsdotfields = evoN[ii], evoFields[ii]
+        
+        # When zero, we have our ICs
+        Neff = N - (Nmassless - NBMassless)
+        
+        # Permute field array and update right most col with fielddotfield vals
+        _icsFieldsr = np.roll(_icsFieldsr, -1, axis=1)
+        _icsFieldsr[:, -1] = np.array([fdf for fdf in fieldsdotfields])
+        
+        # Permute ics N array and update with current efold
+        _icsNr = np.roll(_icsNr, -1)
+        _icsNr[-1] = N
+        
+        # Permute effective N array and update with current Neff
+        _Neffr = np.roll(_Neffr, -1)
+        _Neffr[-1] = Neff
+        
+        # when N - Nmassless - Nstart >= NB 
+        if not Neff < 0:
+            icsN = N
+            icsFields = fieldsdotfields
+            
+            _icsFieldsr = np.hstack((_icsFieldsr, np.array([[fdf] for fdf in evoFields[ii + 1]])))
+            _icsNr = np.append(_icsNr, evoN[ii + 1])
+            _Neffr = np.append(_Neffr, (evoN[ii + 1] - Nstart) - (Nmassless - NBMassless))
+            
+            break
+    
+    if optimize:
+        
+        Neff_Nic_spline = UnivariateSpline(_Neffr, _icsNr, k=3)
+        Neff_Fic_splines = [UnivariateSpline(_Neffr, row) for row in _icsFieldsr]
+        
+        icsN = Neff_Nic_spline(0)
+        icsFields = np.array([spl(0) for spl in Neff_Fic_splines])
+    
+    if icsN is None:
+        print ("\n\n\n\n massless condition not found (BUG!) \n\n\n\n")
+        return np.nan, np.nan
+    
+    return icsN, icsFields
 
-
-# this script finds initial conditions at least NBExit e-folds before horizon exit of k
-# back must finely sample the backgroudn evolution for the initial conditions to be close to exactly NBMassless before
 
 def ICsBE(NBExit, k, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
@@ -172,7 +316,8 @@ def pSpectra(kA, back, params, NB, tols, MTE):
     return zzOut, times
 
 
-# calculates the power spectrum at each element in kA at the end of the background evolution (back) in a manner suitable to be called over many processes
+# calculates the power spectrum at each element in kA at the end of the background evolution (back) in a manner
+# suitable to be called over many processes
 def pSpecMpi(kA, back, params, NB, tols, MTE):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -213,7 +358,8 @@ def pSpecMpi(kA, back, params, NB, tols, MTE):
         return (np.empty, np.empty)
 
 
-# calculates the power spectrum and bisecpturm in equilateral configuration at each element in kA at the end of the background evolution (back)
+# calculates the power spectrum and bisecpturm in equilateral configuration at each element in kA at the end of the
+# background evolution (back)
 def eqSpectra(kA, back, params, NB, tols, MTE):
     zzzOut = np.array([])
     zzOut = np.array([])
@@ -244,7 +390,8 @@ def eqSpectra(kA, back, params, NB, tols, MTE):
     return zzOut, zzzOut, times
 
 
-# calculates the power spectrum and bisecpturm in equilateral configuration at each element in kA at the end of the background evolution (back) in a manner suitable to be run accoss many processes
+# calculates the power spectrum and bisecpturm in equilateral configuration at each element in kA at the end of the
+# background evolution (back) in a manner suitable to be run accoss many processes
 def eqSpecMpi(kA, back, params, NB, tols, MTE):
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -252,7 +399,7 @@ def eqSpecMpi(kA, back, params, NB, tols, MTE):
     rank = comm.Get_rank()
     size = comm.Get_size()
     points = np.size(kA)
-    num = points / size;
+    num = points / size
     
     if float(points) / size != float(points // size):
         if rank == 0:
@@ -290,7 +437,8 @@ def eqSpecMpi(kA, back, params, NB, tols, MTE):
         return (np.empty, np.empty, np.empty)
 
 
-# calcualtes the bispectrum in the alpha beta notation for a given kt at every value of the alphaIn and betIn arrays. The bispectrum is given an nsnaps times always incuding the final time of the evolution (back)
+# calcualtes the bispectrum in the alpha beta notation for a given kt at every value of the alphaIn and betIn arrays.
+# The bispectrum is given an nsnaps times always incuding the final time of the evolution (back)
 def alpBetSpectra(kt, alphaIn, betaIn, back, params, NB, nsnaps, tols, MTE):
     Hin = np.zeros(np.size(back[:, 0]))
     for jj in range(0, np.size(back[:, 0])):
@@ -430,16 +578,16 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
     
     # Build empty array to populate with efold number + eigenvalues of mass-matrix at time step
-    eigs = np.empty((len(back), 1+MTE.nF()))
+    eigs = np.empty((len(back), 1 + MTE.nF()))
     
     for idx, step in enumerate(back):
         
         # Unpack efolding and fields as np arrays
         N, fieldsdotfields = step[0], step[1:1 + 2 * MTE.nF()]
-    
+        
         # Compute mass matrix
         Mij = MTE.massMatrix(fieldsdotfields, params, hess_approx, covariant)
-    
+        
         # Compute and sort eigenvalues
         masses = np.linalg.eigvals(Mij)
         masses = np.sort(masses)
@@ -449,12 +597,180 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
         
         # Assign row values for mass-matrix
         eigs[idx] = np.concatenate((np.array([N]), masses))
-        
+    
     return eigs
 
 
+def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True, errorReturn=False, tmax=None):
+    """
+
+    Simple spline based method to compute the spectral index of a mode that exits the horizon at a time Nend - Nexit
+
+    If kPivot is None, pivot scale is treated as k(Nexit), else kPivot
+
+    If returnRunning is True, returns the first running of the spectral index
+
+    """
+    
+    # Get end of background evolution
+    Nend = back.T[0][-1]
+    
+    # We will compute the 2pf based on momenta that horizon exit 1.2-efolds above & below k pivot,
+    # defined as the mode that exits the horizon at a time Nexit
+    Npivot = Nend - Nexit
+    Nscatter = 0.6
+    Nsteps = 2
+    DeltaN = [Npivot - Nscatter + ii * Nscatter / float(Nsteps) for ii in range(Nsteps * 2 + 1)]
+    
+    # Build numpy array of momenta
+    kVals = np.array([])
+    
+    # Iterate over efolds about exit
+    for NN in DeltaN:
+        
+        # Get horizon exit mode
+        k = kexitN(NN, back, pvals, MTE)
+        
+        # if momenta has become infinite, or subject to numerical error
+        if np.isinf(k) or np.isnan(k):
+            
+            if errorReturn:
+                return ValueError, k
+            
+            raise ValueError, k
+        
+        # Append to momenta values for spline calculation
+        kVals = np.append(kVals, k)
+    
+    # Check momenta are strictly monotonically increasing
+    if not all(kVals[i] < kVals[i + 1] for i in range(len(kVals) - 1)):
+        
+        if errorReturn:
+            return ValueError, kVals
+        
+        raise ValueError, kVals
+    
+    kExit = kVals[Nsteps]
+    
+    # Get pivot scale, midpoint in spline
+    if kPivot is None:
+        kPivot = kVals[Nsteps]
+        
+    else:
+        assert type(kPivot) == float, "kPivot parameter must be float: {}".format(kPivot)
+    
+    # Build power spectra values
+    pZetaVals = np.array([])
+    
+    # Iterate over k-scales
+    for k in kVals:
+        
+        # Build initial conditions for mode based on massless condition
+        Nstart, ICs = ICsBM(subevo, k, back, pvals, MTE)
+        
+        # Check ICs are valid
+        if type(ICs) != np.ndarray and np.isnan(ICs):
+            
+            if errorReturn:
+                return ValueError, ICs
+            
+            raise ValueError, ICs
+        
+        # If no time out is given, assume no kill time
+        if tmax is None:
+            tmax = -1
+        
+        twoPf = MTE.sigEvolve(np.array([Nstart, Nend]), k, ICs, pvals, tols, False, tmax, True)
+        
+        # Handle failed calculation
+        if type(twoPf) is tuple:
+            
+            if errorReturn:
+                return ValueError, twoPf
+            
+            raise ValueError, twoPf
+        
+        # Append power spedctrum at end of background
+        pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
+    
+    #  Build log arrays in k and Pzeta
+    arrLogK = np.log(kVals / kPivot)
+    arrLogPz = np.log(pZetaVals)
+    
+    # Build 4-pt spline from log values
+    twoPtSpline = UnivariateSpline(arrLogK, arrLogPz, k=4)
+    
+    # Differentiate for ns & running
+    nsSpline = twoPtSpline.derivative()
+    alphaSpline = nsSpline.derivative()
+    
+    # Define functions to map exit scale to observables subject to kPicot
+    ns_ = lambda k: nsSpline(np.log(k / kPivot)) + 4.0
+    alpha_ = lambda k: alphaSpline(np.log(k / kPivot))
+    
+    ns = ns_(kExit)
+    alpha = alpha_(kExit)
+    
+    if returnRunning:
+        return np.array([ns, alpha])
+    
+    return ns
+
+
+def fNL(back, pvals, Nexit, tols, subevo, alpha, beta, MTE, errorReturn=False, tmax=None):
+    """
+    
+    Simple wrapper for the reduced bispectrum fNL at the end of inflation, subject to a configuration
+    defined by alpha, beta (Fergusson & Shellard), centred about the horizon exit time Nend - Nexit
+    
+    """
+    
+    # If tmax is none, assign no maximum integration time
+    if tmax is None: tmax_3pf = -1
+    
+    Nend = back.T[0][-1]
+    Npivot = Nend - Nexit
+    
+    kExit = kexitN(Npivot, back, pvals, MTE)
+    
+    # Build Fourier triangle via Fergusson Shellard convention
+    k1 = kExit / 2. - beta * kExit / 2.
+    k2 = kExit * (1. + alpha + beta) / 4.
+    k3 = kExit * (1. - alpha + beta) / 4.
+    
+    # Find largest scale; exits horizon first hence defines ICs
+    kmin = np.min([k1, k2, k3])
+    Nstart, ICs = ICsBM(subevo, kmin, back, pvals, MTE)
+    
+    if type(ICs) != np.ndarray and np.isnan(ICs):
+        
+        if errorReturn:
+            return ValueError, ICs
+        
+        raise ValueError, ICs
+    
+    # Compute three-point function up until end of background
+    threePt = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, pvals, tols, True, tmax_3pf, True)
+    
+    # If flag has been returned when computing 3pf, return flag data
+    if type(threePt) is tuple:
+        
+        if errorReturn:
+            return ValueError, threePt
+        
+        raise ValueError, threePt
+    
+    # Compute amplitude of fNL at end of inglation
+    Pz1, Pz2, Pz3, Bz = [threePt.T[i][-1] for i in range(1, 5)]
+    fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
+    
+    return fNL
+
+
 def GetCurvatureObject(MTE):
-    """ Returns the class 'curvature' object associate with the MTE module """
+    """
+    Returns the class 'curvature' object associate with the MTE module
+    """
     
     # Find curvature records directory and create file instance to lead curvature class obj.
     dir = os.path.dirname(__file__)
