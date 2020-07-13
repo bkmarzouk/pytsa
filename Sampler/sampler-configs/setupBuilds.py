@@ -198,8 +198,8 @@ class bispectrumCfgTemplate:
     def addBispectrumConfiguration(self, name, latex, alpha, beta):
         assert type(name) is str, "configuration name must be string"
         assert type(latex) is str, "latex definition must be string"
-        assert type(alpha) is float, "alpha parameter must be float"
-        assert type(beta) is float, "beta parameter must be float"
+        assert type(alpha) is float or alpha is None, "alpha parameter must be float"
+        assert type(beta) is float or alpha is None, "beta parameter must be float"
         
         if not hasattr(self, "fNLConfigs"): self.fNLConfigs = []
         

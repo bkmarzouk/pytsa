@@ -18,7 +18,9 @@ model.setInitialFieldVelocities(-1, "SR")
 model.setParameterValues(-1, "numpy.exp(numpy.random.uniform(-6, -1))", "numpy")
 
 # Set configurations for the reduced-Bispectrum
-model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", 1./3., 1./3.)
+model.addBispectrumConfiguration("eq", "$f_{NL}^{eq}", None, None)
+model.addBispectrumConfiguration("fo", "$f_{NL}^{fo}", None, None)
+model.addBispectrumConfiguration("sq", "$f_{NL}^{sq}", None, None)
 
 # Once the parameters have been set, we simply execute buildSampler
 model.recordFieldValue(0, "\chi_{0}")

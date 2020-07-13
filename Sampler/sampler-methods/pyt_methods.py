@@ -100,11 +100,12 @@ def buildICPs(modelnumber, rerun_model=False):
     return np.concatenate((fvals, vvals)), pvals
 
 
-def Initialize(modelnumber, rerun_model=False):
+def Initialize(modelnumber, rerun_model=False, initial=None, pvals=None, returnSample=False):
     
     tmax_bg = int(os.environ['tmax_bg'])
     
-    initial, pvals = buildICPs(modelnumber, rerun_model)
+    if initial is None and pvals is None:
+        initial, pvals = buildICPs(modelnumber, rerun_model)
 
     """ We have the following flags in place:
     
@@ -279,32 +280,8 @@ def Initialize(modelnumber, rerun_model=False):
     # Track *actual* initial conditions prior to repositioning
     initial_0 = initial
     
-    # If inflation lasts for more than 70 efolds, reposition ICS s.t. we avoid exponentially large momenta
-    if Nend > 70.0:
-        
-        # Search background from bottom to top
-        for row in np.flipud(back):
-
-            # When the background step is 70 efolds away from the "end" of inflation
-            if Nend - row[0] > 70:
-                
-                # Redefine initial conditions to this point & rerun background compution
-                initial = row[1:]
-                Nend = Nend - row[0]
-                
-                t = np.linspace(0.0, Nend, int((Nend - 0) * 3))
-                back_adj = PyT.backEvolve(t, initial, pvals, tols, False, tmax_bg, True)
-                
-                if type(back_adj) != np.ndarray:
-                    back_adj = back
-                
-                if back_adj[-1][0] != back[-1][0]:
-                    back_adj = back
-                
-                # Break out of search window
-                break
-    else:
-        back_adj = back
+    # Rescale background to start at Nend - minN to avoid exp. large k
+    back_adj = PyS.rescaleBack(back, Nr=minN+10)
 
     # Attempt computation of momenta at horizon crossing, this will be used in all calculations of observables
     kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
@@ -320,7 +297,7 @@ def Initialize(modelnumber, rerun_model=False):
     
     # Find first efoldign to perform eigenvalue test
     try:
-        adiabaticN_start = np.where(back.T[0] >= Nend - adiabaticN)[0][0]
+        adiabaticN_start = np.where(back.T[0] >= back_adj[-1][0] - adiabaticN)[0][0]
     except IndexError:
         return -21
     
@@ -430,9 +407,7 @@ def DemandSample(modelnumber, rerun=False):
     # If successful sample generation, the model number is returned
     while ii != modelnumber:
         
-    
         ii = Initialize(modelnumber, rerun_model=rerun)
-
     
         # If fail flag received: log statistic
         if type(ii) is tuple:
@@ -458,64 +433,16 @@ def DemandSample(modelnumber, rerun=False):
         
 
 def DemandSample_rerun(modelnumber):
-    """ Repeat initialization until successful sample is found : using rerun samples"""
-
-
+    """
+    Repeat initialization until successful sample is found : using rerun samples
+    """
     DemandSample(modelnumber, rerun=True)
-    #
-    # # Get directory for sample stats log
-    # sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
-    #
-    # # Flag defs.
-    # timeoutFlags = [
-    #     -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
-    # ]
-    #
-    # integratorFlags = [
-    #     -20, -21, -22, -23  # end of inflation, background, 2pf, 3pf
-    # ]
-    #
-    # samplerFlags = [
-    #     -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
-    # ]
-    #
-    # allFlags = timeoutFlags + integratorFlags + samplerFlags
-    # flagDict = {str(f): 0 for f in allFlags}
-    #
-    # # Start timer
-    # tstart = time.clock()
-    #
-    # ii = -1
-    #
-    # # If successful sample generation, the model number is returned
-    # while ii != modelnumber:
-    #
-    #     ii = Initialize(modelnumber, rerun_model=True)
-    #
-    #
-    #     # If fail flag received: log statistic
-    #     if type(ii) is tuple:
-    #         flagKey = str(ii[0])
-    #         timeEnd = None
-    #         # flagDict[flagKey] += 1
-    #
-    #     elif type(ii) is int and ii in allFlags:
-    #         flagKey = str(ii)
-    #         timeEnd = None
-    #         # flagDict[flagKey] += 1
-    #
-    #     # If model number, sum number of iterations
-    #     elif ii == modelnumber:
-    #         flagKey = None
-    #         timeEnd = time.clock() - tstart
-    #
-    #     else:
-    #         raise ValueError, modelnumber
-    #
-    #     updateStats(modelnumber, flagKey=flagKey, time=timeEnd)
 
 
 def Mij(modelnumber):
+    """
+    Computes the eigenvalues of the mass-square-matrix at horizon crossing
+    """
     
     # Unload sample data
     path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
@@ -640,89 +567,35 @@ def SpectralIndex(modelnumber):
     assert sample.modelnumber == modelnumber, "Pickled model data does not match! {m1} != {m2}".format(
         m1=modelnumber, m2=sample.modelnumber
     )
-
-    # Unpack background information
-    back = sample.background
-    Nend = sample.Nend
     
-    assert Nend is not None, "Nend = None should not be a saved sample"
-    pvals = np.asarray(sample.parameters)
-
-    # Begin timer
+    # def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True, errorReturn=False, tmax=None):
     ti = time.clock()
+    ns_alpha = PyS.spectralIndex(
+        sample.background, sample.parameters, Nexit, tols, subevo, PyT, errorReturn=True, tmax=tmax_2pf)
 
-    # We will compute the 2pf based on momenta that horizon exit 1.2-efolds about k pivot
-    Npivot = Nend - Nexit
-    Nscatter = 0.6
-    Nsteps = 2
-    DeltaN = [Npivot - Nscatter + ii*Nscatter/float(Nsteps) for ii in range(Nsteps*2 + 1)]
-
-    kVals = np.array([])
-    for NN in DeltaN:
-        
-        k = PyS.kexitN(NN, back, pvals, PyT)
-        
-        if np.isinf(k) or np.isnan(k):
+    # Check for failed ns calculation
+    if isinstance(ns_alpha, tuple):
+        if ns_alpha[0] is ValueError:
             
-            # Build null result file
-            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
-    
-            # Update sample
-            sample.update_observables(twoPt_dict)
-    
-            return {"mn": modelnumber, "flag": -31, "ext": "2pf"}
-        
-        kVals = np.append(kVals, k)
-
-    # Check momenta are monotonically increasing
-    assert all(kVals[i]<kVals[i+1] for i in range(len(kVals)-1)), kVals
-
-    # Get pivot scale
-    kPivot = kVals[Nsteps]
-    
-    # Build power spectra values
-    pZetaVals = np.array([])
-    for k in kVals:
-        
-        # Get ICs from massless condition
-        Nstart, ICs = PyS.ICsBM(subevo, k, back, pvals, PyT)
-        
-        if type(ICs) != np.ndarray and np.isnan(ICs):
+            errKey = ns_alpha[1]
             
-            # Build null result file
-            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
-    
-            # Update sample
-            sample.update_observables(twoPt_dict)
-                
-            return {"mn": modelnumber, "flag": -32, "ext": "2pf"}
-
-        twoPf = PyT.sigEvolve(np.array([Nstart, Nend]), k, ICs, pvals, tols, False, tmax_2pf, True)
-        
-        if type(twoPf) is tuple:
+            # Define error dictionary to return
+            if errKey == "k":
+                retDict = {"mn": modelnumber, "flag": -31, "ext": "2pf"}
+            elif errKey == "ics":
+                retDict = {"mn": modelnumber, "flag": -32, "ext": "2pf"}
+            elif errKey == "2pf":
+                retDict = {"mn": modelnumber, "flag": ns_alpha[2][0], "ext": "2pf"}
+            else:
+                raise KeyError, "Unknown error: {}".format(errKey)
             
-            # Build null result file
-            twoPt_dict = {'ns': None, 'alpha': None, 'T_2pf': None}
+            # Update sample with null result
+            sample.update_observables({'ns': None, 'alpha': None, 'T_2pf': None})
+            
+            return retDict
     
-            # Update sample
-            sample.update_observables(twoPt_dict)
-                
-            return {"mn": modelnumber, "flag": twoPf[0], "ext": "2pf"}
-        
-        pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
-        
-    twoPtSpline = UnivariateSpline(
-        np.log(kVals/kPivot), np.log(pZetaVals), k=4
-    )
-    
-    nsSpline = twoPtSpline.derivative()
-    alphaSpline = nsSpline.derivative()
-    
-    ns_ = lambda k: nsSpline(np.log(k/kPivot)) + 4.0
-    alpha_ = lambda k: alphaSpline(np.log(k/kPivot))
-    
-    ns = ns_(kPivot)
-    alpha = alpha_(kPivot)
+    # Unpack 2pt observables
+    ns, alpha = ns_alpha
 
     # End calculation timer and build results dictionaryobs_
     twoPt_dict = {'ns': ns, 'alpha': alpha, 'T_2pf': time.clock() - ti}
@@ -732,10 +605,12 @@ def SpectralIndex(modelnumber):
 
     return 0
 
+
 def fNL(modelnumber, configName):
     
     tmax_3pf = int(os.environ['tmax_3pf'])
     
+    name = None
     # Gather configuration data from configName
     for d in fNLDict:
         if d['name'] == configName:
@@ -743,6 +618,9 @@ def fNL(modelnumber, configName):
             alpha = d['alpha']
             beta  = d['beta']
             break
+    
+    # Check that fNL definition has been found
+    assert name is not None, "Unable to locate fNL configuration in localdata: {}".format(name)
 
     # Unload sample data
     path = os.path.join(pathSamples, "{}.sample".format(modelnumber))
@@ -755,62 +633,33 @@ def fNL(modelnumber, configName):
     assert sample.modelnumber == modelnumber, "Pickled model data does not match! {m1} != {m2}".format(
         m1=modelnumber, m2=sample.modelnumber
     )
-
-    # Unpack background data
-    back = sample.background
-    Nend = sample.Nend
-    assert Nend is not None, "Nend = None should not be a saved sample"
-    kExit = sample.kExit
-    pvals = np.asarray(sample.parameters)
-
     # Begin timer
     ti = time.clock()
-
-    # Build Fourier triangle via Fergusson Shellard convention
-    k1 = kExit / 2. - beta * kExit / 2.
-    k2 = kExit * (1. + alpha + beta) / 4.
-    k3 = kExit * (1. - alpha + beta) / 4.
-
-    # Find smallest momentum: Build ICs from largest scale mode
-    kmin = np.min([k1, k2, k3])
     
-    # Compute three-point function
-
-    # Compute initial conditions
-    Nstart, ICs = PyS.ICsBM(subevo, kmin, back, pvals, PyT)
-    
-    if type(ICs) != np.ndarray and np.isnan(ICs):
-        
-        # Build result dictionary
-        threePt_Dict = {'{}'.format(name): None, 'T_{}'.format(configName): None}
-
-        # Update sample observables
-        sample.update_observables(threePt_Dict)
-    
-        return {"mn": modelnumber, "flag": -33, "ext": name}
-
-    # Compute 3pt function
-    threePt = PyT.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, pvals, tols, True, tmax_3pf, True)
-
-    # If flag has been returned when computing 3pf, return flag data
-    if type(threePt) is tuple:
-
-        # Build result dictionary
-        threePt_Dict = {'{}'.format(name): None, 'T_{}'.format(configName): None}
-
-        # Update sample observables
-        sample.update_observables(threePt_Dict)
-            
-        return {"mn": modelnumber, "flag": threePt[0], "ext": name}
-    
-    # Transpose data into rows
-    threePt = threePt.T
-
-    # Get power spectra and bispectrum for triangule
-    Pz1, Pz2, Pz3, Bz = [threePt[i][-1] for i in range(1, 5)]
-
     # Compute fNL
-    fNL = (5. / 6.) * Bz / (Pz1 * Pz2 + Pz2 * Pz3 + Pz1 * Pz3)
+    fNL = PyS.fNL(
+        sample.background, sample.parameters, Nexit, tols, subevo, PyT, alpha=alpha, beta=beta, stdConfig=name, errorReturn=True, tmax=tmax_3pf)
+
+    # Check for failed fNL calculation calculation
+    if isinstance(fNL, tuple):
+        if fNL[0] is ValueError:
+        
+            errKey = fNL[1]
+        
+            # Define error dictionary to return
+            if errKey == "k":
+                retDict = {"mn": modelnumber, "flag": -31, "ext": "3pf"}
+            elif errKey == "ics":
+                retDict = {"mn": modelnumber, "flag": -33, "ext": "3pf"}
+            elif errKey == "3pf":
+                retDict = {"mn": modelnumber, "flag": fNL[2][0], "ext": "3pf"}
+            else:
+                raise KeyError, "Unknown error: {}".format(errKey)
+        
+            # Update sample with null result
+            sample.update_observables({'{}'.format(name): None, 'T_{}'.format(configName): None})
+        
+            return retDict
 
     # Build result dictionary
     threePt_Dict = {'{}'.format(name): fNL, 'T_{}'.format(configName): time.clock() - ti}
@@ -833,17 +682,20 @@ def computations(mn_calc):
         if calculation == "masses":
             print "-- Start MAb: model %06d" % modelnumber
             r = Mij(modelnumber)
-            print "--   End MAb: model %06d" % modelnumber
+            status = "" if r == 0 else ", failed"
+            print "--   End MAb: model %06d" % modelnumber + status
 
         elif calculation == "2pf":
             print "-- Start 2pf: model %06d" % modelnumber
             r = SpectralIndex(modelnumber)
-            print "--   End 2pf: model %06d" % modelnumber
+            status = "" if r == 0 else ", failed"
+            print "--   End 2pf: model %06d" % modelnumber + status
 
         elif calculation not in ["masses", "2pf"]:
             print "-- Start fNL: model %06d, config {}".format(calculation) % modelnumber
             r = fNL(modelnumber, calculation)
-            print "--   End fNL: model %06d, config {}".format(calculation) % modelnumber
+            status = "" if r == 0 else ", failed"
+            print "--   End fNL: model %06d, config {}".format(calculation) % modelnumber + status
 
         else:
             raise ValueError, "Undefined calculation: {}".format(calculation)

@@ -4,6 +4,7 @@ import sys
 import pickle as pk
 import csv
 import shutil
+import numpy as np
 
 # Retrieve paths from environment variables
 envKeys = [
@@ -187,7 +188,7 @@ def write_error_report():
         "-- Miscellaneous:\n",
         "Inflation too short:               {}\n".format(totDict['-30']),
         "Unable to find end of inflation:   {}\n".format(totDict['-35']),
-        "Unable to find momenta:            {}\n".format(totDict['-31']),
+        "Unable to find momenta (all):      {}\n".format(totDict['-31']),
         "Unable to find ICs (2pf):          {}\n".format(totDict['-32']),
         "Unable to find ICs (3pf):          {}\n".format(totDict['-33']),
         "Model violation:                   {}\n\n".format(totDict['-34']),
@@ -204,7 +205,7 @@ def write_error_report():
 
     summary_file = open(os.path.join(pathRoot, "outputs", "sampling_summary.txt"), "w")
     
-    with summary_file as f:
+    with summary_file:
         summary_file.writelines(lines)
 
 
@@ -241,37 +242,51 @@ def compress_samples(undo=False):
                 os.remove(item)
 
     else:
-        # open ensemble pickle file
-        ensemblePickles = open(os.path.join(pathSamples, "ensemble.samples"), "rb")
         
-        # Start sample count
-        sampleCounter = 0
+        ensemblePaths = os.listdir(pathSamples)
         
-        try:
+        if len(ensemblePaths) == 1 and ensemblePaths[0] == "ensemble.samples":
             
-            print "\n\n-- Unpacking ensemble samples\n\n"
+            # open ensemble pickle file
+            ensemblePickles = open(os.path.join(pathSamples, "ensemble.samples"), "rb")
             
-            with ensemblePickles:
+            # Start sample count
+            sampleCounter = 0
+            
+            try:
                 
-                # Keep unloading files until an EOFError is raise
-                while True:
-                    
-                    s = pk.load(ensemblePickles)
-                    
-                    modelnumber = s.modelnumber
-                    
-                    # Write with standard syntax as before
-                    samplePickle = open(os.path.join(pathSamples, "{}.sample").format(modelnumber), "wb")
-                    
-                    with samplePickle: pk.dump(s, samplePickle)
-                    
-                    sampleCounter += 1
+                print "\n\n-- Unpacking ensemble samples\n\n"
                 
-        except EOFError:
-            print "\n\n-- Unpack complete: {} samples\n\n".format(sampleCounter)
-            os.remove(os.path.join(pathSamples, "ensemble.samples"))
+                with ensemblePickles:
+                    
+                    # Keep unloading files until an EOFError is raise
+                    while True:
+                        
+                        s = pk.load(ensemblePickles)
+                        
+                        modelnumber = s.modelnumber
+                        
+                        # Write with standard syntax as before
+                        samplePickle = open(os.path.join(pathSamples, "{}.sample").format(modelnumber), "wb")
+                        
+                        with samplePickle: pk.dump(s, samplePickle)
+                        
+                        sampleCounter += 1
+            
+            except EOFError: # Raised when ran out of binary objects in file
+                print "\n\n-- Unpack complete: {} samples\n\n".format(sampleCounter)
+                os.remove(os.path.join(pathSamples, "ensemble.samples"))
+              
+        elif np.all([item.endswith(".sample") for item in os.listdir(pathSamples)]): # If previous run didn't reach unpack stage
+            print "\n\n-- Samples already uncompressed \n\n"
+            
+        elif len(os,listdir(pathSamples)) == 0: # No samples found
+            raise OSError, "No samples found in {}".format(pathSamples)
+        
+        else: # Something else...
+            raise OSError, "Unrecognized files in {}".format(pathSamples)
 
-def write_results():
+def write_results(rerun=False):
 
     headers = ('weight', 'like')
     paths   = [ os.path.join(pathSamples, m) for m in os.listdir(pathSamples)]
@@ -343,6 +358,13 @@ def write_results():
     # Iterate over all sample paths
     for p in paths:
         
+        print p, rerun
+        
+        if rerun:
+            with open(p, "rb") as f:
+                s = pk.load(f)
+            s.check_reject()
+        
         # Open sample
         f = open(p, "rb")
         
@@ -351,6 +373,7 @@ def write_results():
             
             # load binary file and get sample line from method
             s = pk.load(f)
+            
             d = s.line_dict()
 
             # If the sample hasn't been rejected on account of failed computation(s)
