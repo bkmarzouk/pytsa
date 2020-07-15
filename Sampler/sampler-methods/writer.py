@@ -63,6 +63,12 @@ def bg_summary():
     
     # Build paths to pickled minor stats
     bgd = os.path.join(pathStats, "bg") # bg dir
+    
+    mdir = os.path.join(pathStats, "mij")
+    
+    if not os.path.exists(mdir):
+        os.makedirs(mdir)
+    
     stat_paths = [os.path.join(bgd, item) for item in os.listdir(bgd)]
     
     # Set counters dictionary (will sum minor stats)
@@ -76,7 +82,7 @@ def bg_summary():
     ]
 
     samplerFlags = [
-        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+        -30, -31, -32, -33, -34, -35, -36  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal, mij
     ]
 
     allFlags = timeoutFlags + integratorFlags + samplerFlags
@@ -95,6 +101,8 @@ def bg_summary():
             except:
                 raise OSError, sp
         
+        print stats
+        
         # add corresponding dictionary keys
         for k in allKeys:
             totDict[k] += stats[k]
@@ -112,9 +120,11 @@ def bg_summary():
 def write_error_report():
     
     # Build paths to pickled minor stats
+    mijDir = os.path.join(pathStats, "mij")
     twoptDir = os.path.join(pathStats, "2pf")
     threeptDir = os.path.join(pathStats, "3pf")
     
+    mij_paths = [os.path.join(mijDir, p) for p in os.listdir(mijDir)]
     twopt_paths = [os.path.join(twoptDir, p) for p in os.listdir(twoptDir)]
     threept_paths = [os.path.join(threeptDir, p) for p in os.listdir(threeptDir)]
     
@@ -129,7 +139,7 @@ def write_error_report():
     ]
     
     samplerFlags = [
-        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+        -30, -31, -32, -33, -34, -35, -36  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
     ]
     
     allFlags = timeoutFlags + integratorFlags + samplerFlags
@@ -137,21 +147,33 @@ def write_error_report():
     
     totDict   = {k: 0 for k in allKeys}
 
-    # Combine 2pt error stats
-    for p in twopt_paths + threept_paths:
+    sumBG = os.path.join(pathStats, "summary_bg.pk")
+    sumObs = os.path.join(pathStats, "summary_obs.pk")
+
+    if os.path.exists(sumObs):
+        
+        with open(sumObs, "rb") as f:
+            
+            totDict = pk.load(f)
     
-        f = open(p, "rb")
-        with f: s = pk.load(f)
+    else:
     
-        k = str(s['flag'])
-        totDict[k] += 1
+        # Combine 2pt error stats
+        for p in mij_paths + twopt_paths + threept_paths:
+        
+            f = open(p, "rb")
+            with f: s = pk.load(f)
+        
+            k = str(s['flag'])
+            totDict[k] += 1
+    
+        for p in mij_paths + twopt_paths + threept_paths:
+            os.remove(p)
+    
+        f = open(sumObs, "wb")
+        with f: pk.dump(totDict, f)
 
-    for p in twopt_paths + threept_paths: os.remove(p)
-
-    f = open(os.path.join(pathStats, "summary_2pf_3pf.pk"), "wb")
-    with f: pk.dump(totDict, f)
-
-    g = open(os.path.join(pathStats, "summary_bg.pk"), "rb")
+    g = open(sumBG, "rb")
     with g:
         bgStats = pk.load(g)
     
@@ -191,7 +213,8 @@ def write_error_report():
         "Unable to find momenta (all):      {}\n".format(totDict['-31']),
         "Unable to find ICs (2pf):          {}\n".format(totDict['-32']),
         "Unable to find ICs (3pf):          {}\n".format(totDict['-33']),
-        "Model violation:                   {}\n\n".format(totDict['-34']),
+        "Model violation:                   {}\n".format(totDict['-34']),
+        "Eigs linalg. error:                {}\n\n".format(totDict['-36']),
         
         "Total number of rejections:        {}\n\n".format(totFailCounter),
         
@@ -276,13 +299,13 @@ def compress_samples(undo=False):
             except EOFError: # Raised when ran out of binary objects in file
                 print "\n\n-- Unpack complete: {} samples\n\n".format(sampleCounter)
                 os.remove(os.path.join(pathSamples, "ensemble.samples"))
-              
+
+        elif len(os.listdir(pathSamples)) == 0:  # No samples found
+            raise OSError, "No samples found in {}".format(pathSamples)
+        
         elif np.all([item.endswith(".sample") for item in os.listdir(pathSamples)]): # If previous run didn't reach unpack stage
             print "\n\n-- Samples already uncompressed \n\n"
             
-        elif len(os,listdir(pathSamples)) == 0: # No samples found
-            raise OSError, "No samples found in {}".format(pathSamples)
-        
         else: # Something else...
             raise OSError, "Unrecognized files in {}".format(pathSamples)
 
@@ -357,8 +380,6 @@ def write_results(rerun=False):
 
     # Iterate over all sample paths
     for p in paths:
-        
-        print p, rerun
         
         if rerun:
             with open(p, "rb") as f:

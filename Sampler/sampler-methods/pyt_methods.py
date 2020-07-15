@@ -357,7 +357,7 @@ def updateStats(modelnumber, flagKey=None, timeEnd=None):
         ]
     
         samplerFlags = [
-            -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+            -30, -31, -32, -33, -34, -35, -36  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
         ]
     
         allFlags = timeoutFlags + integratorFlags + samplerFlags
@@ -380,9 +380,9 @@ def updateStats(modelnumber, flagKey=None, timeEnd=None):
 def DemandSample(modelnumber, rerun=False):
     """ Repeat initialization until successful sample is found """
 
-    # Get directory for sample stats log
-    sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
-
+    # # Get directory for sample stats log
+    # sample_path = os.path.join(pathStats, "bg", "{}.bg".format(modelnumber))
+    #
     # Flag defs.
     timeoutFlags = [
         -10, -11, -12, -13  # end of inflation, background, 2pf, 3pf
@@ -393,11 +393,11 @@ def DemandSample(modelnumber, rerun=False):
     ]
 
     samplerFlags = [
-        -30, -31, -32, -33, -34, -35  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal
+        -30, -31, -32, -33, -34, -35, -36  # N < Nmin, k not found, no ICs 2pf, no ICs 3pf, model violation, eternal, mij eig fail
     ]
 
     allFlags = timeoutFlags + integratorFlags + samplerFlags
-    flagDict = {str(f): 0 for f in allFlags}
+    # flagDict = {str(f): 0 for f in allFlags}
 
     # Start timer
     tstart = time.clock()
@@ -532,11 +532,26 @@ def Mij(modelnumber):
 
         # Evaluate the background at N_star = Nend - Nexit
         back_star = np.concatenate([np.array([Nstar]), np.array([s(Nstar) for s in fsplines + vsplines])])
+    
+    
+    try:
+        # Compute mass matrix eigenvalues at the exit time
+        Mij = PyS.evolveMasses(
+            np.array([back_star]), pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)[0][1:]
         
-    # Compute mass matrix eigenvalues at the exit time
-    Mij = PyS.evolveMasses(
-        np.array([back_star]), pvals, PyT, scale_eigs=False, hess_approx=False, covariant=False)[0][1:]
+    except np.linalg.LinAlgError:
+    
+        # Build dictionary of masses
+        Mij_eig = {}
+        for i in range(PyT.nF()):
+            Mij_eig['m{}'.format(i)] = None
+        
+        Mij_eig['T_masses'] = None
+        
+        sample.update_observables(Mij_eig)
 
+        return {"mn": modelnumber, "flag": -36, "ext": "mij"}
+        
     # Build dictionary of masses
     Mij_eig = {}
     for i in range(len(Mij)):
@@ -701,22 +716,23 @@ def computations(mn_calc):
             raise ValueError, "Undefined calculation: {}".format(calculation)
         
         if r != 0:
-            
-            # TODO: Add error stats for mass-matrix. Though this should be stable.
-            
-            if calculation == "masses": pass
-            
+                
+            # Determine subdirectory for error records
+            # For now, we will store masses fails in 2pf dir to avoid restructuring
+            if calculation == "masses":
+                subdir = "mij"
+            elif calculation == "2pf":
+                subdir = "2pf"
+            elif calculation == "3pf":
+                subdir = "3pf"
             else:
-                
-                # Determine subdirectory for error records
-                if calculation == "2pf": subdir = calculation
-                else: subdir = "3pf"
-                
-                # Get / remove extension key from dictionary
-                pkEXT = r.pop('ext')
-                
-                # Dump dictionary object
-                pkPath = os.path.join(pathStats, subdir, "{}.{}".format(modelnumber, pkEXT))
-                
-                pkFile = open(pkPath, "wb")
-                with pkFile: pk.dump(r, pkFile)
+                raise KeyError, "Undefined calculation type: {}".format(calculation)
+            
+            # Get / remove extension key from dictionary, used to discriminate 3pf varieties
+            pkEXT = r.pop('ext')
+            
+            # Dump dictionary object
+            pkPath = os.path.join(pathStats, subdir, "{}.{}".format(modelnumber, pkEXT))
+            
+            pkFile = open(pkPath, "wb")
+            with pkFile: pk.dump(r, pkFile)

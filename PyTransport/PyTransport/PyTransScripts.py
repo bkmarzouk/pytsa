@@ -96,7 +96,8 @@ def rescaleBack(bg, Nr=70.0):
             if dN > Nr:
                 # Stop background repositioning, and redefine N efolution to start at zero from this point
                 out[:, 0] -= out[0][0]
-                
+
+    
                 break
     else:
         out = bg
@@ -635,7 +636,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
         if np.isinf(k) or np.isnan(k):
             
             if errorReturn:
-                return ValueError, k
+                return ValueError, "k"
             
             raise ValueError, k
         
@@ -646,7 +647,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     if not all(kVals[i] < kVals[i + 1] for i in range(len(kVals) - 1)):
         
         if errorReturn:
-            return ValueError, kVals
+            return ValueError, "k"
         
         raise ValueError, kVals
     
@@ -672,7 +673,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
         if type(ICs) != np.ndarray and np.isnan(ICs):
             
             if errorReturn:
-                return ValueError, ICs
+                return ValueError, "ics"
             
             raise ValueError, ICs
         
@@ -686,7 +687,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
         if type(twoPf) is tuple:
             
             if errorReturn:
-                return ValueError, twoPf
+                return ValueError, "2pf", twoPf
             
             raise ValueError, twoPf
         
@@ -717,7 +718,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     return ns
 
 
-def fNL(back, pvals, Nexit, tols, subevo, alpha, beta, MTE, errorReturn=False, tmax=None):
+def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None, errorReturn=False, tmax=None):
     """
     
     Simple wrapper for the reduced bispectrum fNL at the end of inflation, subject to a configuration
@@ -725,38 +726,76 @@ def fNL(back, pvals, Nexit, tols, subevo, alpha, beta, MTE, errorReturn=False, t
     
     """
     
+    if alpha is None and beta is None:
+        assert stdConfig is not None, "Without supplying alpha and beta parameters, we must pass a standard config. " \
+                                      "name: 'squeezed', 'folded', 'equilateral' [or abrv. 'sq', 'fo', 'eq']"
+    
     # If tmax is none, assign no maximum integration time
-    if tmax is None: tmax_3pf = -1
+    if tmax is None:
+        tmax = -1
     
     Nend = back.T[0][-1]
     Npivot = Nend - Nexit
     
     kExit = kexitN(Npivot, back, pvals, MTE)
     
-    # Build Fourier triangle via Fergusson Shellard convention
-    k1 = kExit / 2. - beta * kExit / 2.
-    k2 = kExit * (1. + alpha + beta) / 4.
-    k3 = kExit * (1. - alpha + beta) / 4.
+    if kExit == np.inf or kExit == np.nan:
+        
+        if errorReturn:
+            return ValueError, "k"
+        
+        raise ValueError, kExit
     
-    # Find largest scale; exits horizon first hence defines ICs
+    # Build Fourier triangle via Fergusson Shellard convention;
+    _k1 = lambda k, alpha, beta: k * (1. - beta) / 2.
+    _k2 = lambda k, alpha, beta: k * (1. + alpha + beta) / 4.
+    _k3 = lambda k, alpha, beta: k * (1. - alpha + beta) / 4.
+    
+    if stdConfig is not None:
+        
+        if stdConfig in ["eq", "equal", "equilateral"]:
+            alpha, beta = 0, 1./3.
+        
+        elif stdConfig in ["fo", "fold", "folded"]:
+            alpha, beta = -0.5, 0.5
+        
+        elif stdConfig in ["sq", "squeeze", "squeezed"]:
+            alpha, beta = 0.9, 0.01
+
+        else:
+            assert alpha is not None, "Must supply alpha: {}".format(alpha)
+            assert beta is not None, "Must supply beta: {}".format(beta)
+    
+    # Compute momentum triangle
+    k1 = _k1(kExit, alpha, beta)
+    k2 = _k2(kExit, alpha, beta)
+    k3 = _k3(kExit, alpha, beta)
+    
+    # Check momenta
+    for k, lab in zip([k1, k2, k3], ['k1', 'k2', 'k3']):
+        assert k != np.inf, "Invalid {} = {}".format(lab, k)
+        assert k != np.nan, "Invalid {} = {}".format(lab, k)
+        assert k not in [0, 0.0], "Invalid {} = {}".format(lab, k)
+    
+    # Find larges scale and compute ICs
     kmin = np.min([k1, k2, k3])
     Nstart, ICs = ICsBM(subevo, kmin, back, pvals, MTE)
     
     if type(ICs) != np.ndarray and np.isnan(ICs):
         
         if errorReturn:
-            return ValueError, ICs
+            return ValueError, "ics"
         
         raise ValueError, ICs
     
     # Compute three-point function up until end of background
-    threePt = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, pvals, tols, True, tmax_3pf, True)
+    threePt = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, pvals, tols, True, tmax, True)
     
     # If flag has been returned when computing 3pf, return flag data
     if type(threePt) is tuple:
         
         if errorReturn:
-            return ValueError, threePt
+            return ValueError, "3pf", threePt
         
         raise ValueError, threePt
     

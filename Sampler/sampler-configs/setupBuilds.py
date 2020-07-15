@@ -388,6 +388,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.root = os.path.join(self.saveLocation, self.name)
         self.stats_dir = os.path.join(self.root, "stats")
         self.stats_dir_bg = os.path.join(self.stats_dir, "bg")
+        self.stats_dir_mij = os.path.join(self.stats_dir, "mij")
         self.stats_dir_2pf = os.path.join(self.stats_dir, "2pf")
         self.stats_dir_3pf = os.path.join(self.stats_dir, "3pf")
         self.samples_dir = os.path.join(self.root, "samples")
@@ -399,7 +400,7 @@ class PyTransportSampler(icpsCfgTemplate, bispectrumCfgTemplate):
         self.methods_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../sampler-methods"))
         
         # Build paths as required, subject to whether the model file is being updated
-        for item in [self.root, self.stats_dir, self.stats_dir_bg,
+        for item in [self.root, self.stats_dir, self.stats_dir_bg, self.stats_dir_mij,
                      self.stats_dir_2pf, self.stats_dir_3pf, self.samples_dir, self.outputs_dir, self.localdata_dir]:
             
             if update is False:
