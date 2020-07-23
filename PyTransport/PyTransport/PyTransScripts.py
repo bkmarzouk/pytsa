@@ -96,8 +96,7 @@ def rescaleBack(bg, Nr=70.0):
             if dN > Nr:
                 # Stop background repositioning, and redefine N efolution to start at zero from this point
                 out[:, 0] -= out[0][0]
-
-    
+                
                 break
     else:
         out = bg
@@ -239,7 +238,6 @@ def ICsBM(NBMassless, k, back, params, MTE, optimize=True):
             break
     
     if optimize:
-        
         Neff_Nic_spline = UnivariateSpline(_Neffr, _icsNr, k=3)
         Neff_Fic_splines = [UnivariateSpline(_Neffr, row) for row in _icsFieldsr]
         
@@ -559,7 +557,7 @@ def kexitN(Nexit, back, params, MTE):
     
     for i in range(1, 2 * nF + 1):
         backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
-    k = np.exp(Nexit) * MTE.H(backExit, params);
+    k = np.exp(Nexit) * MTE.H(backExit, params)
     return k
 
 
@@ -573,6 +571,59 @@ def kexitPhi(PhiExit, n, back, params, MTE):
         backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
     k = np.exp(Nexit) * MTE.H(backExit, params);
     return k
+
+
+def matchKExitN(back, params, MTE, k=0.002):
+    
+    
+    const = 55.75 - np.log(k/0.05)
+    
+    kExitArr = np.zeros(4, dtype=float)
+    HArr = np.zeros(4, dtype=float)
+    
+    # Iterate over background step
+    for ii in range(len(back) - 1):
+        
+        row = back[ii]
+        N, fdf = row[0], row[1:]
+        
+        kExit = kexitN(N, back, params, MTE)
+        
+        kDelta = kExit - k
+        H = MTE.H(fdf, params)
+        
+        kExitArr = np.roll(kExitArr, -1)
+        HArr = np.roll(HArr, -1)
+        
+        kExitArr[-1] = kExit
+        HArr[-1] = H
+        
+        if kDelta > 0:
+            
+            row = back[ii + 1]
+            N, fdf = row[0], row[1:]
+    
+            kExit = kexitN(N, back, params, MTE)
+    
+            H = MTE.H(fdf, params)
+    
+            kExitArr = np.roll(kExitArr, -1)
+            HArr = np.roll(HArr, -1)
+    
+            kExitArr[-1] = kExit
+            HArr[-1] = H
+            
+            break
+            
+    HkSpl = UnivariateSpline(kExitArr, HArr)
+    
+    Hk = HkSpl(k)
+    
+    Hend = MTE.H(back[-1][1:], params)
+    
+    Nk = const + np.log(243.5 * 3 ** 0.25 * np.sqrt(Hk)) + np.log(np.sqrt(Hk/Hend))
+    
+    return Nk
 
 
 def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
@@ -602,7 +653,7 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
     return eigs
 
 
-def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True, errorReturn=False, tmax=None):
+def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True, errorReturn=False, tmax=None, useMatchEq=True):
     """
 
     Simple spline based method to compute the spectral index of a mode that exits the horizon at a time Nend - Nexit
@@ -615,6 +666,9 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     
     # Get end of background evolution
     Nend = back.T[0][-1]
+    
+    if useMatchEq:
+        Nexit = matchKExitN(back, params, MTE)
     
     # We will compute the 2pf based on momenta that horizon exit 1.2-efolds above & below k pivot,
     # defined as the mode that exits the horizon at a time Nexit
@@ -656,7 +710,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     # Get pivot scale, midpoint in spline
     if kPivot is None:
         kPivot = kVals[Nsteps]
-        
+    
     else:
         assert type(kPivot) == float, "kPivot parameter must be float: {}".format(kPivot)
     
@@ -718,7 +772,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     return ns
 
 
-def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None, errorReturn=False, tmax=None):
+def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None, errorReturn=False, tmax=None, useMatchEq=True):
     """
     
     Simple wrapper for the reduced bispectrum fNL at the end of inflation, subject to a configuration
@@ -735,6 +789,10 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
         tmax = -1
     
     Nend = back.T[0][-1]
+    
+    if useMatchEq:
+        Nexit = matchKExitN(back, params, MTE)
+    
     Npivot = Nend - Nexit
     
     kExit = kexitN(Npivot, back, pvals, MTE)
@@ -754,14 +812,14 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
     if stdConfig is not None:
         
         if stdConfig in ["eq", "equal", "equilateral"]:
-            alpha, beta = 0, 1./3.
+            alpha, beta = 0, 1. / 3.
         
         elif stdConfig in ["fo", "fold", "folded"]:
             alpha, beta = -0.5, 0.5
         
         elif stdConfig in ["sq", "squeeze", "squeezed"]:
             alpha, beta = 0.9, 0.01
-
+        
         else:
             assert alpha is not None, "Must supply alpha: {}".format(alpha)
             assert beta is not None, "Must supply beta: {}".format(beta)
