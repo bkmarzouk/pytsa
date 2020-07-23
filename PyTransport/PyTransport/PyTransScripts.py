@@ -668,7 +668,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     Nend = back.T[0][-1]
     
     if useMatchEq:
-        Nexit = matchKExitN(back, params, MTE)
+        Nexit = matchKExitN(back, pvals, MTE)
     
     # We will compute the 2pf based on momenta that horizon exit 1.2-efolds above & below k pivot,
     # defined as the mode that exits the horizon at a time Nexit
@@ -791,7 +791,7 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
     Nend = back.T[0][-1]
     
     if useMatchEq:
-        Nexit = matchKExitN(back, params, MTE)
+        Nexit = matchKExitN(back, pvals, MTE)
     
     Npivot = Nend - Nexit
     
