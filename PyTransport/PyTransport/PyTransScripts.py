@@ -63,7 +63,7 @@ def unPackSig(twoPtOut, MTE):
     return zeta, np.reshape(sig, (np.size(twoPtOut[:, 0]), 2 * nF, 2 * nF))
 
 
-def rescaleBack(bg, Nr=70.0):
+def rescaleBack(bg, Nr=70.0, reposition=True):
     """
     
     Repositions background evolution to begin Nr efolds before the end of inflation.
@@ -71,33 +71,41 @@ def rescaleBack(bg, Nr=70.0):
     
     If Nr exceeds the length of inflation, the original background is returned.
     
+    Finally, we also ensure that the first 10 efolds of inflation are finely sampled enough s.t.
+    accurate estimates of ICsBM can be made
+    
     """
     
     # Get final efold of background evolution
     Nend = bg[-1][0]
     Nstart = bg[0][0]
     
-    # If background evolution is sufficiently long
-    if (Nend - Nstart) > Nr:
+    if reposition:
         
-        # Copy final row of evolution
-        out = np.copy(bg[-1])
-        
-        # Iterate over back steps from last to first
-        for row in np.flipud(bg[:-1]):
+        # If background evolution is sufficiently long
+        if (Nend - Nstart) > Nr:
             
-            # Compute difference between current efold and end of inflation
-            dN = Nend - row[0]
+            # Copy final row of evolution
+            out = np.copy(bg[-1])
             
-            # Stack ontop of output array
-            out = np.vstack((row, out))
-            
-            # If dN has reached the target reposition
-            if dN > Nr:
-                # Stop background repositioning, and redefine N efolution to start at zero from this point
-                out[:, 0] -= out[0][0]
+            # Iterate over back steps from last to first
+            for row in np.flipud(bg[:-1]):
                 
-                break
+                # Compute difference between current efold and end of inflation
+                dN = Nend - row[0]
+                
+                # Stack ontop of output array
+                out = np.vstack((row, out))
+                
+                # If dN has reached the target reposition
+                if dN > Nr:
+                    # Stop background repositioning, and redefine N efolution to start at zero from this point
+                    out[:, 0] -= out[0][0]
+                    
+                    break
+        else:
+            out = bg
+            
     else:
         out = bg
     
@@ -117,7 +125,7 @@ def rescaleBack(bg, Nr=70.0):
     return out
 
 
-def ICsBM(NBMassless, k, back, params, MTE, optimize=True):
+def ICsBM(NBMassless, k, back, params, MTE):
     """
     
     Computes initial conditions subject to NBMassless efolds before massless condition is realised.
@@ -128,127 +136,110 @@ def ICsBM(NBMassless, k, back, params, MTE, optimize=True):
     
     """
     
-    # If running optimization, we need to make sure we don't have N_{ii} = N_{ii+1}, s.t.
-    # we build splines from strictly monotonic sequences
-    evoN = back.T[0]
+    # Compute evolution of mass matrix eigenvalues along the background
+    massEvo = evolveMasses(back, params, MTE)
     
-    if optimize:
-        killRows = np.array([ii for ii in range(len(back) - 1) if back.T[0][ii] == back.T[0][ii + 1]])
-        killRows = killRows[::-1]
-        for ii in killRows:
-            back = np.delete(back, ii, axis=0)
+    # Pick out the largest mass along the trajectory to infer the massless condition
+    mEvo = np.array([np.max(row[1:]) for row in massEvo])
     
-    # Get eigenvalue evolution
-    evoEigs = evolveMasses(back, params, MTE)  # mi^2 / H^2
+    kSq = k ** 2
     
-    # get fields-dotfields evolution
-    evoFields = back[:, 1:]
-    Nmassless = None
+    NMArr = np.zeros(4, dtype=float)
+    zeroArr = np.zeros(4, dtype=float)
     
-    # Initialize empty arrays for splin-point calculation
-    _Nr = np.array([0, 0, 0], dtype=float)
-    _mEffr = np.array([0, 0, 0], dtype=float)
-    
-    for ii in range(len(back) - 1):
+    for ii in range(len(back)-1):
+        Msq = mEvo[ii]
+        row = back[ii]
         
-        # Get N, eigs and field vals. at background step
-        N, eigs, fieldsdotfields = evoN[ii], evoEigs[ii], evoFields[ii]
+        N = row[0]
+        fdf = row[1:]
         
-        # Compute effective mass
-        mEff = np.max(eigs) - (k * np.exp(-N) / MTE.H(fieldsdotfields, params)) ** 2
+        aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
         
-        # Maintin 3x3 array of spline data, permuting, then replacing the last (column) element with the current value
-        _mEffr = np.roll(_mEffr, -1)
-        _Nr = np.roll(_Nr, -1)
-        _mEffr[-1] = mEff
-        _Nr[-1] = N
+        MaHSq = Msq * aHsq
         
-        # When mEff turns over to a non-negative value
-        if not mEff < 0:
-            # Define this to be the massless efold
-            Nmassless = N
+        massless = MaHSq - kSq
+        
+        NMArr = np.roll(NMArr, -1)
+        zeroArr = np.roll(zeroArr, -1)
+        
+        NMArr[-1] = N
+        zeroArr[-1] = massless
+        
+        if massless > 0:
             
-            # Append one further time step of data to the arrays used for spline calculation
-            N, eigs, fieldsdotfields = evoN[ii + 1], evoEigs[ii + 1], evoFields[ii + 1]
-            mEff = np.max(eigs) - (k * np.exp(-N) / MTE.H(fieldsdotfields, params)) ** 2
-            _mEffr = np.append(_mEffr, mEff)
-            _Nr = np.append(_Nr, N)
+            Msq = mEvo[ii+1]
+            row = back[ii+1]
             
-            break
-    
-    if optimize:
-        # Build spline of effective mass as a function of N
-        m_N_spline = UnivariateSpline(_Nr, _mEffr, k=3)
-        
-        # We want to find the N that gives an effective mass of zero. This is achived by minimizing
-        # the abs val. of the spline function
-        minfunc = lambda N: abs(m_N_spline(N))
-        Nmassless = minimize_scalar(minfunc).x  # .x evaluates result
-    
-    Nstart = evoN[0]
-    
-    if Nmassless is None:
-        print ("\n\n\n\n massless condition not found \n\n\n\n")
-        return np.nan, np.nan
-    
-    if Nmassless - NBMassless < Nstart:
-        print ("\n\n\n\n Insufficient background to compute NB efolds before massless \n\n\n\n")
-        return np.nan, np.nan
-    
-    # We now find the background data NBMassless efolds before the massless condition.
-    
-    icsN = None
-    icsFields = None
-    
-    # Initialize arrays for spline based calculation
-    _icsFieldsr = np.vstack((np.zeros(3, dtype=float) for ii in range(2 * MTE.nF())))
-    _icsNr = np.zeros(3, dtype=float)
-    _Neffr = np.zeros(3, dtype=float)
-    
-    # Iterate over background steps
-    for ii in range(len(evoN) - 1):
-        
-        # Unpack N and field-dot-fields
-        N, fieldsdotfields = evoN[ii], evoFields[ii]
-        
-        # When zero, we have our ICs
-        Neff = N - (Nmassless - NBMassless)
-        
-        # Permute field array and update right most col with fielddotfield vals
-        _icsFieldsr = np.roll(_icsFieldsr, -1, axis=1)
-        _icsFieldsr[:, -1] = np.array([fdf for fdf in fieldsdotfields])
-        
-        # Permute ics N array and update with current efold
-        _icsNr = np.roll(_icsNr, -1)
-        _icsNr[-1] = N
-        
-        # Permute effective N array and update with current Neff
-        _Neffr = np.roll(_Neffr, -1)
-        _Neffr[-1] = Neff
-        
-        # when N - Nmassless - Nstart >= NB 
-        if not Neff < 0:
-            icsN = N
-            icsFields = fieldsdotfields
+            N = row[0]
+            fdf = row[1:]
             
-            _icsFieldsr = np.hstack((_icsFieldsr, np.array([[fdf] for fdf in evoFields[ii + 1]])))
-            _icsNr = np.append(_icsNr, evoN[ii + 1])
-            _Neffr = np.append(_Neffr, (evoN[ii + 1] - Nstart) - (Nmassless - NBMassless))
+            aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
+            
+            MaHSq = Msq * aHsq
+            
+            massless = MaHSq - kSq
+            
+            NMArr = np.roll(NMArr, -1)
+            zeroArr = np.roll(zeroArr, -1)
+            
+            NMArr[-1] = N
+            zeroArr[-1] = massless
             
             break
     
-    if optimize:
-        Neff_Nic_spline = UnivariateSpline(_Neffr, _icsNr, k=3)
-        Neff_Fic_splines = [UnivariateSpline(_Neffr, row) for row in _icsFieldsr]
-        
-        icsN = Neff_Nic_spline(0)
-        icsFields = np.array([spl(0) for spl in Neff_Fic_splines])
+    masslessSpl = UnivariateSpline(zeroArr, NMArr)
     
-    if icsN is None:
-        print ("\n\n\n\n massless condition not found (BUG!) \n\n\n\n")
+    NMassless = masslessSpl(0)
+    
+    NICs = NMassless - NBMassless
+    
+    if ii == len(back) - 2:
+        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
     
-    return icsN, icsFields
+    FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
+    
+    zeroArr2 = np.zeros(4, dtype=float)
+    
+    for ii in range(len(back)-1):
+        
+        row = back[ii]
+        
+        N, fdf = row[0], row[1:]
+        
+        zero = N - NICs
+        
+        FieldsArr = np.roll(FieldsArr, -1, axis=1)
+        zeroArr2 = np.roll(zeroArr2, -1)
+        
+        FieldsArr[:, -1] = fdf
+        zeroArr2[-1] = zero
+        
+        if zero > 0:
+
+            row = back[ii+1]
+
+            N, fdf = row[0], row[1:]
+
+            zero = N - NICs
+            FieldsArr = np.roll(FieldsArr, -1, axis=1)
+            zeroArr2 = np.roll(zeroArr2, -1)
+
+            FieldsArr[:, -1] = fdf
+            zeroArr2[-1] = zero
+            
+            break
+    
+    if ii == len(back) - 2:
+        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+        return np.nan, np.nan
+    
+    FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+    
+    ICs = np.array([spl(0) for spl in FieldsSpl])
+    
+    return NICs, ICs
 
 
 def ICsBE(NBExit, k, back, params, MTE):
@@ -575,7 +566,6 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 def matchKExitN(back, params, MTE, k=0.002):
     
-    
     const = 55.75 - np.log(k/0.05)
     
     kExitArr = np.zeros(4, dtype=float)
@@ -653,10 +643,11 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
     return eigs
 
 
-def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True, errorReturn=False, tmax=None, useMatchEq=True):
+def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True,
+                  errorReturn=False, tmax=None, useMatchEq=True):
     """
 
-    Simple spline based method to compute the spectral index of a mode that exits the horizon at a time Nend - Nexit
+    Simple based method to compute the spectral index of a mode that exits the horizon at a time Nend - Nexit
 
     If kPivot is None, pivot scale is treated as k(Nexit), else kPivot
 
@@ -772,7 +763,8 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     return ns
 
 
-def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None, errorReturn=False, tmax=None, useMatchEq=True):
+def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None,
+        errorReturn=False, tmax=None, useMatchEq=True):
     """
     
     Simple wrapper for the reduced bispectrum fNL at the end of inflation, subject to a configuration
@@ -824,19 +816,27 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
             assert alpha is not None, "Must supply alpha: {}".format(alpha)
             assert beta is not None, "Must supply beta: {}".format(beta)
     
-    # Compute momentum triangle
-    k1 = _k1(kExit, alpha, beta)
-    k2 = _k2(kExit, alpha, beta)
-    k3 = _k3(kExit, alpha, beta)
+    kt = 3 * kExit
     
-    # Check momenta
-    for k, lab in zip([k1, k2, k3], ['k1', 'k2', 'k3']):
-        assert k != np.inf, "Invalid {} = {}".format(lab, k)
-        assert k != np.nan, "Invalid {} = {}".format(lab, k)
-        assert k not in [0, 0.0], "Invalid {} = {}".format(lab, k)
+    # Compute momentum triangle
+    k1 = _k1(kt, alpha, beta)
+    k2 = _k2(kt, alpha, beta)
+    k3 = _k3(kt, alpha, beta)
+    
+    # Check momenta TODO: return error for bad k here
+    for k in [k1, k2, k3]:
+        
+        # if momenta has become infinite, or subject to numerical error
+        if np.isinf(k) or np.isnan(k):
+        
+            if errorReturn:
+                return ValueError, "k"
+        
+            raise ValueError, k
     
     # Find larges scale and compute ICs
     kmin = np.min([k1, k2, k3])
+    
     Nstart, ICs = ICsBM(subevo, kmin, back, pvals, MTE)
     
     if type(ICs) != np.ndarray and np.isnan(ICs):
