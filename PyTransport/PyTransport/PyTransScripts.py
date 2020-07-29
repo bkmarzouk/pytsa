@@ -646,15 +646,29 @@ def kexitN(Nexit, back, params, MTE):
             
             break
     
-    assert 0, [Narr, fdf]
+    print Narr
     
-    fdfSpl = np.array([UnivariateSpline(Narr, row) for row in fdf])
+    print
+    
+    print backExitArr
+    
+    fdfSpl = np.array([UnivariateSpline(Narr, row) for row in backExitArr])
     
     fdfOut = np.array([spl(0) for spl in fdfSpl])
     
+    print
+    
+    print fdfOut
+    
     HOut = MTE.H(fdfOut, params)
     
+    print
+    
+    print HOut
+    
     k = np.exp(Nexit) * HOut
+    
+    assert 0, k
     
     return k
     
