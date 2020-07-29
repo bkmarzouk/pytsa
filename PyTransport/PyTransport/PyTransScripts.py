@@ -668,9 +668,9 @@ def kexitN(Nexit, back, params, MTE):
             backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
         k = np.exp(Nexit) * MTE.H(backExit, params)
         
-        print k, type(k), k==np.nan
+        print k, type(k), np.isnan(k)
         
-        if k in [np.nan, np.inf]:
+        if np.isnan(k) or np.isinf(k):
             
             print "*** Error computing k, k = {} ***".format(k)
             
