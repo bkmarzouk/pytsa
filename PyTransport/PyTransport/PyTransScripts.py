@@ -105,7 +105,7 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
                     break
         else:
             out = bg
-            
+    
     else:
         out = bg
     
@@ -123,7 +123,7 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
         out = np.delete(out, ii, axis=0)
     
     return out
-    
+
 
 def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     """
@@ -146,7 +146,7 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     
     count = 0
     
-    for ii in range(len(back)-1):
+    for ii in range(len(back) - 1):
         
         Msq = mEvo[ii]
         row = back[ii]
@@ -154,7 +154,7 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
         N = row[0]
         fdf = row[1:]
         
-        aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
+        aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
         
         MaHSq = Msq * aHsq
         
@@ -170,13 +170,13 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
         
         if massless > 0:
             
-            Msq = mEvo[ii+1]
-            row = back[ii+1]
+            Msq = mEvo[ii + 1]
+            row = back[ii + 1]
             
             N = row[0]
             fdf = row[1:]
             
-            aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
+            aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
             
             MaHSq = Msq * aHsq
             
@@ -193,25 +193,24 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
             if count < 4:
                 
                 for jj in range(4 - count):
-                
                     Msq = mEvo[ii + 1 + jj + 1]
                     row = back[ii + 1 + jj + 1]
-        
+                    
                     N = row[0]
                     fdf = row[1:]
-        
+                    
                     aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
-        
+                    
                     MaHSq = Msq * aHsq
-        
+                    
                     massless = MaHSq - kSq
-        
+                    
                     NMArr = np.roll(NMArr, -1)
                     zeroArr = np.roll(zeroArr, -1)
-        
+                    
                     NMArr[-1] = N
                     zeroArr[-1] = massless
-        
+                    
                     count += 1
             
             break
@@ -226,13 +225,13 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
         print ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
     
-    FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
+    FieldsArr = np.vstack(np.zeros(4) for ii in range(2 * MTE.nF()))
     
     zeroArr2 = np.zeros(4, dtype=float)
     
     count = 0
     
-    for ii in range(len(back)-1):
+    for ii in range(len(back) - 1):
         
         row = back[ii]
         
@@ -249,15 +248,15 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
         count += 1
         
         if zero > 0:
-
-            row = back[ii+1]
-
+            
+            row = back[ii + 1]
+            
             N, fdf = row[0], row[1:]
-
+            
             zero = N - NICs
             FieldsArr = np.roll(FieldsArr, -1, axis=1)
             zeroArr2 = np.roll(zeroArr2, -1)
-
+            
             FieldsArr[:, -1] = fdf
             zeroArr2[-1] = zero
             
@@ -266,20 +265,19 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
             if count < 4:
                 
                 for jj in range(4 - count):
-                    
                     row = back[ii + 1 + jj + 1]
-    
+                    
                     N, fdf = row[0], row[1:]
-    
+                    
                     zero = N - NICs
                     FieldsArr = np.roll(FieldsArr, -1, axis=1)
                     zeroArr2 = np.roll(zeroArr2, -1)
-    
+                    
                     FieldsArr[:, -1] = fdf
                     zeroArr2[-1] = zero
-    
-                    count += 1
                     
+                    count += 1
+            
             break
     
     if ii == len(back) - 2:
@@ -594,8 +592,7 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 
 
 def kexitN(Nexit, back, params, MTE):
-    
-    backExitArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
+    backExitArr = np.vstack(np.zeros(4) for ii in range(2 * MTE.nF()))
     Narr = np.zeros(4)
     
     count = 0
@@ -605,7 +602,7 @@ def kexitN(Nexit, back, params, MTE):
         row = back[ii]
         
         N, fdf = row[0], row[1:]
-
+        
         Narr = np.roll(Narr, -1)
         Narr[-1] = N
         
@@ -617,12 +614,12 @@ def kexitN(Nexit, back, params, MTE):
         if N > Nexit:
             
             row = back[ii + 1]
-    
+            
             N, fdf = row[0], row[1:]
-    
+            
             Narr = np.roll(Narr, -1)
             Narr[-1] = N
-    
+            
             backExitArr = np.roll(backExitArr, -1, axis=1)
             backExitArr[:, -1] = fdf
             
@@ -631,17 +628,16 @@ def kexitN(Nexit, back, params, MTE):
             if count < 4:
                 
                 for jj in range(4 - count):
-                    
                     row = back[ii + 1 + jj + 1]
-    
+                    
                     N, fdf = row[0], row[1:]
-    
+                    
                     Narr = np.roll(Narr, -1)
                     Narr[-1] = N
-    
+                    
                     backExitArr = np.roll(backExitArr, -1, axis=1)
                     backExitArr[:, -1] = fdf
-    
+                    
                     count += 1
             
             break
@@ -655,8 +651,8 @@ def kexitN(Nexit, back, params, MTE):
     k = np.exp(Nexit) * HOut
     
     return k
-    
-#
+
+
 # def kexitN(Nexit, back, params, MTE):
 #
 #     try:
@@ -698,8 +694,7 @@ def kexitPhi(PhiExit, n, back, params, MTE):
 
 
 def matchKExitN(back, params, MTE, k=0.002):
-    
-    const = 55.75 - np.log(k/0.05)
+    const = 55.75 - np.log(k / 0.05)
     
     kExitArr = np.zeros(4, dtype=float)
     HArr = np.zeros(4, dtype=float)
@@ -731,39 +726,38 @@ def matchKExitN(back, params, MTE, k=0.002):
             
             row = back[ii + 1]
             N, fdf = row[0], row[1:]
-    
+            
             kExit = kexitN(N, back, params, MTE)
-    
+            
             H = MTE.H(fdf, params)
-    
+            
             kExitArr = np.roll(kExitArr, -1)
             HArr = np.roll(HArr, -1)
-    
+            
             kExitArr[-1] = kExit
             HArr[-1] = H
             
-            count +=1
+            count += 1
             
             if count < 4:
                 for jj in range(4 - count):
-                    
                     row = back[ii + 1 + jj + 1]
                     N, fdf = row[0], row[1:]
-    
+                    
                     kExit = kexitN(N, back, params, MTE)
-    
+                    
                     H = MTE.H(fdf, params)
-    
+                    
                     kExitArr = np.roll(kExitArr, -1)
                     HArr = np.roll(HArr, -1)
-    
+                    
                     kExitArr[-1] = kExit
                     HArr[-1] = H
-    
+                    
                     count += 1
             
             break
-            
+    
     print kExitArr, HArr
     
     HkSpl = UnivariateSpline(kExitArr, HArr)
@@ -772,7 +766,7 @@ def matchKExitN(back, params, MTE, k=0.002):
     
     Hend = MTE.H(back[-1][1:], params)
     
-    Nk = const + np.log(243.5 * 3 ** 0.25 * np.sqrt(Hk)) + np.log(np.sqrt(Hk/Hend))
+    Nk = const + np.log(243.5 * 3 ** 0.25 * np.sqrt(Hk)) + np.log(np.sqrt(Hk / Hend))
     
     return Nk
 
@@ -989,10 +983,10 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
         
         # if momenta has become infinite, or subject to numerical error
         if np.isinf(k) or np.isnan(k):
-        
+            
             if errorReturn:
                 return ValueError, "k"
-        
+            
             raise ValueError, k
     
     # Find larges scale and compute ICs
