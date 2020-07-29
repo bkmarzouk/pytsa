@@ -125,51 +125,59 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
     return out
 
 
-def ICsBM(NBMassless, k, back, params, MTE):
+def denseBeforeN(back, params, MTE, NB=10, Ndense=0.05, tols=np.array([1e-12, 1e-12])):
+    """
+    Increases the density of background steps within the interval N \in [Nstart, Nstart + Ndense]
+    """
+    
+    Nevo = back.T[0]
+    
+    bgIdx = np.where(Nevo < Nevo[0] + NB)[0]
+    
+    Nstart, Nend = Nevo[0], Nevo[bgIdx[-1]]
+    
+    backReg = back[bgIdx[-1]+1:]
+    
+    NNew = np.linspace(Nstart, Nend, int(float(NB)/ float(Ndense)))
+    
+    Nfix = -1
+    
+    while round(Nfix,3) != round(Nend, 3):
+        backNewStart = MTE.backEvolve(NNew, back[0][1:], params, tols, 0, -1, True)
+        Nfix = backNewStart[-1][0]
+        tols *= 10
+    
+    backOut = np.vstack((backNewStart, backReg))
+    
+    return backOut
+    
+
+def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     """
     
     Computes initial conditions subject to NBMassless efolds before massless condition is realised.
     
     Massless condition: m^2 = (k/a)^2 : m is larges eigenvalue of the mass-squared matrix
     
-    optimize runs a spline based estimate of the massless condition
-    
     """
     
-    # Compute evolution of mass matrix eigenvalues along the background
-    massEvo = evolveMasses(back, params, MTE)
-    
-    # Pick out the largest mass along the trajectory to infer the massless condition
-    mEvo = np.array([np.max(row[1:]) for row in massEvo])
-    
-    kSq = k ** 2
-    
-    NMArr = np.zeros(4, dtype=float)
-    zeroArr = np.zeros(4, dtype=float)
-    
-    for ii in range(len(back)-1):
-        Msq = mEvo[ii]
-        row = back[ii]
+    try:
         
-        N = row[0]
-        fdf = row[1:]
+        # Compute evolution of mass matrix eigenvalues along the background
+        massEvo = evolveMasses(back, params, MTE)
         
-        aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
+        # Pick out the largest mass along the trajectory to infer the massless condition
+        mEvo = np.array([np.max(row[1:]) for row in massEvo])
         
-        MaHSq = Msq * aHsq
+        kSq = k ** 2
         
-        massless = MaHSq - kSq
+        NMArr = np.zeros(4, dtype=float)
+        zeroArr = np.zeros(4, dtype=float)
         
-        NMArr = np.roll(NMArr, -1)
-        zeroArr = np.roll(zeroArr, -1)
-        
-        NMArr[-1] = N
-        zeroArr[-1] = massless
-        
-        if massless > 0:
+        for ii in range(len(back)-1):
             
-            Msq = mEvo[ii+1]
-            row = back[ii+1]
+            Msq = mEvo[ii]
+            row = back[ii]
             
             N = row[0]
             fdf = row[1:]
@@ -186,58 +194,95 @@ def ICsBM(NBMassless, k, back, params, MTE):
             NMArr[-1] = N
             zeroArr[-1] = massless
             
-            break
-    
-    masslessSpl = UnivariateSpline(zeroArr, NMArr)
-    
-    NMassless = masslessSpl(0)
-    
-    NICs = NMassless - NBMassless
-    
-    if ii == len(back) - 2:
-        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
-        return np.nan, np.nan
-    
-    FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
-    
-    zeroArr2 = np.zeros(4, dtype=float)
-    
-    for ii in range(len(back)-1):
+            if massless > 0:
+                
+                Msq = mEvo[ii+1]
+                row = back[ii+1]
+                
+                N = row[0]
+                fdf = row[1:]
+                
+                aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
+                
+                MaHSq = Msq * aHsq
+                
+                massless = MaHSq - kSq
+                
+                NMArr = np.roll(NMArr, -1)
+                zeroArr = np.roll(zeroArr, -1)
+                
+                NMArr[-1] = N
+                zeroArr[-1] = massless
+                
+                break
         
-        row = back[ii]
+        masslessSpl = UnivariateSpline(zeroArr, NMArr)
         
-        N, fdf = row[0], row[1:]
+        NMassless = masslessSpl(0)
         
-        zero = N - NICs
+        NICs = NMassless - NBMassless
         
-        FieldsArr = np.roll(FieldsArr, -1, axis=1)
-        zeroArr2 = np.roll(zeroArr2, -1)
+        if ii == len(back) - 2:
+            print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+            return np.nan, np.nan
         
-        FieldsArr[:, -1] = fdf
-        zeroArr2[-1] = zero
+        FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
         
-        if zero > 0:
-
-            row = back[ii+1]
-
+        zeroArr2 = np.zeros(4, dtype=float)
+        
+        for ii in range(len(back)-1):
+            
+            row = back[ii]
+            
             N, fdf = row[0], row[1:]
-
+            
             zero = N - NICs
+            
             FieldsArr = np.roll(FieldsArr, -1, axis=1)
             zeroArr2 = np.roll(zeroArr2, -1)
-
+            
             FieldsArr[:, -1] = fdf
             zeroArr2[-1] = zero
             
-            break
+            if zero > 0:
     
-    if ii == len(back) - 2:
-        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
-        return np.nan, np.nan
+                row = back[ii+1]
     
-    FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+                N, fdf = row[0], row[1:]
     
-    ICs = np.array([spl(0) for spl in FieldsSpl])
+                zero = N - NICs
+                FieldsArr = np.roll(FieldsArr, -1, axis=1)
+                zeroArr2 = np.roll(zeroArr2, -1)
+    
+                FieldsArr[:, -1] = fdf
+                zeroArr2[-1] = zero
+                
+                break
+        
+        if ii == len(back) - 2:
+            print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+            return np.nan, np.nan
+        
+        FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+        
+        ICs = np.array([spl(0) for spl in FieldsSpl])
+        
+    except ValueError:
+        
+        print zeroArr
+        print NMArr
+        print
+        print zeroArr2
+        print FieldsArr
+        
+        if rerun is False:
+            
+            _back = denseBeforeN(back, params, MTE)
+            
+            return ICsBM(NBMassless, k, _back, params, MTE, rerun=True)
+        
+        else:
+            raise ValueError, "Unable to determine ICs"
     
     return NICs, ICs
 
