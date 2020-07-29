@@ -593,7 +593,7 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
             return (np.empty, np.empty, np.empty, np.empty, np.empty, snaps)
 
 
-def kexitN(Nexit, back, params, MTE):
+def kexitN2(Nexit, back, params, MTE):
     
     backExitArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
     Narr = np.zeros(4)
@@ -646,42 +646,33 @@ def kexitN(Nexit, back, params, MTE):
             
             break
     
-    print Narr
-    
-    print
-    
-    print backExitArr
-    
     fdfSpl = np.array([UnivariateSpline(Narr, row) for row in backExitArr])
     
     fdfOut = np.array([spl(0) for spl in fdfSpl])
     
-    print
-    
-    print fdfOut
-    
     HOut = MTE.H(fdfOut, params)
     
-    print
-    
-    print HOut
-    
     k = np.exp(Nexit) * HOut
-    
-    assert 0, k
     
     return k
     
 
-def kexitN2(Nexit, back, params, MTE):
-    nF = np.size(back[0, 1:]) // 2
-    backExit = np.zeros(2 * nF)
+def kexitN(Nexit, back, params, MTE):
     
-    for i in range(1, 2 * nF + 1):
-        backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
-    k = np.exp(Nexit) * MTE.H(backExit, params)
-    
-    
+    try:
+        
+        nF = np.size(back[0, 1:]) // 2
+        backExit = np.zeros(2 * nF)
+        
+        for i in range(1, 2 * nF + 1):
+            backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
+        k = np.exp(Nexit) * MTE.H(backExit, params)
+        
+    except ValueError:
+        
+        print "-- Spline fail in kExitN: Calling backup routine"
+        
+        k = kexitN2(Nexit, back, params, MTE)
     
     return k
 
