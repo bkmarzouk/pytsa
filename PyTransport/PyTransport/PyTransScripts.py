@@ -160,24 +160,45 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     Massless condition: m^2 = (k/a)^2 : m is larges eigenvalue of the mass-squared matrix
     
     """
+    # Compute evolution of mass matrix eigenvalues along the background
+    massEvo = evolveMasses(back, params, MTE)
     
-    try:
+    # Pick out the largest mass along the trajectory to infer the massless condition
+    mEvo = np.array([np.max(row[1:]) for row in massEvo])
+    
+    kSq = k ** 2
+    
+    NMArr = np.zeros(4, dtype=float)
+    zeroArr = np.zeros(4, dtype=float)
+    
+    count = 0
+    
+    for ii in range(len(back)-1):
         
-        # Compute evolution of mass matrix eigenvalues along the background
-        massEvo = evolveMasses(back, params, MTE)
+        Msq = mEvo[ii]
+        row = back[ii]
         
-        # Pick out the largest mass along the trajectory to infer the massless condition
-        mEvo = np.array([np.max(row[1:]) for row in massEvo])
+        N = row[0]
+        fdf = row[1:]
         
-        kSq = k ** 2
+        aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
         
-        NMArr = np.zeros(4, dtype=float)
-        zeroArr = np.zeros(4, dtype=float)
+        MaHSq = Msq * aHsq
         
-        for ii in range(len(back)-1):
+        massless = MaHSq - kSq
+        
+        NMArr = np.roll(NMArr, -1)
+        zeroArr = np.roll(zeroArr, -1)
+        
+        NMArr[-1] = N
+        zeroArr[-1] = massless
+        
+        count += 1
+        
+        if massless > 0:
             
-            Msq = mEvo[ii]
-            row = back[ii]
+            Msq = mEvo[ii+1]
+            row = back[ii+1]
             
             N = row[0]
             fdf = row[1:]
@@ -194,95 +215,107 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
             NMArr[-1] = N
             zeroArr[-1] = massless
             
-            if massless > 0:
-                
-                Msq = mEvo[ii+1]
-                row = back[ii+1]
-                
-                N = row[0]
-                fdf = row[1:]
-                
-                aHsq = np.exp(2*N) * MTE.H(fdf, params) ** 2
-                
-                MaHSq = Msq * aHsq
-                
-                massless = MaHSq - kSq
-                
-                NMArr = np.roll(NMArr, -1)
-                zeroArr = np.roll(zeroArr, -1)
-                
-                NMArr[-1] = N
-                zeroArr[-1] = massless
-                
-                break
-        
-        masslessSpl = UnivariateSpline(zeroArr, NMArr)
-        
-        NMassless = masslessSpl(0)
-        
-        NICs = NMassless - NBMassless
-        
-        if ii == len(back) - 2:
-            print ("\n\n\n\n warning initial condition not found \n\n\n\n")
-            return np.nan, np.nan
-        
-        FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
-        
-        zeroArr2 = np.zeros(4, dtype=float)
-        
-        for ii in range(len(back)-1):
+            count += 1
             
-            row = back[ii]
+            if count < 4:
+                
+                for jj in range(4 - count):
+                
+                    Msq = mEvo[ii + 1 + jj + 1]
+                    row = back[ii + 1 + jj + 1]
+        
+                    N = row[0]
+                    fdf = row[1:]
+        
+                    aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
+        
+                    MaHSq = Msq * aHsq
+        
+                    massless = MaHSq - kSq
+        
+                    NMArr = np.roll(NMArr, -1)
+                    zeroArr = np.roll(zeroArr, -1)
+        
+                    NMArr[-1] = N
+                    zeroArr[-1] = massless
+        
+                    count += 1
             
+            break
+    
+    masslessSpl = UnivariateSpline(zeroArr, NMArr)
+    
+    NMassless = masslessSpl(0)
+    
+    NICs = NMassless - NBMassless
+    
+    if ii == len(back) - 2:
+        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+        return np.nan, np.nan
+    
+    FieldsArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
+    
+    zeroArr2 = np.zeros(4, dtype=float)
+    
+    count = 0
+    
+    for ii in range(len(back)-1):
+        
+        row = back[ii]
+        
+        N, fdf = row[0], row[1:]
+        
+        zero = N - NICs
+        
+        FieldsArr = np.roll(FieldsArr, -1, axis=1)
+        zeroArr2 = np.roll(zeroArr2, -1)
+        
+        FieldsArr[:, -1] = fdf
+        zeroArr2[-1] = zero
+        
+        count += 1
+        
+        if zero > 0:
+
+            row = back[ii+1]
+
             N, fdf = row[0], row[1:]
-            
+
             zero = N - NICs
-            
             FieldsArr = np.roll(FieldsArr, -1, axis=1)
             zeroArr2 = np.roll(zeroArr2, -1)
-            
+
             FieldsArr[:, -1] = fdf
             zeroArr2[-1] = zero
             
-            if zero > 0:
-    
-                row = back[ii+1]
-    
-                N, fdf = row[0], row[1:]
-    
-                zero = N - NICs
-                FieldsArr = np.roll(FieldsArr, -1, axis=1)
-                zeroArr2 = np.roll(zeroArr2, -1)
-    
-                FieldsArr[:, -1] = fdf
-                zeroArr2[-1] = zero
+            count += 1
+            
+            if count < 4:
                 
-                break
-        
-        if ii == len(back) - 2:
-            print ("\n\n\n\n warning initial condition not found \n\n\n\n")
-            return np.nan, np.nan
-        
-        FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
-        
-        ICs = np.array([spl(0) for spl in FieldsSpl])
-        
-    except ValueError:
-        
-        print zeroArr
-        print NMArr
-        print
-        print zeroArr2
-        print FieldsArr
-        
-        if rerun is False:
-            
-            _back = denseBeforeN(back, params, MTE)
-            
-            return ICsBM(NBMassless, k, _back, params, MTE, rerun=True)
-        
-        else:
-            raise ValueError, "Unable to determine ICs"
+                for jj in range(4 - count):
+                    
+                    row = back[ii + 1 + jj + 1]
+    
+                    N, fdf = row[0], row[1:]
+    
+                    zero = N - NICs
+                    FieldsArr = np.roll(FieldsArr, -1, axis=1)
+                    zeroArr2 = np.roll(zeroArr2, -1)
+    
+                    FieldsArr[:, -1] = fdf
+                    zeroArr2[-1] = zero
+    
+                    count += 1
+                    
+            break
+    
+    if ii == len(back) - 2:
+        print ("\n\n\n\n warning initial condition not found \n\n\n\n")
+        return np.nan, np.nan
+    
+    FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+    
+    ICs = np.array([spl(0) for spl in FieldsSpl])
     
     return NICs, ICs
 
@@ -616,6 +649,8 @@ def matchKExitN(back, params, MTE, k=0.002):
     kExitArr = np.zeros(4, dtype=float)
     HArr = np.zeros(4, dtype=float)
     
+    count = 0
+    
     # Iterate over background step
     for ii in range(len(back) - 1):
         
@@ -633,6 +668,8 @@ def matchKExitN(back, params, MTE, k=0.002):
         kExitArr[-1] = kExit
         HArr[-1] = H
         
+        count += 1
+        
         if kDelta > 0:
             
             row = back[ii + 1]
@@ -647,6 +684,26 @@ def matchKExitN(back, params, MTE, k=0.002):
     
             kExitArr[-1] = kExit
             HArr[-1] = H
+            
+            count +=1
+            
+            if count < 4:
+                for jj in range(4 - count):
+                    
+                    row = back[ii + 1 + jj + 1]
+                    N, fdf = row[0], row[1:]
+    
+                    kExit = kexitN(N, back, params, MTE)
+    
+                    H = MTE.H(fdf, params)
+    
+                    kExitArr = np.roll(kExitArr, -1)
+                    HArr = np.roll(HArr, -1)
+    
+                    kExitArr[-1] = kExit
+                    HArr[-1] = H
+    
+                    count += 1
             
             break
             
