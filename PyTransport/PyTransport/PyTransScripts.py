@@ -723,6 +723,8 @@ def matchKExitN(back, params, MTE, k=0.002):
         
         count += 1
         
+        print kExit, kDelta
+        
         if kDelta > 0:
             
             row = back[ii + 1]
