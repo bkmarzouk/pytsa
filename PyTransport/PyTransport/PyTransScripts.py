@@ -594,12 +594,61 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 
 
 def kexitN(Nexit, back, params, MTE):
+    
+    nF = MTE.nF()
+    
+    backExitArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
+    Narr = np.zeros(4)
+    
+    for ii in range(len(back)):
+        
+        row = back[ii]
+        
+        N, fdf = row[0], row[1:]
+
+        Narr = np.roll(Narr, -1)
+        Narr[-1] = N
+        
+        backExitArr = np.roll(backExitArr, -1, axis=1)
+        backExitArr[:, -1] = fdf
+        
+        if N > Nexit:
+            
+            row = back[ii + 1]
+    
+            N, fdf = row[0], row[1:]
+    
+            Narr = np.roll(Narr, -1)
+            Narr[-1] = N
+    
+            backExitArr = np.roll(backExitArr, -1, axis=1)
+            backExitArr[:, -1] = fdf
+            
+            break
+    
+    assert 0, [Narr, fdf]
+    
+    fdfSpl = np.array([UnivariateSpline(Narr, row) for row in fdf])
+    
+    fdfOut = np.array([spl(0) for spl in fdfSpl])
+    
+    HOut = MTE.H(fdfOut, params)
+    
+    k = np.exp(Nexit) * HOut
+    
+    return k
+    
+
+def kexitN2(Nexit, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
     backExit = np.zeros(2 * nF)
     
     for i in range(1, 2 * nF + 1):
         backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
     k = np.exp(Nexit) * MTE.H(backExit, params)
+    
+    
+    
     return k
 
 
