@@ -664,11 +664,11 @@ def fNL(modelnumber, configName):
         
             # Define error dictionary to return
             if errKey == "k":
-                retDict = {"mn": modelnumber, "flag": -31, "ext": "3pf"}
+                retDict = {"mn": modelnumber, "flag": -31, "ext": name}
             elif errKey == "ics":
-                retDict = {"mn": modelnumber, "flag": -33, "ext": "3pf"}
+                retDict = {"mn": modelnumber, "flag": -33, "ext": name}
             elif errKey == "3pf":
-                retDict = {"mn": modelnumber, "flag": fNL[2][0], "ext": "3pf"}
+                retDict = {"mn": modelnumber, "flag": fNL[2][0], "ext": name}
             else:
                 raise KeyError, "Unknown error: {}".format(errKey)
         
@@ -724,10 +724,8 @@ def computations(mn_calc):
                 subdir = "mij"
             elif calculation == "2pf":
                 subdir = "2pf"
-            elif calculation == "3pf":
-                subdir = "3pf"
             else:
-                raise KeyError, "Undefined calculation type: {}".format(calculation)
+                subdir = "3pf"
             
             # Get / remove extension key from dictionary, used to discriminate 3pf varieties
             pkEXT = r.pop('ext')

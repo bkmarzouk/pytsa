@@ -955,7 +955,7 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
         raise ValueError, Nexit
     
     Npivot = Nend - Nexit
-    
+
     kExit = kexitN(Npivot, back, pvals, MTE)
     
     if kExit == np.inf or kExit == np.nan:
