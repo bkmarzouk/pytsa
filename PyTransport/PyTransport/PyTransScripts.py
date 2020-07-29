@@ -595,10 +595,10 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 
 def kexitN(Nexit, back, params, MTE):
     
-    nF = MTE.nF()
-    
     backExitArr = np.vstack(np.zeros(4) for ii in range(2*MTE.nF()))
     Narr = np.zeros(4)
+    
+    count = 0
     
     for ii in range(len(back)):
         
@@ -612,6 +612,8 @@ def kexitN(Nexit, back, params, MTE):
         backExitArr = np.roll(backExitArr, -1, axis=1)
         backExitArr[:, -1] = fdf
         
+        count += 1
+        
         if N > Nexit:
             
             row = back[ii + 1]
@@ -623,6 +625,24 @@ def kexitN(Nexit, back, params, MTE):
     
             backExitArr = np.roll(backExitArr, -1, axis=1)
             backExitArr[:, -1] = fdf
+            
+            count += 1
+            
+            if count < 4:
+                
+                for jj in range(4 - count):
+                    
+                    row = back[ii + 1 + jj + 1]
+    
+                    N, fdf = row[0], row[1:]
+    
+                    Narr = np.roll(Narr, -1)
+                    Narr[-1] = N
+    
+                    backExitArr = np.roll(backExitArr, -1, axis=1)
+                    backExitArr[:, -1] = fdf
+    
+                    count += 1
             
             break
     
