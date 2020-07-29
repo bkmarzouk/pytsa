@@ -123,33 +123,6 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
         out = np.delete(out, ii, axis=0)
     
     return out
-
-
-def denseBeforeN(back, params, MTE, NB=10, Ndense=0.05, tols=np.array([1e-12, 1e-12])):
-    """
-    Increases the density of background steps within the interval N \in [Nstart, Nstart + Ndense]
-    """
-    
-    Nevo = back.T[0]
-    
-    bgIdx = np.where(Nevo < Nevo[0] + NB)[0]
-    
-    Nstart, Nend = Nevo[0], Nevo[bgIdx[-1]]
-    
-    backReg = back[bgIdx[-1]+1:]
-    
-    NNew = np.linspace(Nstart, Nend, int(float(NB)/ float(Ndense)))
-    
-    Nfix = -1
-    
-    while round(Nfix,3) != round(Nend, 3):
-        backNewStart = MTE.backEvolve(NNew, back[0][1:], params, tols, 0, -1, True)
-        Nfix = backNewStart[-1][0]
-        tols *= 10
-    
-    backOut = np.vstack((backNewStart, backReg))
-    
-    return backOut
     
 
 def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
