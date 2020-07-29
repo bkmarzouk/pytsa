@@ -680,6 +680,8 @@ def matchKExitN(back, params, MTE, k=0.002):
             
             break
             
+    print kExitArr, HArr
+    
     HkSpl = UnivariateSpline(kExitArr, HArr)
     
     Hk = HkSpl(k)
