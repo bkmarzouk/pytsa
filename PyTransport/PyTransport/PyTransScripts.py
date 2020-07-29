@@ -146,7 +146,7 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     
     count = 0
     
-    for ii in range(len(back) - 1):
+    for ii in range(len(back) - 4):
         
         Msq = mEvo[ii]
         row = back[ii]
@@ -215,11 +215,16 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
             
             break
     
-    masslessSpl = UnivariateSpline(zeroArr, NMArr)
+    try:
+        masslessSpl = UnivariateSpline(zeroArr, NMArr)
     
-    NMassless = masslessSpl(0)
-    
-    NICs = NMassless - NBMassless
+        NMassless = masslessSpl(0)
+        
+        NICs = NMassless - NBMassless
+        
+    except ValueError:
+        print ("\n\n\n\n warning, error fitting spline for massless condition \n\n\n\n")
+        return np.nan, np.nan
     
     if ii == len(back) - 2:
         print ("\n\n\n\n warning initial condition not found \n\n\n\n")
@@ -231,7 +236,7 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
     
     count = 0
     
-    for ii in range(len(back) - 1):
+    for ii in range(len(back) - 4):
         
         row = back[ii]
         
@@ -280,13 +285,18 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
             
             break
     
-    if ii == len(back) - 2:
+    if ii == len(back) - 4:
         print ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
     
-    FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+    try:
+        FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
+        
+        ICs = np.array([spl(0) for spl in FieldsSpl])
     
-    ICs = np.array([spl(0) for spl in FieldsSpl])
+    except ValueError:
+        print ("\n\n\n\n warning failure to fit spline for field ICs \n\n\n\n")
+        return np.nan, np.nan
     
     return NICs, ICs
 
@@ -654,34 +664,6 @@ def kexitN(Nexit, back, params, MTE):
     return k
 
 
-# def kexitN(Nexit, back, params, MTE):
-#
-#     try:
-#
-#         nF = np.size(back[0, 1:]) // 2
-#         backExit = np.zeros(2 * nF)
-#
-#         for i in range(1, 2 * nF + 1):
-#             backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
-#         k = np.exp(Nexit) * MTE.H(backExit, params)
-#
-#         print k, type(k), np.isnan(k)
-#
-#         if np.isnan(k) or np.isinf(k):
-#
-#             print "*** Error computing k, k = {} ***".format(k)
-#
-#             raise ValueError
-#
-#     except ValueError:
-#
-#         print "-- Spline fail in kExitN: Calling backup routine"
-#
-#         k = kexitN2(Nexit, back, params, MTE)
-#
-#     return k
-
-
 def kexitPhi(PhiExit, n, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
     backExit = np.zeros(2 * nF)
@@ -703,7 +685,7 @@ def matchKExitN(back, params, MTE, k=0.002):
     count = 0
     
     # Iterate over background step
-    for ii in range(len(back) - 1):
+    for ii in range(len(back) - 4):
         
         row = back[ii]
         N, fdf = row[0], row[1:]
@@ -757,13 +739,26 @@ def matchKExitN(back, params, MTE, k=0.002):
             
             break
     
-    HkSpl = UnivariateSpline(kExitArr, HArr)
+    if ii == len(back) - 4:
+        
+        print ("\n\n\n\n warning unable to compute pivot time Nk with background \n\n\n\n")
+        
+        return np.nan
     
-    Hk = HkSpl(k)
+    try:
+        HkSpl = UnivariateSpline(kExitArr, HArr)
+        
+        Hk = HkSpl(k)
+        
+        Hend = MTE.H(back[-1][1:], params)
+        
+        Nk = const + np.log(243.5 * 3 ** 0.25 * np.sqrt(Hk)) + np.log(np.sqrt(Hk / Hend))
     
-    Hend = MTE.H(back[-1][1:], params)
-    
-    Nk = const + np.log(243.5 * 3 ** 0.25 * np.sqrt(Hk)) + np.log(np.sqrt(Hk / Hend))
+    except ValueError:
+        
+        print ("\n\n\n\n warning error fitting spline for pivot exit scale: {}\n\n\n\n".format(k))
+        
+        return np.nan
     
     return Nk
 
@@ -795,7 +790,7 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
     return eigs
 
 
-def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunning=True,
+def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
                   errorReturn=False, tmax=None, useMatchEq=True):
     """
 
@@ -812,6 +807,15 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     
     if useMatchEq:
         Nexit = matchKExitN(back, pvals, MTE)
+        
+    if np.isnan(Nexit):
+        
+        print ("\n\n\n\n warning error computin Nexit from matchin \n\n\n\n")
+        
+        if errorReturn:
+            return ValueError, "ics"
+    
+        raise ValueError, Nexit
     
     # We will compute the 2pf based on momenta that horizon exit 1.2-efolds above & below k pivot,
     # defined as the mode that exits the horizon at a time Nexit
@@ -851,11 +855,15 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
     kExit = kVals[Nsteps]
     
     # Get pivot scale, midpoint in spline
-    if kPivot is None:
-        kPivot = kVals[Nsteps]
+    kPivot = kVals[Nsteps]
     
-    else:
-        assert type(kPivot) == float, "kPivot parameter must be float: {}".format(kPivot)
+    if np.isnan(kPivot) or np.isinf(kPivot):
+        print "\n\n\n\n warning kPivot parameter must be float: {} \n\n\n\n".format(kPivot)
+
+        if errorReturn:
+            return ValueError, "k"
+
+        raise ValueError, kVals
     
     # Build power spectra values
     pZetaVals = np.array([])
@@ -865,6 +873,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, kPivot=None, returnRunn
         
         # Build initial conditions for mode based on massless condition
         Nstart, ICs = ICsBM(subevo, k, back, pvals, MTE)
+    
         
         # Check ICs are valid
         if type(ICs) != np.ndarray and np.isnan(ICs):
@@ -931,11 +940,19 @@ def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=
     # If tmax is none, assign no maximum integration time
     if tmax is None:
         tmax = -1
-    
+        
+    # Get end of background evolution
     Nend = back.T[0][-1]
-    
+
     if useMatchEq:
         Nexit = matchKExitN(back, pvals, MTE)
+
+    if np.isnan(Nexit):
+    
+        if errorReturn:
+            return ValueError, "ics"
+    
+        raise ValueError, Nexit
     
     Npivot = Nend - Nexit
     

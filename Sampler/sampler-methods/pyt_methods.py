@@ -283,7 +283,8 @@ def Initialize(modelnumber, rerun_model=False, initial=None, pvals=None, returnS
     # Rescale background to start at Nend - minN to avoid exp. large k
     back_adj = PyS.rescaleBack(back, Nr=minN+10)
 
-    # Attempt computation of momenta at horizon crossing, this will be used in all calculations of observables
+    # Attempt computation of momenta at horizon crossing, the value used will be in the ballpark of requirements
+    # for 2pf and 3pf tasks. Hence, we discard the realization at this point if it's prospects look bad.
     kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
     
     # Asses success by data type of momenta result
