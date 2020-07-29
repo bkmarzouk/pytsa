@@ -668,6 +668,12 @@ def kexitN(Nexit, back, params, MTE):
             backExit[i - 1] = interpolate.splev(Nexit, interpolate.splrep(back[:, 0], back[:, i], s=1e-15), der=0)
         k = np.exp(Nexit) * MTE.H(backExit, params)
         
+        if k in [np.nan, np.inf]:
+            
+            print "*** Error computing k, k = {} ***".format(k)
+            
+            raise ValueError
+        
     except ValueError:
         
         print "-- Spline fail in kExitN: Calling backup routine"
