@@ -225,7 +225,7 @@ def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
         print ("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
     
-    FieldsArr = np.vstack(np.zeros(4) for ii in range(2 * MTE.nF()))
+    FieldsArr = np.vstack([np.zeros(4) for ii in range(2 * MTE.nF())])
     
     zeroArr2 = np.zeros(4, dtype=float)
     
@@ -592,7 +592,8 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 
 
 def kexitN(Nexit, back, params, MTE):
-    backExitArr = np.vstack(np.zeros(4) for ii in range(2 * MTE.nF()))
+    
+    backExitArr = np.vstack([np.zeros(4) for ii in range(2 * MTE.nF())])
     Narr = np.zeros(4)
     
     count = 0
@@ -720,8 +721,6 @@ def matchKExitN(back, params, MTE, k=0.002):
         
         count += 1
         
-        print kExit, kDelta
-        
         if kDelta > 0:
             
             row = back[ii + 1]
@@ -757,8 +756,6 @@ def matchKExitN(back, params, MTE, k=0.002):
                     count += 1
             
             break
-    
-    print kExitArr, HArr
     
     HkSpl = UnivariateSpline(kExitArr, HArr)
     
