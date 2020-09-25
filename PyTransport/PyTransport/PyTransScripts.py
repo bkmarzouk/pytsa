@@ -608,7 +608,7 @@ def kexitN(Nexit, back, params, MTE):
     
     count = 0
     
-    for ii in range(len(back)):
+    for ii in range(len(back)-1):
         
         row = back[ii]
         
@@ -652,14 +652,35 @@ def kexitN(Nexit, back, params, MTE):
                     count += 1
             
             break
+
+
+    if ii == len(back):
+        print "** Warning, kExit not found in background **"
+        return np.nan 
+
     
     fdfSpl = np.array([UnivariateSpline(Narr, row) for row in backExitArr])
     
-    fdfOut = np.array([spl(0) for spl in fdfSpl])
+    # fdfOut = np.array([spl(0) for spl in fdfSpl])
+    fdfOut = np.array([spl(Nexit) for spl in fdfSpl])
     
     HOut = MTE.H(fdfOut, params)
+
+    # if HOut is None:
+
+    #    HEvo = []
+    #    Nevo = []
+
+    #    for row in back:
+    #        N, fdf = row[0], row[1:]
+
+    #        H = MTE.H(fdf, params)
+
+            
     
-    k = np.exp(Nexit) * HOut
+    k = np.exp(Nexit + np.log(HOut))
+
+    # print MTE.V(fdfOut[:6], params), HOut, k
     
     return k
 
@@ -757,6 +778,10 @@ def matchKExitN(back, params, MTE, k=0.002):
     except ValueError:
         
         print ("\n\n\n\n warning error fitting spline for pivot exit scale: {}\n\n\n\n".format(k))
+
+#        message = str(kExitArr) + "\n" + str(HArr) + "\n"
+
+#        assert 0, message
         
         return np.nan
     
