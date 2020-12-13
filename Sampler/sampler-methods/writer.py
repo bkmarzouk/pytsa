@@ -101,12 +101,21 @@ def bg_summary():
             except:
                 raise OSError, sp
         
-        print stats
-        
         # add corresponding dictionary keys
         for k in allKeys:
-            totDict[k] += stats[k]
+
+            try:
+
+                totDict[k] += stats[k]
     
+            except KeyError:
+
+                if k == 'time':
+                    print 'Sample data unavailable since no "time key": {}'.format(sp)
+
+                else:
+                    raise KeyError, "key={} not in {}".format(k, sp)
+
     for sp in stat_paths:
         # remove minor stats data
         os.remove(sp)
@@ -123,10 +132,17 @@ def write_error_report():
     mijDir = os.path.join(pathStats, "mij")
     twoptDir = os.path.join(pathStats, "2pf")
     threeptDir = os.path.join(pathStats, "3pf")
-    
-    mij_paths = [os.path.join(mijDir, p) for p in os.listdir(mijDir)]
-    twopt_paths = [os.path.join(twoptDir, p) for p in os.listdir(twoptDir)]
-    threept_paths = [os.path.join(threeptDir, p) for p in os.listdir(threeptDir)]
+
+    mij_paths = []
+    twopt_paths = []
+    threept_paths = []
+
+    if os.path.exists(mijDir):    
+        mij_paths = [os.path.join(mijDir, p) for p in os.listdir(mijDir)]
+    if os.path.exists(twoptDir):
+        twopt_paths = [os.path.join(twoptDir, p) for p in os.listdir(twoptDir)]
+    if os.path.exists(threeptDir):
+        threept_paths = [os.path.join(threeptDir, p) for p in os.listdir(threeptDir)]
     
     # Flag defs.
     
@@ -145,8 +161,6 @@ def write_error_report():
     allFlags = timeoutFlags + integratorFlags + samplerFlags
     allKeys = [str(f) for f in allFlags]
     
-    totDict   = {k: 0 for k in allKeys}
-
     sumBG = os.path.join(pathStats, "summary_bg.pk")
     sumObs = os.path.join(pathStats, "summary_obs.pk")
 
@@ -157,21 +171,28 @@ def write_error_report():
             totDict = pk.load(f)
     
     else:
-    
-        # Combine 2pt error stats
-        for p in mij_paths + twopt_paths + threept_paths:
+        totDict = {k: 0 for k in allKeys}
+
+
+    # TODO: Report will be wrong in instances of rerunning observables
+    # since error calculations will be additive to previous run !
+    # Find some means of tracking these errors better ...
+
+
+    # Combine 2pt error stats
+    for p in mij_paths + twopt_paths + threept_paths:
         
-            f = open(p, "rb")
-            with f: s = pk.load(f)
+        f = open(p, "rb")
+        with f: s = pk.load(f)
         
-            k = str(s['flag'])
-            totDict[k] += 1
+        k = str(s['flag'])
+        totDict[k] += 1
+
+    for p in mij_paths + twopt_paths + threept_paths:
+        os.remove(p)
     
-        for p in mij_paths + twopt_paths + threept_paths:
-            os.remove(p)
-    
-        f = open(sumObs, "wb")
-        with f: pk.dump(totDict, f)
+    f = open(sumObs, "wb")
+    with f: pk.dump(totDict, f)
 
     g = open(sumBG, "rb")
     with g:
@@ -183,9 +204,11 @@ def write_error_report():
     n_obtained = len(os.listdir(pathSamples))
     
     for k in allKeys:
-        bgFailCounter += bgStats[k]
-        totDict[k]    += bgStats[k]
-        totFailCounter += totDict[k]
+        if k in bgStats:
+            bgFailCounter += bgStats[k]
+            totDict[k]    += bgStats[k]
+        if k in totDict:
+            totFailCounter += totDict[k]
     
     averageSampleTime = float(bgStats['time']) / float(n_obtained)
     

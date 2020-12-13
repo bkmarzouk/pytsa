@@ -285,7 +285,13 @@ def Initialize(modelnumber, rerun_model=False, initial=None, pvals=None, returnS
 
     # Attempt computation of momenta at horizon crossing, the value used will be in the ballpark of requirements
     # for 2pf and 3pf tasks. Hence, we discard the realization at this point if it's prospects look bad.
-    kExit = PyS.kexitN(Nend - Nexit, back_adj, pvals, PyT)
+    
+    Npiv = PyS.matchKExitN(back_adj, pvals, PyT, 0.002)
+
+    if np.isnan(Npiv):
+        return -31
+
+    kExit = PyS.kexitN(Nend - Npiv, back_adj, pvals, PyT)
     
     # Asses success by data type of momenta result
     if type(kExit) not in [float, np.float, np.float32, np.float64] or np.isnan(kExit) or np.isinf(kExit):
