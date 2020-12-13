@@ -606,15 +606,17 @@ def SpectralIndex(modelnumber):
                 raise KeyError, "Unknown error: {}".format(errKey)
             
             # Update sample with null result
-            sample.update_observables({'ns': None, 'alpha': None, 'T_2pf': None})
+            sample.update_observables({'ns': None, 'As': None, 'alpha': None, 'T_2pf': None})
             
             return retDict
     
     # Unpack 2pt observables
-    ns, alpha = ns_alpha
+    ns, As, alpha = ns_alpha
+
+    As = np.log(10**10 * As)
 
     # End calculation timer and build results dictionaryobs_
-    twoPt_dict = {'ns': ns, 'alpha': alpha, 'T_2pf': time.clock() - ti}
+    twoPt_dict = {'ns': ns, 'As': As, 'alpha': alpha, 'T_2pf': time.clock() - ti}
 
     # Update sample observables
     sample.update_observables(twoPt_dict)

@@ -1,5 +1,5 @@
 """
-    Builds N-flation type models with canonical field space and quadratic/chaotic potential terms
+    Builds N-flation type models with canonical field space and chaotic potential
 
     execute "python NQuadGenerator.py <int>"
 
@@ -53,4 +53,3 @@ preamble = ["import os\n",
 with open(fname, "w") as f:
     for line in preamble:
         f.writelines(line)
-

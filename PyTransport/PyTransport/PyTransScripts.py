@@ -897,8 +897,11 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
             
             raise ValueError, twoPf
         
-        # Append power spedctrum at end of background
+        # Append power sepctrum at end of background
         pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
+        
+        if k == kPivot:
+            scalar_amplitude = pZetaVals[-1]
     
     #  Build log arrays in k and Pzeta
     arrLogK = np.log(kVals / kPivot)
@@ -919,9 +922,9 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
     alpha = alpha_(kExit)
     
     if returnRunning:
-        return np.array([ns, alpha])
+        return np.array([ns, scalar_amplitude, alpha])
     
-    return ns
+    return ns, scalar_amplitude
 
 
 def fNL(back, pvals, Nexit, tols, subevo, MTE, alpha=None, beta=None, stdConfig=None,
