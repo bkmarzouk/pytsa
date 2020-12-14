@@ -929,7 +929,7 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
             
             # print(kPivot, pZetaVals[-1], pZetaVals[-1]  / kPivot**3)
             
-            scalar_amplitude = pZetaVals[-1] / (kPivot ** 3)
+            scalar_amplitude = pZetaVals[-1] * (kPivot ** 3)
     
     #  Build log arrays in k and Pzeta
     arrLogK = np.log(kVals / kPivot)
