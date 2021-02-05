@@ -47,17 +47,17 @@ with transportFile: transportDict = pk.load(transportFile)
 # sys.path.append(pathClasses)
 sys.path.append(pathMethods)
 
-# Import PyTransport and writer tools
+# Import _PyTransport and writer tools
 import pyt_methods as pytm
 import writer as w
 
-# Finally configure internal PyTransport workings
+# Finally configure internal _PyTransport workings
 sys.path.append(pathPyT)
 import PyTransSetup
 
 PyTransSetup.pathSet()
 
-# Load PyTransport module installation and scripts
+# Load _PyTransport module installation and scripts
 PyT = importlib.import_module(transportDict['transportModule'])
 import PyTransScripts as PyS
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # Import argument parser for cmd args
     from argparse import ArgumentParser
     
-    parser = ArgumentParser(description="Configure PyTransport Sampler Routine")
+    parser = ArgumentParser(description="Configure _PyTransport Sampler Routine")
     
     """ Args1: Set schwimmbad mpi """
     

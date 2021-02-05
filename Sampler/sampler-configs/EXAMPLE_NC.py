@@ -4,10 +4,10 @@
 # Ensure that the setupBuilds module is imported
 from setupBuilds import *
 
-# Import the PyTransport module you want to perform sampling with
+# Import the _PyTransport module you want to perform sampling with
 import PyTrans2Quad as PyT
 
-# Initialize the model file using the PyTransport module
+# Initialize the model file using the _PyTransport module
 model = PyTransportSampler(PyT)
 
 # Set core params

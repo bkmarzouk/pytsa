@@ -16,7 +16,7 @@
 # Ignore Installation Directory (except for examples)
 /Install/*
 !/Install/.gitkeep
-!/Install/2QuadSetup.py
+!/Install/DQuadExample.py
 
 # Ignore sampler builds, but keep directory
 /Sampler/sampler-builds/*
@@ -39,6 +39,11 @@
 # Ignore .h header files that are generated from proto
 /PyTransport/PyTransport/CppTrans/fieldmetric.h
 /PyTransport/PyTransport/CppTrans/potential.h
+
+# Ignore correlation files
+**.pdf
+**.cfs
+correlation_functions.py
 
 # Keep .gitignore
 !.gitignore

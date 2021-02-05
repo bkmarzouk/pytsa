@@ -3,11 +3,11 @@ import os, sys, numpy as np, importlib, shutil, pickle as pk
 pytpath = (
     os.path.abspath(
         os.path.join(
-            os.path.dirname(__file__), "../..", "PyTransport", "PyTransport"
+            os.path.dirname(__file__), "../..", "_PyTransport", "_PyTransport"
         )
     )
 )
-assert os.path.exists(pytpath), "Cannot locate PyTransport installation: {}".format(pytpath)
+assert os.path.exists(pytpath), "Cannot locate _PyTransport installation: {}".format(pytpath)
 sys.path.append(pytpath)
 
 
