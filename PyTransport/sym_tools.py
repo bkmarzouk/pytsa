@@ -5,7 +5,7 @@ import os
 import cache_tools
 
 
-def OperationMatrix(N):
+def riemann_operation_matrix(N, verbose=True):
     """
     Computes matrix of operations for independent components of the Riemann tensor
 
@@ -116,8 +116,6 @@ def OperationMatrix(N):
                     else:
                         pass
 
-    c = 0
-
     # Copy terms which could be related via the Bianchi identity
     bterms_copy = bterms
 
@@ -169,7 +167,8 @@ def OperationMatrix(N):
     assert 12 * idp_ijkl == N * (N - 1) * (N - 2) * (N - 3), str(idp_ijkl) + "/" + str(
         N * (N - 1) * (N - 2) * (N - 3) / 12)
 
-    print("-- Independent components: {}".format(idp_ijij + idp_ijki + idp_ijkl))
+    if verbose:
+        print("-- Independent components: {}".format(idp_ijij + idp_ijki + idp_ijkl))
 
     # Return matrix
     return OM
@@ -186,6 +185,7 @@ def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix, recache=Fals
 
     return fs_derived
 
+
 def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=False, simplify=True):
     try:
         pot_derived = cache_tools.load_pot(potential, delete=recache)
@@ -196,6 +196,20 @@ def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=Fals
         pot_derived = _PotentialSym(n_fields, n_params, potential, simplify)
 
     return pot_derived
+
+
+def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix, potential: sym.Expr, recache=False,
+            simple_metric=True, simple_potential=True, simple_covd=True):
+    try:
+        covd_derived = cache_tools.load_covd(metric, potential, delete=recache)
+        print("-- Derived covariant derivatives loaded from cache")
+
+    except OSError:
+        print("-- Performing covariant derivative calculations ...")
+        covd_derived = _CovariantDerivativesSym(n_fields, n_params, metric, potential,
+                                                simple_metric, simple_potential, simple_covd)
+
+    return covd_derived
 
 
 class _FieldSpaceSym(object):
@@ -372,8 +386,6 @@ class _FieldSpaceSym(object):
         if self.canonical:
             Rdcab = 0
         else:
-
-            print(d, type(d))
             d, d_idx = self.get_symb_and_coord(d)
             c, c_idx = self.get_symb_and_coord(c)
             a, a_idx = self.get_symb_and_coord(a)
@@ -390,7 +402,7 @@ class _FieldSpaceSym(object):
 
         self.riemann_tensor = np.zeros((self.nf, self.nf, self.nf, self.nf), dtype=object)
 
-        om = OperationMatrix(self.nf)
+        om = riemann_operation_matrix(self.nf)
 
         assert self.riemann_tensor.shape == om.shape, "Operation matrix incompatible shape with Riemann tensor"
 
@@ -530,19 +542,275 @@ class _PotentialSym(object):
                         self.pdpdpd_potential[ii, jj, kk] = self.pdpdpd_potential[ii, kk, jj]
 
 
-nF = 2  # number of fields needed to define the double quadratic potential
-nP = 3  # number of parameters needed to define the double quadtartic potential
-f = sym.symarray('f', nF)  # an array representing the nF fields present for this model
-p = sym.symarray('p',
-                 nP)  # an array representing the nP parameters needed to define this model (that we might wish to change) if we don't
-# wish to change them they could be typed explicitly in the potential below
+class _CovariantDerivativesSym(object):
 
-V = 1. / 2. * p[0] ** 2.0 * f[0] ** 2.0 + 1. / 2. * p[1] ** 2.0 * f[
-    1] ** 2.0  # this is the potential written in sympy notation
-G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2.0 * sym.sin(f[0]) ** 2.0]])
+    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix, potential: sym.Expr,
+                 simple_metric=True, simple_potential=True, simple_covd=True):
 
-fs = FieldSpaceSym(2, 2, G, recache=False)
-ps = PotentialSym(2, 2, V)
+        self.nf = n_fields
+        self.nf_range = list(range(n_fields))
+        self.f_syms = sym.symarray("f", n_fields)  # field symbols
+        self.p_syms = sym.symarray("f", n_params) if n_params > 0 else None  # param symbols
+
+        self.simplify = simple_covd
+        self.fmet_sym = FieldSpaceSym(n_fields, n_params, metric, simplify=simple_metric)
+        self.pot_sym = PotentialSym(n_fields, n_params, potential, simplify=simple_potential)
+
+        self._configure_covd_potential()
+        self._configure_covdcovd_potential()
+        self._configure_covdcovdcovd_potential()
+        self._configure_covd_riemann()
+
+        cache_tools.cache_covd(metric, potential, self)
+
+    def get_symb_and_coord(self, symb_or_coord):
+        return self.fmet_sym.get_symb_and_coord(symb_or_coord)
+
+    def _get_lowered_riemann_tensor(self, a, b, c, d):
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+        c, c_idx = self.get_symb_and_coord(c)
+        d, d_idx = self.get_symb_and_coord(d)
+        return self.fmet_sym.riemann_tensor[a_idx, b_idx, c_idx, d_idx]
+
+    def _get_christoffel_symbol(self, a, b, c):
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+        c, c_idx = self.get_symb_and_coord(c)
+        return self.fmet_sym.christoffel_symbols[a_idx, b_idx, c_idx]
+
+    def _compute_covd_riemann(self, e, d, c, a, b):
+        """ Compute the covariant derivative of the Riemann tensor \nabla_e R_{dcab}"""
+
+        out = 0
+
+        if not self.fmet_sym.canonical:
+            e, e_idx = self.get_symb_and_coord(e)
+            d, d_idx = self.get_symb_and_coord(d)
+            c, c_idx = self.get_symb_and_coord(c)
+            a, a_idx = self.get_symb_and_coord(a)
+            b, b_idx = self.get_symb_and_coord(b)
+
+            riemann_tensor = self._get_lowered_riemann_tensor(d, c, a, b)
+
+            pd_riemann_tensor = sym.diff(riemann_tensor, e)
+
+            connexion_terms = -sum([
+                self._get_christoffel_symbol(x_idx, d_idx, e_idx) *
+                self._get_lowered_riemann_tensor(x_idx, c_idx, a_idx, b_idx) +
+                self._get_christoffel_symbol(x_idx, c_idx, e_idx) *
+                self._get_lowered_riemann_tensor(d_idx, x_idx, a_idx, b_idx) +
+                self._get_christoffel_symbol(x_idx, a_idx, e_idx) *
+                self._get_lowered_riemann_tensor(d_idx, c_idx, x_idx, b_idx) +
+                self._get_christoffel_symbol(x_idx, b_idx, e_idx) *
+                self._get_lowered_riemann_tensor(d_idx, c_idx, a_idx, x_idx)
+                for x_idx in self.nf_range
+            ])
+
+            out += pd_riemann_tensor + connexion_terms
+
+            if self.simplify:
+                out = sym.simplify(out)
+
+        return out
+
+    def _configure_covd_riemann(self):
+
+        print("-- Precomputing covariant derivatives of Riemann tensor")
+
+        self.covd_riemann = np.zeros((self.nf, self.nf, self.nf, self.nf, self.nf), dtype=object)
+
+        # can borrow symmetries from riemann tensor to exploit syms
+        OM = riemann_operation_matrix(self.nf, verbose=False)
+
+        # Get location of independent elements to compute & symmetrically related components
+        calc_locs = np.where(OM == "calc")
+        symm_locs = np.where(np.logical_and(OM != "calc", OM != 0))
+
+        # Transpose into rows of i, j, k, l matrix coordinates / tensor indices
+        calc_ijkl = np.asarray(calc_locs).T
+        symm_ijkl = np.asarray(symm_locs).T
+
+        for deriv_idx in self.nf_range:
+
+            print("   -> computing derivative {}/{}".format(deriv_idx + 1, self.nf))
+
+            deriv_sym, deriv_idx = self.get_symb_and_coord(deriv_idx)
+
+            for ijkl in calc_ijkl:
+                i, j, k, l = ijkl
+
+                covd_riemann = self._compute_covd_riemann(deriv_idx, i, j, k, l)
+
+                if self.simplify:
+                    covd_riemann = sym.simplify(covd_riemann)
+
+                self.covd_riemann[deriv_idx, i, j, k, l] = covd_riemann
+
+            for ijkl in symm_ijkl:
+
+                i, j, k, l = ijkl
+
+                assert self.covd_riemann[deriv_idx, i, j, k, l] == 0, \
+                    "Cov D Riemann componentalready has assigned value! {}".format(
+                        self.covd_riemann[deriv_idx, i, j, k, l]
+                    )
+
+                # Unpack the string that points to the fundamental Matrix element(s) and multiplicative sign
+                str_pointer = OM[i, j, k, l]
+
+                if len(str_pointer) == 5:
+                    sign, p, q, r, s = str_pointer
+
+                    covdRpqrs = self.covd_riemann[deriv_idx, int(p), int(q), int(r), int(s)]
+
+                    if sign == "+":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += covdRpqrs
+                    elif sign == "-":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += -covdRpqrs
+                    else:
+                        raise ValueError("Unrecognized sign value: {}".format(sign))
+
+                elif len(str_pointer) == 10:
+                    sign1, p, q, r, s, sign2, t, u, v, w = str_pointer
+
+                    covdRpqrs = self.covd_riemann[deriv_idx, int(p), int(q), int(r), int(s)]
+                    covdRtuvw = self.covd_riemann[deriv_idx, int(t), int(u), int(v), int(w)]
+
+                    if sign1 == "+":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += covdRpqrs
+                    elif sign1 == "-":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += -covdRpqrs
+                    else:
+                        raise ValueError("Unrecognized sign value: {}".format(sign1))
+
+                    if sign2 == "+":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += covdRtuvw
+                    elif sign2 == "-":
+                        self.covd_riemann[deriv_idx, i, j, k, l] += -covdRtuvw
+                    else:
+                        raise ValueError("Unrecognized sign value: {}".format(sign2))
+
+                else:
+                    raise ValueError("Unrecognized symmetry relation: {}".format(str_pointer))
+
+    def _get_pd_potential(self, a):
+        a, a_idx = self.get_symb_and_coord(a)
+        return self.pot_sym.pd_potential[a_idx]
+
+    def _get_pdpd_potential(self, a, b):
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+        return self.pot_sym.pdpd_potential[a_idx, b_idx]
+
+    def _get_pdpdpd_potential(self, a, b, c):
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+        c, c_idx = self.get_symb_and_coord(c)
+        return self.pot_sym.pdpdpd_potential[a_idx, b_idx, c_idx]
+
+    def _compute_covd_potential(self, a):
+
+        a, a_idx = self.get_symb_and_coord(a)
+
+        covd_potential = self._get_pd_potential(a_idx)  # simply same as partial derivative at 1st derivative
+
+        if self.simplify:
+            covd_potential = sym.simplify(covd_potential)
+
+        return covd_potential
+
+    def _configure_covd_potential(self):
+
+        print("-- Computing 1st covariant derivatives of the potential")
+
+        self.covd_potential = np.zeros(self.nf, dtype=object)
+
+        for a in self.nf_range:
+            self.covd_potential[a] = self._compute_covd_potential(a)
+
+    def _compute_covdcovd_potential(self, a, b):
+
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+
+        out = self._get_pdpd_potential(a, b)  # canonical fmet -> second partial derivative
+
+        if not self.fmet_sym.canonical:  # NC has christoffel term
+            connexion_term = -sum(
+                [self._get_christoffel_symbol(k_idx, a_idx, b_idx) * self.covd_potential[k_idx]
+                 for k_idx in self.nf_range])
+
+            out += connexion_term
+
+        if self.simplify:
+            out = sym.simplify(out)
+
+        return out
+
+    def _configure_covdcovd_potential(self):
+
+        print("-- Computing 2nd covariant derivatives of the potential")
+
+        self.covdcovd_potential = np.zeros((self.nf, self.nf), dtype=object)
+
+        for a in self.nf_range:
+            for b in self.nf_range:
+                if a >= b:
+                    self.covdcovd_potential[a, b] = self._compute_covdcovd_potential(a, b)
+                else:
+                    self.covdcovd_potential[a, b] = self.covdcovd_potential[b, a]
+
+    def _compute_covdcovdcovd_potential(self, a, b, c):
+
+        a, a_idx = self.get_symb_and_coord(a)
+        b, b_idx = self.get_symb_and_coord(b)
+        c, c_idx = self.get_symb_and_coord(c)
+
+        out = self._get_pdpdpd_potential(a, b, c)  # canonical is simply thrid partial derivative
+
+        if not self.fmet_sym.canonical:
+            t1 = -sum([sym.diff(self._get_christoffel_symbol(k_idx, b_idx, c_idx) * self._get_pd_potential(k_idx), a)
+                       for k_idx in self.nf_range])
+
+            t2 = -sum([self._get_christoffel_symbol(d_idx, a_idx, b_idx) * self.covdcovd_potential[d_idx, c_idx] +
+                       self._get_christoffel_symbol(d_idx, a_idx, c_idx) * self.covdcovd_potential[d_idx, b_idx]
+                       for d_idx in self.nf_range])
+
+            out += t1 + t2
+
+        if self.simplify:
+            out = sym.simplify(out)
+
+        return out
+
+    def _configure_covdcovdcovd_potential(self):
+
+        print("-- Computing 3rd covariant derivatives of the potential")
+
+        self.covdcovdcovd_potential = np.zeros((self.nf, self.nf, self.nf), dtype=object)
+
+        for a in self.nf_range:
+            for b in self.nf_range:
+                for c in self.nf_range:
+
+                    if c >= b:
+                        self.covdcovdcovd_potential[a, b, c] = self._compute_covdcovdcovd_potential(a, b, c)
+                    else:
+                        self.covdcovdcovd_potential[a, b, c] = self._compute_covdcovdcovd_potential(a, c, b)
+
+
+nF = 2
+nP = 3
+f = sym.symarray('f', nF)
+p = sym.symarray('p', nP)
+
+V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2 + sym.Rational(1, 2) * p[1] ** 2 * f[1] ** 2
+G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2 * sym.sin(f[0]) ** 2]])
+
+# fs = FieldSpaceSym(2, 2, G, recache=False)
+# ps = PotentialSym(2, 2, V)
+ms = CovDSym(2, 3, G, V)
 
 # n = 6
 # OM = OperationMatrix(n)

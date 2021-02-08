@@ -7,6 +7,7 @@ import pickle as pk
 model_cache = os.environ["model_cache"]
 fmet_cache = os.environ["fmet_cache"]
 pot_cache = os.environ["pot_cache"]
+covd_cache = os.environ["covd_cache"]
 
 
 def fmet_path(metric: sym.Matrix):
@@ -46,7 +47,7 @@ def pot_path(potential: sym.Expr):
     return fname
 
 
-def model_path(metric: sym.Matrix, potential: sym.Expr):
+def covd_path(metric: sym.Matrix, potential: sym.Expr):
     """
     Creates hash string from sympy metric and potential and builds path
 
@@ -61,7 +62,7 @@ def model_path(metric: sym.Matrix, potential: sym.Expr):
     hash_str_fmet = os.path.split(fpath)[-1].split(".")[0]
     hash_str_pot = os.path.split(vpath)[-1].split(".")[0]
 
-    fname = os.path.join(model_cache, hash_str_fmet + "_" + hash_str_pot + ".model")
+    fname = os.path.join(covd_cache, hash_str_fmet + "_" + hash_str_pot + ".covd")
 
     return fname
 
@@ -122,35 +123,29 @@ def load_pot(potential: sym.Expr, delete=False):
     return pot_derived
 
 
-def cache_model(metric: sym.Matrix, potential: sym.Expr, delete=False):
-    path = model_path(metric, potential)
+def cache_covd(metric: sym.Matrix, potential: sym.Expr, covd_derived, recache=False):
+    path = covd_path(metric, potential)
+
+    if os.path.exists(path):
+        if recache:
+            os.remove(path)
+        else:
+            raise OSError("Covariant derivatives already cached: {}".format(path))
+
+    with open(path, "wb") as f:
+        pk.dump(covd_derived, f)
+
+
+def load_covd(metric: sym.Matrix, potential: sym.Expr, delete=False):
+    path = covd_path(metric, potential)
 
     if delete and os.path.exists(path):
         os.remove(path)
 
     if os.path.exists(path):
         with open(path, "rb") as f:
-            model_derived = pk.load(f)
+            covd_derived = pk.load(f)
     else:
-        raise OSError("Model derived from metric and potential does not exists: {}".format(path))
+        raise OSError("Covariant derivatives do not exists: {}".format(path))
 
-    return model_derived
-
-
-nF = 2  # number of fields needed to define the double quadratic potential
-nP = 3  # number of parameters needed to define the double quadtartic potential
-f = sym.symarray('f', nF)  # an array representing the nF fields present for this model
-p = sym.symarray('p',
-                 nP)  # an array representing the nP parameters needed to define this model (that we might wish to change) if we don't
-# wish to change them they could be typed explicitly in the potential below
-
-V = 1. / 2. * p[0] ** 2.0 * f[0] ** 2.0 + 1. / 2. * p[1] ** 2.0 * f[
-    1] ** 2.0  # this is the potential written in sympy notation
-G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2.0 * sym.sin(f[0]) ** 2.0]])
-
-# fpath = fmet_path(G)
-# vpath = pot_path(V)
-# mpath = model_path(G, V)
-#
-# for p in [fpath, vpath, mpath]:
-#     print(p)
+    return covd_derived
