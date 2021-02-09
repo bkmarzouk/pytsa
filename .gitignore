@@ -17,6 +17,8 @@
 /Install/*
 !/Install/.gitkeep
 !/Install/dquad_euclidean.py
+!/Install/dquad_2sphere.py
+!/Install/path_root.py
 
 # Ignore sampler builds, but keep directory
 /Sampler/sampler-builds/*
