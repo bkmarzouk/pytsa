@@ -1,5 +1,4 @@
 from hashlib import sha224
-import numpy as np
 import sympy as sym
 import os
 import pickle as pk
@@ -17,6 +16,7 @@ def fmet_path(metric: sym.Matrix):
     :param metric: sympy representation of metric
     :return: path to metric calculations
     """
+
     assert isinstance(metric, sym.Matrix), "Must pass sympy matrix representation of metric: {}".format(metric)
     assert metric.is_symmetric(), "Metric must be symmetric: {}".format(metric)
 

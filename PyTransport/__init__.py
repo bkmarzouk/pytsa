@@ -1,7 +1,5 @@
-from PyTransport import PyTransSetup
+# from PyTransport import PyTransSetup
 import os
-
-PyTransSetup.pathSet()
 
 sym_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sym_cache")  # cache locations for sym calcs
 fmet_cache = os.path.join(sym_cache, "fmet")

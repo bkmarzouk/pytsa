@@ -16,7 +16,7 @@
 # Ignore Installation Directory (except for examples)
 /Install/*
 !/Install/.gitkeep
-!/Install/DQuadExample.py
+!/Install/dquad_euclidean.py
 
 # Ignore sampler builds, but keep directory
 /Sampler/sampler-builds/*
@@ -29,12 +29,12 @@
 !/Sampler/sampler-configs/EXAMPLE_NC.py
 !/Sampler/sampler-configs/setupBuilds.py
 
-# Need to ignore files in 
-/PyTransport/PyTransport/PyTrans/lib/python2.7/site-packages/*
-!/PyTransport/PyTransport/PyTrans/lib/python2.7/site-packages/.gitkeep
+# Ignore compile modules
+/PyTransport/PyTrans/lib/python3.8/site-packages/*
+!/PyTransport/PyTrans/lib/python3.8/site-packages/.gitkeep
 
-# Maintain cache directory (Not sure if this is requried)
-!/PyTransport/PyTransport/__pycache__/.gitkeep
+# Ignore cached symbolic files
+/PyTransport/sym_cache/*
 
 # Ignore .h header files that are generated from proto
 /PyTransport/PyTransport/CppTrans/fieldmetric.h

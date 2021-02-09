@@ -38,5 +38,5 @@ filename2 = os.path.join(dir, '../CppTrans/stepper/rkf45.cpp')
 dirs = os.path.join(dir, '../CppTrans/')
 
 # don't edit the comment at the end of the setup line below #######################################
-setup(name="PyTransdquad", version="1.0", ext_modules=[Extension("PyTransdquad", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup
+setup(name="PyTransdquad_2sphere", version="1.0", ext_modules=[Extension("PyTransdquad_2sphere", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup
 ###################################################################################################

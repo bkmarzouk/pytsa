@@ -26,6 +26,7 @@ import shutil
 import time as t
 import pickle as pk
 from PyTransport import gravtools_pyt
+from PyTransport import sym_tools
 
 
 def directory(NC: bool):
@@ -120,74 +121,14 @@ def compileName(name, NC=False):
     location = os.path.join(dir, 'PyTrans')
     filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
 
-    if NC is True:
-        # There should exist a temporary file fom the calling 'potential'
-        curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
-        assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
-
-        # Rename temporary curvature file with compilation name!
-        new_curv_path = curv_path.replace('TEMP', name)
-        os.rename(curv_path, new_curv_path)
-
-    f = open(filename1, "r")
-    lines = f.readlines()
-    f.close()
-    f = open(filename1, "w")
-    for line in lines:
-        if not line.endswith("#setup\n"):
-            f.write(line)
-        if line.endswith("#setup\n"):
-            f.write(
-                # 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup\n')
-                'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup\n')
-    f.close()
-
-    filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
-    f = open(filename, "r")
-    lines = f.readlines()
-    f.close()
-
-    f = open(filename, "w")
-    for line in lines:
-        if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith("//modDef\n"):
-            f.write(line)
-        if line.endswith("//FuncDef\n"):
-            f.write(
-                'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
-        if line.endswith("//modDef\n"):
-            f.write('     //modDef\n')
-        if line.endswith("//initFunc\n"):
-            f.write(
-                'void initPyTrans' + name + '(void)    {        Py_InitModule3("PyTrans' + name + '", PyTrans' + name + '_funcs,                       "Extension module for inflationary statistics");        import_array();   }//initFunc\n')
-
-    f.close()
-
-    my_env = os.environ.copy()
-    my_env["PYTHONUSERBASE"] = location
-    p = subprocess.Popen(["python", filename1, "install", "--user"], cwd=location, stdin=subprocess.PIPE,
-                         stderr=subprocess.PIPE, env=my_env)
-
-    stdout, stderr = p.communicate()
-
-    pathSet()
-
-    shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
-
-
-def compileName3(name, NC=False):
-    directory(NC)
-    dir = os.path.dirname(__file__)
-    location = os.path.join(dir, 'PyTrans')
-    filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
-
-    if NC is True:
-        # There should exist a temporary file fom the calling 'potential'
-        curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
-        assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
-
-        # Rename temporary curvature file with compilation name!
-        new_curv_path = curv_path.replace('TEMP', name)
-        os.rename(curv_path, new_curv_path)
+    # if NC is True:
+    #     # There should exist a temporary file fom the calling 'potential'
+    #     curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
+    #     assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
+    #
+    #     # Rename temporary curvature file with compilation name!
+    #     new_curv_path = curv_path.replace('TEMP', name)
+    #     os.rename(curv_path, new_curv_path)
 
     f = open(filename1, "r")
     lines = f.readlines()
@@ -248,66 +189,75 @@ def tol(rtol, atol):
     f = open(filename, "r")
 
 
-def potential(V, nF, nP, simpleGeometric=False, simplePotentials=False, G="canonical", silent=True):
+def potential(V, nF, nP, simple_fmet=False, simple_potential=False, G=None, silent=False, recache=False):
     # Define symbols for fields and parameters
-    f = sym.symarray('f', nF)
-    p = sym.symarray('p', nP)
+    # f = sym.symarray('f', nF)
+    # p = sym.symarray('p', nP)
+    #
+    # # build curvature records directory if not found
+    # dir = os.path.dirname(__file__)
+    # curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
+    # if not os.path.exists(curv_dir):
+    #     os.makedirs(curv_dir)
 
-    # build curvature records directory if not found
-    dir = os.path.dirname(__file__)
-    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-    if not os.path.exists(curv_dir):
-        os.makedirs(curv_dir)
+    covd_sym = sym_tools.CovDSym(nF, nP, G, V, recache, simple_fmet, simple_potential,
+                                 simple_potential and simple_fmet)
 
-    # Make a temporary name for the curvature file (will be renamed by in compile process)
-    curv_tmp = os.path.join(curv_dir, "TEMP.curvature")
-    if not silent:
-        timer = t.process_time()
-        print('[{time}] constructing curvature class instance'.format(time=t.ctime()))
+    fieldmetric(nF, nP, G, V, recache, simple_fmet, simple_potential, silent)
+    # fmet_sym = covd_sym.fmet_sym
+    # pot_sym = covd_sym.pot_sym
 
-    # Initialize curvature class instance: This will handle all symbolic computations requried
-    """ TODO: add kwargs for simplifying curv. and pots. """
-    curv_instance = gravtools_pyt.curvatureObject(
-        G, f, V, params=p, simpleGeometric=simpleGeometric, simplePotentials=simplePotentials)
+    # # Make a temporary name for the curvature file (will be renamed by in compile process)
+    # curv_tmp = os.path.join(curv_dir, "TEMP.curvature")
+    # if not silent:
+    #     timer = t.process_time()
+    #     print('[{time}] constructing curvature class instance'.format(time=t.ctime()))
+    #
+    # # Initialize curvature class instance: This will handle all symbolic computations requried
+    # """ TODO: add kwargs for simplifying curv. and pots. """
+    # curv_instance = gravtools_pyt.curvatureObject(
+    #     G, f, V, params=p, simpleGeometric=simpleGeometric, simplePotentials=simplePotentials)
+    #
+    # if not silent:
+    #     print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
+    #
+    # # Save record of curvature class (this can then be callable from PyTransScripts)
+    # curv_file = open(curv_tmp, 'wb')
+    # with curv_file as cf:
+    #     pk.dump(curv_instance, cf)
 
-    if not silent:
-        print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
+    # if not silent:
+    #     timer = t.process_time()
+    #     print('[{time}] writing curvature expressions'.format(time=t.ctime()))
+    #
+    # # Pass curvature instance to fieldmetric function: Will write PyTrans files
+    # fieldmetric(G, nF, nP, simple=simpleGeometric, silent=silent, curv_obj=curv_instance)
+    #
+    # # Construct (flattened) symbolic arrays to hold 2st, 2nd and 3rd order derivatives
+    # vd = sym.symarray('vd', nF)
+    # vdd = sym.symarray('vdd', nF * nF)
+    # vddd = sym.symarray('vddd', nF * nF * nF)
+    #
+    # # Load precomputed arrays and remap to flattened configuration
+    # dV_arr = curv_instance.dV
+    # ddV_arr = curv_instance.ddV
+    # dddV_arr = curv_instance.dddV
 
-    # Save record of curvature class (this can then be callable from PyTransScripts)
-    curv_file = open(curv_tmp, 'wb')
-    with curv_file as cf:
-        pk.dump(curv_instance, cf)
+    # # We then flatten these arrays and (hopefully) match indices for the cpp writer
+    # ddV_arr_flat = ddV_arr.flatten()
+    # dddV_arr_flat = dddV_arr.T.flatten()  # Transpose of canonical matrix coords. + flatten seems to agree
+    #
+    # for i in range(nF):
+    #     vd[i] = dV_arr[i]
+    #     for j in range(nF):
+    #         vdd[i + j * nF] = ddV_arr_flat[i + j * nF]
+    #         for k in range(nF):
+    #             vddd[i + j * nF + k * nF * nF] = dddV_arr_flat[i + j * nF + k * nF * nF]
 
-    if not silent:
-        timer = t.process_time()
-        print('[{time}] writing curvature expressions'.format(time=t.ctime()))
+    # if not silent:
+    #     print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
 
-    # Pass curvature instance to fieldmetric function: Will write PyTrans files
-    fieldmetric(G, nF, nP, simple=simpleGeometric, silent=silent, curv_obj=curv_instance)
-
-    # Construct (flattened) symbolic arrays to hold 2st, 2nd and 3rd order derivatives
-    vd = sym.symarray('vd', nF)
-    vdd = sym.symarray('vdd', nF * nF)
-    vddd = sym.symarray('vddd', nF * nF * nF)
-
-    # Load precomputed arrays and remap to flattened configuration
-    dV_arr = curv_instance.dV
-    ddV_arr = curv_instance.ddV
-    dddV_arr = curv_instance.dddV
-
-    # We then flatten these arrays and (hopefully) match indices for the cpp writer
-    ddV_arr_flat = ddV_arr.flatten()
-    dddV_arr_flat = dddV_arr.T.flatten()  # Transpose of canonical matrix coords. + flatten seems to agree
-
-    for i in range(nF):
-        vd[i] = dV_arr[i]
-        for j in range(nF):
-            vdd[i + j * nF] = ddV_arr_flat[i + j * nF]
-            for k in range(nF):
-                vddd[i + j * nF + k * nF * nF] = dddV_arr_flat[i + j * nF + k * nF * nF]
-
-    if not silent:
-        print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
+    v, vd, vdd, vddd = covd_sym.get_potential_sym_arrays()
 
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'potentialProto.h')
@@ -427,14 +377,7 @@ def rewrite_indices(expr, nF, nP):
     return new_expr
 
 
-def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
-    f = sym.symarray('f', nF)
-    p = sym.symarray('p', nP)
-
-    Ga = curv_obj._christoffelSymbols
-    Ri = 0  # This isn't actually used...
-    Rm = curv_obj._riemannTensor
-    covDRm = curv_obj._riemannTensorCovD
+def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential=False, silent=True):
 
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'fieldmetricProto.h')
@@ -442,88 +385,14 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
     e = open(filename1, 'r')
     h = open(filename2, 'w')
 
-    # Build symbolic arrays to hold quantities: These will be converted into cpp expressions later
-    G_array = curv_obj.G_array
-    Gamma_array = sym.symarray('Gamma', 2 * nF * 2 * nF * 2 * nF)
-    R_array = sym.symarray('Riemann', nF * nF * nF * nF)
-    gradR_array = sym.symarray('gradRiemann', nF * nF * nF * nF * nF)
+    covd_sym = sym_tools.CovDSym(nF, nP, G, V, recache, simple_fmet, simple_potential,
+                                 simple_fmet and simple_potential)
 
-    # populate connexion matrix
-    for i in range(2 * nF):
-        for j in range(2 * nF):
-            for k in range(2 * nF):
-                if i < nF:
-                    ii = -i - 1
-                else:
-                    ii = i - (nF - 1)
-                if j < nF:
-                    jj = -j - 1
-                else:
-                    jj = j - (nF - 1)
-                if k < nF:
-                    kk = -k - 1
-                else:
-                    kk = k - (nF - 1)
-
-                if kk < 0 or jj < 0 or ii > 0:
-                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(0)
-                else:
-                    Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = Ga(
-                        ii, jj, kk) if curv_obj is None else curv_obj.getChristoffel(abs(ii) - 1, jj - 1, kk - 1)
-
-                    if curv_obj is None and simple is True:
-                        Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k] = sym.simplify(
-                            Gamma_array[(2 * nF) * (2 * nF) * i + (2 * nF) * j + k]
-                        )
-
-    # populate Riemann matrix
-    for i in range(nF):
-        for j in range(nF):
-            for k in range(nF):
-                for l in range(nF):
-                    ii = i + 1
-                    jj = j + 1
-                    kk = k + 1
-                    ll = l + 1
-
-                    if curv_obj is None:
-                        if simple is True:
-                            R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = sym.simplify(
-                                Rm(ii, jj, kk, ll))
-                        else:
-                            R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm(ii, jj, kk, ll)
-                    else:
-                        R_array[(nF) * (nF) * (nF) * i + (nF) * (nF) * j + (nF) * k + l] = Rm[
-                            ii - 1, jj - 1, kk - 1, ll - 1]
-
-    # populate covariant-derivative of Riemann matrix
-    for i in range(nF):
-        for j in range(nF):
-            for k in range(nF):
-                for l in range(nF):
-                    for m in range(nF):
-                        ii = i + 1
-                        jj = j + 1
-                        kk = k + 1
-                        ll = l + 1
-                        mm = m + 1
-
-                        if curv_obj is None:
-                            if simple is True:
-                                gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
-                                    nF) * l + m] = sym.simplify(Rm.covariantD(ii, jj, kk, ll, mm))
-                            else:
-                                gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
-                                    nF) * l + m] = Rm.covariantD(ii, jj, kk, ll, mm)
-
-                        else:
-                            gradR_array[(nF) * (nF) * (nF) * (nF) * i + (nF) * (nF) * (nF) * j + (nF) * (nF) * k + (
-                                nF) * l + m] = covDRm[ii - 1, jj - 1, kk - 1, ll - 1, mm - 1]
+    G_array, Gamma_array, R_array, gradR_array = covd_sym.get_curvature_sym_arrays()
 
     for line in e:
         h.write(line)
         if line == "// #FP\n":
-            # h.write('nF='+str(nF)+';\n')
             h.write('nF=' + str(nF) + ';\n' + 'nP=' + str(nP) + ';\n')
 
         if line == "// metric\n":
@@ -549,7 +418,7 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
 
             if not silent:
                 timer_cse = t.process_time()
-                print('    [{time}] performing CSE for Christoffel symbols'.format(time=t.ctime()))
+                print('[{time}] performing CSE for Christoffel symbols'.format(time=t.ctime()))
             decls, new_expr = sym.cse(Gamma_array, order='none')
             if not silent:
                 print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
@@ -619,5 +488,3 @@ def fieldmetric(G, nF, nP, simple=False, silent=True, curv_obj=None):
 
     h.close()
     e.close()
-
-    # return g, Ga, Ri, Rm

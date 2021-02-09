@@ -10,5 +10,5 @@ V = sum(s)
 
 PyTransSetup.tol(1E-8, 1E-8)
 
-PyTransSetup.potential(V, nF, nP, simpleGeometric=True, simplePotentials=True, silent=False)
-PyTransSetup.compileName3('dquad', True)
+PyTransSetup.potential(V, nF, nP, simple_fmet=True, simple_potential=True, silent=False)
+PyTransSetup.compileName('dquad', True)

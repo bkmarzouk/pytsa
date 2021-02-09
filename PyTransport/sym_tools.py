@@ -1,8 +1,6 @@
 import numpy as np
-import numpy as np
 import sympy as sym
-import os
-import cache_tools
+from . import cache_tools
 
 
 def riemann_operation_matrix(N, verbose=True):
@@ -174,7 +172,11 @@ def riemann_operation_matrix(N, verbose=True):
     return OM
 
 
-def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix, recache=False, simplify=True):
+def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, recache=False, simplify=True):
+
+    if metric is None:
+        metric = sym.matrices.eye(n_fields)
+
     try:
         fs_derived = cache_tools.load_fmet(metric, delete=recache)
         print("-- Derived field space calculations loaded from cache")
@@ -198,8 +200,12 @@ def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=Fals
     return pot_derived
 
 
-def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix, potential: sym.Expr, recache=False,
+def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix or None, potential: sym.Expr, recache=False,
             simple_metric=True, simple_potential=True, simple_covd=True):
+
+    if metric is None:
+        metric = sym.eye(n_fields)
+
     try:
         covd_derived = cache_tools.load_covd(metric, potential, delete=recache)
         print("-- Derived covariant derivatives loaded from cache")
@@ -215,7 +221,7 @@ def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix, potential: sym.Exp
 class _FieldSpaceSym(object):
     """ Handles symbolic calculations relevant to the field space metric"""
 
-    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix, simplify=True):
+    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix or None, simplify=True):
 
         self.nf = n_fields
         self.nf_range = list(range(n_fields))
@@ -544,7 +550,7 @@ class _PotentialSym(object):
 
 class _CovariantDerivativesSym(object):
 
-    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix, potential: sym.Expr,
+    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix or None, potential: sym.Expr,
                  simple_metric=True, simple_potential=True, simple_covd=True):
 
         self.nf = n_fields
@@ -798,6 +804,83 @@ class _CovariantDerivativesSym(object):
                         self.covdcovdcovd_potential[a, b, c] = self._compute_covdcovdcovd_potential(a, b, c)
                     else:
                         self.covdcovdcovd_potential[a, b, c] = self._compute_covdcovdcovd_potential(a, c, b)
+
+    def get_potential_sym_arrays(self):
+
+        print("-- Repacking potentials into flat arrays")
+
+        vd = sym.symarray("vd", self.nf)
+        vdd = sym.symarray("vdd", self.nf ** 2)
+        vddd = sym.symarray("vddd", self.nf ** 3)
+
+        covd_potential_flat = self.covd_potential
+        covdcovd_potential_flat = self.covdcovd_potential.flatten()
+        covdcovdcovd_potential_flat = self.covdcovdcovd_potential.flatten()
+
+        for a in self.nf_range:
+            vd[a] = covd_potential_flat[a]
+            for b in self.nf_range:
+                b_idx = a + b * self.nf
+                vdd[b_idx] = covdcovd_potential_flat[b_idx]
+                for c in self.nf_range:
+                    c_idx = a + b * self.nf + c * self.nf ** 2
+                    vddd[c_idx] = covdcovdcovd_potential_flat[c_idx]
+
+        return self.pot_sym.potential, vd, vdd, vddd
+
+    def get_curvature_sym_arrays(self):
+
+        print("-- Repacking curvature quantities into flat arrays")
+
+        metric = self.fmet_sym.G_array
+        christoffel = sym.symarray("Gamma", (2 * self.nf) ** 3)
+        riemann = sym.symarray("Riemann", self.nf ** 4)
+        covd_riemann = sym.symarray("gradRiemann", self.nf ** 5)
+
+        _ch = self.fmet_sym.christoffel_symbols
+        _ri = self.fmet_sym.riemann_tensor
+        _cr = self.covd_riemann
+
+        # populate connexion matrix
+        for i in range(2 * self.nf):
+            for j in range(2 * self.nf):
+                for k in range(2 * self.nf):
+                    if i < self.nf:
+                        ii = -i - 1
+                    else:
+                        ii = i - (self.nf - 1)
+                    if j < nF:
+                        jj = -j - 1
+                    else:
+                        jj = j - (self.nf - 1)
+                    if k < nF:
+                        kk = -k - 1
+                    else:
+                        kk = k - (self.nf - 1)
+
+                    if kk < 0 or jj < 0 or ii > 0:
+                        christoffel[(2 * self.nf) * (2 * self.nf) * i + (2 * self.nf) * j + k] = sym.Rational(0)
+                    else:
+                        christoffel[(2 * self.nf) * (2 * self.nf) * i + (2 * self.nf) * j + k] = \
+                            _ch[abs(ii) - 1, jj - 1, kk - 1]
+
+        # populate Riemann matrix
+        for i in range(self.nf):
+            for j in range(self.nf):
+                for k in range(self.nf):
+                    for l in range(self.nf):
+                        riemann[self.nf ** 3 * i + self.nf ** 2 * j + self.nf * k + l] = _ri[i, j, k, l]
+
+        # populate covariant-derivative of Riemann matrix
+        for i in range(nF):
+            for j in range(nF):
+                for k in range(nF):
+                    for l in range(nF):
+                        for m in range(nF):
+                            covd_riemann[self.nf ** 4 * i + self.nf ** 3 * j + self.nf ** 2 * k + self.nf * l + m] = \
+                                _cr[i, j, k, l, m]
+
+        return metric, christoffel, riemann, covd_riemann
 
 
 nF = 2
