@@ -10,8 +10,8 @@
 !/PyTransport/PyTransport/PyTrans/CurvatureRecords/.gitkeep
 
 # Ignore Pytransport model compile files
-**/.egg-info
-**/.so
+/**/.egg-info
+/**/.so
 
 # Ignore Installation Directory (except for examples)
 /Install/*
