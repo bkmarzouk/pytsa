@@ -9,6 +9,7 @@ p = sym.symarray('p', nP)
 s = [sym.Rational(1, 2) * f[i] ** 2 * p[i] ** 2 for i in range(2)]
 V = sum(s)
 
-PyTransSetup.tol(1E-8, 1E-8)
-PyTransSetup.potential(V, nF, nP, simple_fmet=True, simple_potential=True, silent=False)
-PyTransSetup.compileName('dquad_euclidean', True)
+PyTransSetup.potential(V, nF, nP, simplify_fmet=True, simplify_pot=True, simplify_covd=True, silent=False)
+PyTransSetup.compileName('dquad_euclidean', True, use_j=True)
+
+import distutils

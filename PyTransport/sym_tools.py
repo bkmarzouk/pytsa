@@ -173,12 +173,11 @@ def riemann_operation_matrix(N, verbose=True):
 
 
 def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, recache=False, simplify=True):
-
     if metric is None:
         metric = sym.matrices.eye(n_fields)
 
     try:
-        fs_derived = cache_tools.load_fmet(metric, delete=recache)
+        fs_derived = cache_tools.load_fmet(metric, delete=recache, simplify=simplify)
         print("-- Derived field space calculations loaded from cache")
 
     except OSError:
@@ -190,7 +189,7 @@ def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, reca
 
 def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=False, simplify=True):
     try:
-        pot_derived = cache_tools.load_pot(potential, delete=recache)
+        pot_derived = cache_tools.load_pot(potential, delete=recache, simplify=simplify)
         print("-- Derived potential calculations loaded from cache")
 
     except OSError:
@@ -201,19 +200,19 @@ def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=Fals
 
 
 def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix or None, potential: sym.Expr, recache=False,
-            simple_metric=True, simple_potential=True, simple_covd=True):
-
+            simplify_fmet=True, simplify_pot=True, simplify=True):
     if metric is None:
         metric = sym.eye(n_fields)
 
     try:
-        covd_derived = cache_tools.load_covd(metric, potential, delete=recache)
+        covd_derived = cache_tools.load_covd(metric, potential, delete=recache, simplify_fmet=simplify_fmet,
+                                             simplify_pot=simplify_pot, simplify=simplify)
         print("-- Derived covariant derivatives loaded from cache")
 
     except OSError:
         print("-- Performing covariant derivative calculations ...")
         covd_derived = _CovariantDerivativesSym(n_fields, n_params, metric, potential,
-                                                simple_metric, simple_potential, simple_covd)
+                                                simplify_fmet, simplify_pot, simplify)
 
     return covd_derived
 
@@ -221,7 +220,7 @@ def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix or None, potential:
 class _FieldSpaceSym(object):
     """ Handles symbolic calculations relevant to the field space metric"""
 
-    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix or None, simplify=True):
+    def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix or None, simplify: bool):
 
         self.nf = n_fields
         self.nf_range = list(range(n_fields))
@@ -234,7 +233,7 @@ class _FieldSpaceSym(object):
         self._configure_christoffel_symbols()
         self._configure_riemann_tensor()
 
-        cache_tools.cache_fmet(metric, self)
+        cache_tools.cache_fmet(metric, self, simplify=simplify)
 
     def _coord2symb(self, coord):
 
@@ -489,7 +488,7 @@ class _FieldSpaceSym(object):
 
 class _PotentialSym(object):
 
-    def __init__(self, n_fields: int, n_params: int, potential: sym.Expr, simplify=True):
+    def __init__(self, n_fields: int, n_params: int, potential: sym.Expr, simplify: bool):
 
         self.nf = n_fields
         self.nf_range = list(range(n_fields))
@@ -498,7 +497,7 @@ class _PotentialSym(object):
 
         self.simplify = simplify
         self._configure_potential(potential)
-        cache_tools.cache_pot(potential, self)
+        cache_tools.cache_pot(potential, self, simplify=simplify)
 
     def _configure_potential(self, potential):
 
@@ -551,7 +550,7 @@ class _PotentialSym(object):
 class _CovariantDerivativesSym(object):
 
     def __init__(self, n_fields: int, n_params: int, metric: sym.Matrix or None, potential: sym.Expr,
-                 simple_metric=True, simple_potential=True, simple_covd=True):
+                 simple_metric: bool, simple_potential: bool, simple_covd: bool):
 
         self.nf = n_fields
         self.nf_range = list(range(n_fields))
@@ -567,7 +566,7 @@ class _CovariantDerivativesSym(object):
         self._configure_covdcovdcovd_potential()
         self._configure_covd_riemann()
 
-        cache_tools.cache_covd(metric, potential, self)
+        cache_tools.cache_covd(metric, potential, self, simplify_fmet=simple_metric, simplify_pot=simple_potential, simplify=simple_covd)
 
     def get_symb_and_coord(self, symb_or_coord):
         return self.fmet_sym.get_symb_and_coord(symb_or_coord)
@@ -849,11 +848,11 @@ class _CovariantDerivativesSym(object):
                         ii = -i - 1
                     else:
                         ii = i - (self.nf - 1)
-                    if j < nF:
+                    if j < self.nf:
                         jj = -j - 1
                     else:
                         jj = j - (self.nf - 1)
-                    if k < nF:
+                    if k < self.nf:
                         kk = -k - 1
                     else:
                         kk = k - (self.nf - 1)
@@ -872,28 +871,28 @@ class _CovariantDerivativesSym(object):
                         riemann[self.nf ** 3 * i + self.nf ** 2 * j + self.nf * k + l] = _ri[i, j, k, l]
 
         # populate covariant-derivative of Riemann matrix
-        for i in range(nF):
-            for j in range(nF):
-                for k in range(nF):
-                    for l in range(nF):
-                        for m in range(nF):
+        for i in range(self.nf):
+            for j in range(self.nf):
+                for k in range(self.nf):
+                    for l in range(self.nf):
+                        for m in range(self.nf):
                             covd_riemann[self.nf ** 4 * i + self.nf ** 3 * j + self.nf ** 2 * k + self.nf * l + m] = \
                                 _cr[i, j, k, l, m]
 
         return metric, christoffel, riemann, covd_riemann
 
 
-nF = 2
-nP = 3
-f = sym.symarray('f', nF)
-p = sym.symarray('p', nP)
-
-V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2 + sym.Rational(1, 2) * p[1] ** 2 * f[1] ** 2
-G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2 * sym.sin(f[0]) ** 2]])
-
-# fs = FieldSpaceSym(2, 2, G, recache=False)
-# ps = PotentialSym(2, 2, V)
-ms = CovDSym(2, 3, G, V)
+# nF = 2
+# nP = 3
+# f = sym.symarray('f', nF)
+# p = sym.symarray('p', nP)
+#
+# V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2 + sym.Rational(1, 2) * p[1] ** 2 * f[1] ** 2
+# G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2 * sym.sin(f[0]) ** 2]])
+#
+# # fs = FieldSpaceSym(2, 2, G, recache=False)
+# # ps = PotentialSym(2, 2, V)
+# ms = CovDSym(2, 3, G, V)
 
 # n = 6
 # OM = OperationMatrix(n)

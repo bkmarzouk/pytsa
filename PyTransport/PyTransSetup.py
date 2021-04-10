@@ -15,6 +15,7 @@
 
 
 # This file contains python scripts used to setup the compiled PyTrans module
+import time
 
 import sympy as sym
 import sys
@@ -24,9 +25,27 @@ import platform
 import os
 import shutil
 import time as t
-import pickle as pk
-from PyTransport import gravtools_pyt
 from PyTransport import sym_tools
+
+try:
+    import multiprocessing
+
+    n_cores = multiprocessing.cpu_count()
+    j_avail = True
+except ImportError:
+
+    multiprocessing = None
+    n_cores = 0
+    j_avail = False
+
+
+def compile_str(name, use_j=False):
+    if not use_j:
+        return 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup\n'
+
+    j_str = " -j {}".format(int(1.5 * n_cores))
+
+    return 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans' + j_str + '"])#setup\n'
 
 
 def directory(NC: bool):
@@ -114,12 +133,31 @@ def pathSet():
 
     site.addsitedir(os.path.join(dir, 'PyTransScripts'))
 
+def delta_ctime(a, b):
 
-def compileName(name, NC=False):
+    h = lambda t: int(t.split(":")[0][-2:])
+    m = lambda t: int(t.split(":")[1])
+    s = lambda t: int(t.split(":")[2][:2])
+
+    i = h(a) * 60 * 60 + m(a) * 60 + s(a)
+    j = h(b) * 60 * 60 + m(b) * 60 + s(b)
+
+    return j - i
+
+def compileName(name, NC=False, use_j=False):
+
+    t_start = t.ctime()
+    print('[{time}] compile start'.format(time=t_start))
+
     directory(NC)
     dir = os.path.dirname(__file__)
     location = os.path.join(dir, 'PyTrans')
     filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
+
+    if use_j and j_avail:
+        use_j = True
+    else:
+        use_j = False
 
     # if NC is True:
     #     # There should exist a temporary file fom the calling 'potential'
@@ -130,6 +168,8 @@ def compileName(name, NC=False):
     #     new_curv_path = curv_path.replace('TEMP', name)
     #     os.rename(curv_path, new_curv_path)
 
+    # assert 0, compile_str(name, use_j=use_j)
+
     f = open(filename1, "r")
     lines = f.readlines()
     f.close()
@@ -139,9 +179,7 @@ def compileName(name, NC=False):
         if not line.endswith("#setup\n"):
             f.write(line)
         if line.endswith("#setup\n"):
-            f.write(
-                # 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11"])#setup\n')
-                'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup\n')
+            f.write(compile_str(name, use_j=use_j))
     f.close()
 
     filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
@@ -177,6 +215,12 @@ def compileName(name, NC=False):
 
     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
 
+    t_end = t.ctime()
+
+    print('[{time}] compile complete'.format(time=t_end))
+
+    print("\n-- Compiled source in {} seconds".format(delta_ctime(t_start, t_end)))
+
 
 def deleteModule(name):
     location = os.path.join(dir, 'PyTrans')
@@ -189,7 +233,8 @@ def tol(rtol, atol):
     f = open(filename, "r")
 
 
-def potential(V, nF, nP, simple_fmet=False, simple_potential=False, G=None, silent=False, recache=False):
+def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=False, G: sym.Matrix or None = None,
+              silent=False, recache=False):
     # Define symbols for fields and parameters
     # f = sym.symarray('f', nF)
     # p = sym.symarray('p', nP)
@@ -200,10 +245,12 @@ def potential(V, nF, nP, simple_fmet=False, simple_potential=False, G=None, sile
     # if not os.path.exists(curv_dir):
     #     os.makedirs(curv_dir)
 
-    covd_sym = sym_tools.CovDSym(nF, nP, G, V, recache, simple_fmet, simple_potential,
-                                 simple_potential and simple_fmet)
+    covd_sym = sym_tools.CovDSym(nF, nP, G, V, simplify_fmet=simplify_fmet, simplify_pot=simplify_pot,
+                                 simplify=simplify_covd, recache=recache)
 
-    fieldmetric(nF, nP, G, V, recache, simple_fmet, simple_potential, silent)
+    fieldmetric(nF, nP, G, V, recache=recache, simple_fmet=simplify_fmet, simple_potential=simplify_pot,
+                simple_covd=simplify_covd, silent=silent)
+
     # fmet_sym = covd_sym.fmet_sym
     # pot_sym = covd_sym.pot_sym
 
@@ -377,16 +424,14 @@ def rewrite_indices(expr, nF, nP):
     return new_expr
 
 
-def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential=False, silent=True):
-
+def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential=False, simple_covd=False, silent=True):
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'fieldmetricProto.h')
     filename2 = os.path.join(dir, 'CppTrans', 'fieldmetric.h')
     e = open(filename1, 'r')
     h = open(filename2, 'w')
 
-    covd_sym = sym_tools.CovDSym(nF, nP, G, V, recache, simple_fmet, simple_potential,
-                                 simple_fmet and simple_potential)
+    covd_sym = sym_tools.CovDSym(nF, nP, G, V, recache, simple_fmet, simple_potential, simple_covd)
 
     G_array, Gamma_array, R_array, gradR_array = covd_sym.get_curvature_sym_arrays()
 

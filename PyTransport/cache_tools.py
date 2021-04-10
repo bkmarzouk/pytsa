@@ -9,11 +9,12 @@ pot_cache = os.environ["pot_cache"]
 covd_cache = os.environ["covd_cache"]
 
 
-def fmet_path(metric: sym.Matrix):
+def fmet_path(metric: sym.Matrix, simplify=True):
     """
     Creates hash string from symbolic metric and builds path
 
     :param metric: sympy representation of metric
+    :param simplify: if True, simplified representation
     :return: path to metric calculations
     """
 
@@ -21,6 +22,8 @@ def fmet_path(metric: sym.Matrix):
     assert metric.is_symmetric(), "Metric must be symmetric: {}".format(metric)
 
     expr_str = str(metric)
+    if simplify:
+        expr_str += "_simple"
 
     hash_str = sha224(bytes(expr_str, encoding='utf-8')).hexdigest()
 
@@ -29,16 +32,20 @@ def fmet_path(metric: sym.Matrix):
     return fname
 
 
-def pot_path(potential: sym.Expr):
+def pot_path(potential: sym.Expr, simplify=True):
     """
     Creates hash string from symbolic potential and builds path
 
     :param potential: sympy expression for potential
+    :param simplify: if True, simplified potential
     :return: path to potential calculations
     """
     assert isinstance(potential, sym.Expr), "Must pass sympy expression for the potential: {}".format(potential)
 
     expr_str = str(potential)
+
+    if simplify:
+        expr_str += "_simple"
 
     hash_str = sha224(bytes(expr_str, encoding='utf-8')).hexdigest()
 
@@ -47,28 +54,34 @@ def pot_path(potential: sym.Expr):
     return fname
 
 
-def covd_path(metric: sym.Matrix, potential: sym.Expr):
+def covd_path(metric: sym.Matrix, potential: sym.Expr, simplify=True, simplify_fmet=True, simplify_pot=True):
     """
     Creates hash string from sympy metric and potential and builds path
 
     :param metric: sympy representation of metric
     :param potential: sympy expression for potential
+    :param simplify: if True, simplified covd results
+    :param simplify_fmet: if True, simplified metric
+    :param simplify_pot: if True, simplified potential
     :return: path to joint metric + potential calculations
     """
 
-    fpath = fmet_path(metric)
-    vpath = pot_path(potential)
+    fpath = fmet_path(metric, simplify=simplify_fmet)
+    vpath = pot_path(potential, simplify=simplify_pot)
 
     hash_str_fmet = os.path.split(fpath)[-1].split(".")[0]
     hash_str_pot = os.path.split(vpath)[-1].split(".")[0]
+
+    if simplify:
+        hash_str_pot += "_simple"
 
     fname = os.path.join(covd_cache, hash_str_fmet + "_" + hash_str_pot + ".covd")
 
     return fname
 
 
-def cache_fmet(metric: sym.Matrix, fmet_derived, recache=False):
-    path = fmet_path(metric)
+def cache_fmet(metric: sym.Matrix, fmet_derived, recache=False, simplify=True):
+    path = fmet_path(metric, simplify=simplify)
 
     if os.path.exists(path):
         if recache:
@@ -80,8 +93,8 @@ def cache_fmet(metric: sym.Matrix, fmet_derived, recache=False):
         pk.dump(fmet_derived, f)
 
 
-def load_fmet(metric: sym.Matrix, delete=False):
-    path = fmet_path(metric)
+def load_fmet(metric: sym.Matrix, delete=False, simplify=True):
+    path = fmet_path(metric, simplify=simplify)
 
     if delete and os.path.exists(path):
         os.remove(path)
@@ -95,8 +108,8 @@ def load_fmet(metric: sym.Matrix, delete=False):
     return fmet_derived
 
 
-def cache_pot(potential: sym.Expr, pot_derived, recache=False):
-    path = pot_path(potential)
+def cache_pot(potential: sym.Expr, pot_derived, recache=False, simplify=True):
+    path = pot_path(potential, simplify=simplify)
 
     if os.path.exists(path):
         if recache:
@@ -108,8 +121,8 @@ def cache_pot(potential: sym.Expr, pot_derived, recache=False):
         pk.dump(pot_derived, f)
 
 
-def load_pot(potential: sym.Expr, delete=False):
-    path = pot_path(potential)
+def load_pot(potential: sym.Expr, delete=False, simplify=True):
+    path = pot_path(potential, simplify=simplify)
 
     if delete and os.path.exists(path):
         os.remove(path)
@@ -123,8 +136,9 @@ def load_pot(potential: sym.Expr, delete=False):
     return pot_derived
 
 
-def cache_covd(metric: sym.Matrix, potential: sym.Expr, covd_derived, recache=False):
-    path = covd_path(metric, potential)
+def cache_covd(metric: sym.Matrix, potential: sym.Expr, covd_derived, recache=False, simplify=True, simplify_fmet=True,
+               simplify_pot=True):
+    path = covd_path(metric, potential, simplify=simplify, simplify_pot=simplify_pot, simplify_fmet=simplify_fmet)
 
     if os.path.exists(path):
         if recache:
@@ -136,8 +150,9 @@ def cache_covd(metric: sym.Matrix, potential: sym.Expr, covd_derived, recache=Fa
         pk.dump(covd_derived, f)
 
 
-def load_covd(metric: sym.Matrix, potential: sym.Expr, delete=False):
-    path = covd_path(metric, potential)
+def load_covd(metric: sym.Matrix, potential: sym.Expr, delete=False, simplify_fmet=True, simplify_pot=True,
+              simplify=True):
+    path = covd_path(metric, potential, simplify=simplify, simplify_fmet=simplify_fmet, simplify_pot=simplify_pot)
 
     if delete and os.path.exists(path):
         os.remove(path)
