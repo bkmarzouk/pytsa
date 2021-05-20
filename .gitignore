@@ -3,6 +3,7 @@
 
 # Ignore .idea
 /.idea/*
+__pycache__
 
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature
@@ -29,7 +30,7 @@
 !/Sampler/sampler-configs/.gitkeep
 !/Sampler/sampler-configs/EXAMPLE.py
 !/Sampler/sampler-configs/EXAMPLE_NC.py
-!/Sampler/sampler-configs/setupBuilds.py
+!/Sampler/sampler-configs/setup_sampler.py
 
 # Ignore compile modules
 /PyTransport/PyTrans/lib/python3.8/site-packages/*

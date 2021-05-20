@@ -2,6 +2,28 @@ import numpy as np
 import scipy.stats
 
 
+class Constant(object):
+
+    def __init__(self, val):
+        """
+        Mimics methods from scipy.stats for constructing samples via rvs or ppf. Returns constant in either case
+        for any value
+
+        :param val: constant value to return
+        """
+        self.val = val
+
+    def rvs(self):
+        return self.val
+
+    def ppf(self, *x):
+        return self.val
+
+    @classmethod
+    def slow_roll(cls):
+        return cls("sr")
+
+
 class Sampler(object):
 
     def __init__(self, seed=None):
