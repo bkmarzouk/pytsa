@@ -85,6 +85,6 @@ def build_catalogue(s: Setup, parsed_args):
         np.save(samples_path, np.asarray(samples, dtype=float))
 
     print("-- Sample ICs & Params @ {}".format(samples_path))
-
-
-build_catalogue(_s, args)
+#
+#
+# build_catalogue(_s, args)

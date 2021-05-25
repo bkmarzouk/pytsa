@@ -241,7 +241,7 @@ if __name__ == "__main__":
         import os
         import matplotlib.pyplot as plt
 
-        n_samples = 500
+        n_samples = 5000
 
         a = APriori()
         l = LatinHypercube(n_cells=n_samples)
@@ -261,8 +261,8 @@ if __name__ == "__main__":
 
         for ax, sa, sl, d, l, t in zip(axs, samples_a, samples_l, dists, dist_lims,
                                        ['Uniform', 'Normal', '$\\beta$-prime']):
-            ax.hist(sa, density=True, bins=20, alpha=0.33, label="Apriori")
-            ax.hist(sl, density=True, bins=20, alpha=0.33, label="Latin")
+            ax.hist(sa, density=True, bins=40, alpha=0.33, label="Apriori")
+            ax.hist(sl, density=True, bins=40, alpha=0.33, label="Latin")
             v = np.linspace(l[0], l[1], 1000)
             ax.plot(v, d.pdf(v), ls="--", c="k", lw=2, label="PDF")
             ax.set_title(t)

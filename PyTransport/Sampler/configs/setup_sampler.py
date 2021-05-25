@@ -8,6 +8,7 @@ from PyTransport.PyTransSetup import pathSet
 pathSet()
 
 from PyTransport.cache_tools import hash_pars
+from PyTransport.Sampler.methods import samplers
 
 apriori = "apriori"
 latin = "latin"
@@ -244,8 +245,8 @@ class Setup(_SamplingParameters):
         else:
             os.makedirs(self.path)
             self._dump_self()
-            src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "constructor.py")
-            dest = os.path.join(self.path, "constructor.py")
+            src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "methods", "run.py")
+            dest = os.path.join(self.path, "run.py")
             shutil.copy(src, dest)
 
     def _dump_self(self):
@@ -258,6 +259,65 @@ class Setup(_SamplingParameters):
         with open(pk_path, "wb") as f:
             print("-- sampler configuration data @ {}".format(pk_path))
             pk.dump(self, f)
+
+
+def build_catalogue(s: Setup, parsed_args):
+    pars = [s.N_min, s.N_adiabitc, s.N_sub_evo, s.tols]
+    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_samples]
+
+    hash = hash_pars(*pars)
+
+    dir_name = "latin_" if parsed_args.latin else "apriori_"
+
+    dir_name += hash
+
+    dir_path = s.path
+
+    path = os.path.join(dir_path, dir_name)
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    if parsed_args.apriori:
+        x = samplers.APriori(parsed_args.seed)
+    else:
+        x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
+
+    samples_path = os.path.join(path, "catalogue.npy")
+
+    if not os.path.exists(samples_path):
+
+        print("-- Constructing catalogue for ICs & Params")
+
+        for f in range(s.nF):
+            x.add_param(s.fields[f])
+        for f in range(s.nF):
+            x.add_param(s.dot_fields[f])
+        for p in range(s.nP):
+            x.add_param(s.params[p])
+
+        if parsed_args.apriori:
+            samples = x.get_samples(parsed_args.n_samples).T
+        else:
+            samples = x.get_samples().T
+
+        for row_idx, row in enumerate(samples):
+
+            if "sr" in row:
+                f = np.array([*row[1:1 + s.nF]], dtype=float)
+                p = np.array([*row[-s.nP:]], dtype=float)
+                V = s.PyT.V(f, p)
+                dV = s.PyT.dV(f, p)
+
+                sr_ic = -dV / np.sqrt(3 * V)
+
+                for idx in range(s.nF):
+                    if samples[row_idx][s.nF + idx] == "sr":
+                        samples[row_idx][s.nF + idx] = sr_ic[idx]
+
+        np.save(samples_path, np.asarray(samples, dtype=float))
+
+    print("-- Sample ICs & Params @ {}".format(samples_path))
 
 
 if __name__ == "__main__":
