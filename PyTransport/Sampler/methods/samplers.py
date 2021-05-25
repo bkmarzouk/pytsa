@@ -14,7 +14,7 @@ class Constant(object):
         self.val = val
 
     def rvs(self, n=1):
-        return np.array([self.val]).repeat(n) if n > 1 else n
+        return np.array([self.val]).repeat(n) if n > 1 else self.val
 
     def ppf(self, *x):
         return self.val
@@ -38,6 +38,11 @@ class Sampler(object):
         self.n_params = 0
         self.dists = []
 
+        self.n_consts = 0
+        self.consts = []
+
+        self.order = {}
+
     def add_param(self, dist=scipy.stats.uniform(0, 1)):
         """
         Adds parameter to be sampled via a specified distribution.
@@ -50,8 +55,14 @@ class Sampler(object):
         if issubclass(Sampler, APriori):
             assert hasattr(dist, "rvs"), "Must have random variables generator, as defined as 'rvs' method."
 
-        self.n_params += 1
-        self.dists.append(dist)
+        if isinstance(dist, Constant):
+            self.consts.append(dist)
+            self.n_consts += 1
+            self.order[len(self.order)] = "c"
+        else:
+            self.dists.append(dist)
+            self.n_params += 1
+            self.order[len(self.order)] = "p"
 
     def get_samples(self):
         assert 0, "override method"
@@ -74,12 +85,25 @@ class APriori(Sampler):
         :param n_samples: number of samples
         :return: array of samples with shape (n_samples, n_params)
         """
-        out = np.zeros((self.n_params, n_samples), dtype=object)
+        out = np.zeros((self.n_params + self.n_consts, n_samples), dtype=object)
+
+        p_samples = np.zeros((self.n_params, n_samples))
+        c_samples = np.array([c.rvs() for c in self.consts]).repeat(n_samples).reshape((self.n_consts, n_samples))
 
         np.random.seed(self.seed)
 
         for idx, d in enumerate(self.dists):
-            out[idx] = d.rvs(n_samples)
+            p_samples[idx] = d.rvs(n_samples)
+
+        p_count = 0
+        c_count = 0
+        for idx in range(len(self.order)):
+            if self.order[idx] == "p":
+                out[idx] = p_samples[p_count]
+                p_count += 1
+            else:
+                out[idx] = c_samples[c_count]
+                c_count += 1
 
         return out
 
@@ -179,14 +203,34 @@ class LatinHypercube(Sampler):
 
         if verbose:
             print("-- building samples")
-        samples = np.zeros((self.n_cells, self.n_params), dtype=object)
+
+        p_samples = np.zeros((self.n_cells, self.n_params), dtype=object)
         for ii in range(self.n_cells):
-            samples[ii] = self.v2s(*unifs[ii])
+            p_samples[ii] = self.v2s(*unifs[ii])
 
         if verbose:
             print("-- done")
-        return samples.T
 
+        p_samples = p_samples.T
+
+        c_samples = np.zeros((self.n_consts, self.n_cells))
+
+        for idx, c in enumerate(self.consts):
+            c_samples[idx] = c.rvs()
+
+        out = np.zeros((self.n_params + self.n_consts, self.n_cells))
+
+        p_count = 0
+        c_count = 0
+        for idx in range(len(self.order)):
+            if self.order[idx] == "p":
+                out[idx] = p_samples[p_count]
+                p_count += 1
+            else:
+                out[idx] = c_samples[c_count]
+                c_count += 1
+
+        return out
 
 if __name__ == "__main__":
 
