@@ -25,13 +25,21 @@ def main(pool, sampler, args):
 
     pool_data = []
 
-    catalogue_path = os.path.join(sampler.path, "catalogue.npy")
+    catalogue_path = build_catalogue(s, args, path_only=True)
+
+    with open("sampler.pk", "rb") as f:
+        setup = pk.load(f)
+        assert isinstance(setup, Setup), setup
 
     for idx in range(n_samples):
         pd = _Data()
         pd.PyT = sampler.PyT.__name__
         pd.model_number = idx
         pd.path = catalogue_path
+        pd.tols = setup.tols
+        pd.N_min = setup.N_min
+        pd.N_adi = setup.N_adiabitc
+        pd.N_sub = setup.N_sub_evo
         pool_data.append(pd)
 
     pool.map(pyt_methods.compute_background, pool_data)

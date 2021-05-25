@@ -62,14 +62,21 @@ def compute_background(data):
     PyT = importlib.import_module(data.PyT)
     model_number = data.model_number
     catalogue_path = data.path
-    # ics_params = np.load(catalogue_path, mmap_mode="r")[model_number]
-    #
-    # ics = ics_params[:2 * PyT.nF()]
-    # params = ics_params[2 * PyT.nF():]
-    #
-    # print(model_number)
-    # print(ics)
-    # print(params)
+    ics_params = np.zeros((2 * PyT.nF() + PyT.nP()), dtype=np.float64)
+    ics_params[::] = np.load(catalogue_path, mmap_mode="r")[model_number]
+
+    ics = ics_params[:2 * PyT.nF()]
+    params = ics_params[2 * PyT.nF():]
+
+    tols = data.tols
+    N_min = data.N_min
+    N_sub = data.N_sub
+    N_eps = PyT.findEndOfInflation(ics, params, tols, True)
+
+    N_evo = np.linspace(0, N_eps, int(1.25 * N_eps))
+    bg_eps = PyT.backEvolve(N_evo, ics, params, tols, True, -1, True)
+
+    print(N_eps, bg_eps[-1][0])
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

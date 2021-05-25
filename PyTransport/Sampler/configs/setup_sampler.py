@@ -261,7 +261,7 @@ class Setup(_SamplingParameters):
             pk.dump(self, f)
 
 
-def build_catalogue(s: Setup, parsed_args):
+def build_catalogue(s: Setup, parsed_args, path_only=False):
     pars = [s.N_min, s.N_adiabitc, s.N_sub_evo, s.tols]
     pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_samples]
 
@@ -278,14 +278,16 @@ def build_catalogue(s: Setup, parsed_args):
     if not os.path.exists(path):
         os.makedirs(path)
 
-    if parsed_args.apriori:
-        x = samplers.APriori(parsed_args.seed)
-    else:
-        x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
-
     samples_path = os.path.join(path, "catalogue.npy")
 
+    if path_only:
+        return samples_path
+
     if not os.path.exists(samples_path):
+        if parsed_args.apriori:
+            x = samplers.APriori(parsed_args.seed)
+        else:
+            x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
 
         print("-- Constructing catalogue for ICs & Params")
 
@@ -304,8 +306,8 @@ def build_catalogue(s: Setup, parsed_args):
         for row_idx, row in enumerate(samples):
 
             if "sr" in row:
-                f = np.array([*row[1:1 + s.nF]], dtype=float)
-                p = np.array([*row[-s.nP:]], dtype=float)
+                f = np.array([*row[:s.nF]], dtype=np.float64)
+                p = np.array([*row[-s.nP:]], dtype=np.float64)
                 V = s.PyT.V(f, p)
                 dV = s.PyT.dV(f, p)
 
@@ -315,7 +317,7 @@ def build_catalogue(s: Setup, parsed_args):
                     if samples[row_idx][s.nF + idx] == "sr":
                         samples[row_idx][s.nF + idx] = sr_ic[idx]
 
-        np.save(samples_path, np.asarray(samples, dtype=float))
+        np.save(samples_path, np.asarray(samples, dtype=np.float64))
 
     print("-- Sample ICs & Params @ {}".format(samples_path))
 
@@ -331,10 +333,15 @@ if __name__ == "__main__":
 
         sampler_setup = Setup(PyT)
 
+        # sampler_setup.set_field(0, 1, method=stats.uniform(-20, 20))
+        # sampler_setup.set_dot_field(0, 1, method="sr")
+        # sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
+        # sampler_setup.build_sampler()
+
         sampler_setup.set_field(0, 1, method=Constant(12))
-        sampler_setup.set_dot_field(0, method=stats.norm(0, 1))
-        sampler_setup.set_dot_field(1, method="sr")
-        sampler_setup.set_param(0, 1, method=stats.loguniform(1e-5, 1e-2))
+        sampler_setup.set_dot_field(0, 1, method="sr")
+        sampler_setup.set_param(0, method=Constant(1e-5))
+        sampler_setup.set_param(1, method=Constant(9 * 1e-5))
         sampler_setup.build_sampler()
 
 #
