@@ -8,6 +8,15 @@ fmet_cache = os.environ["fmet_cache"]
 pot_cache = os.environ["pot_cache"]
 covd_cache = os.environ["covd_cache"]
 
+def hash_pars(*pars: object):
+
+    s = ""
+
+    for par in pars:
+        s += str(par)
+
+    return sha224(bytes(s, encoding='utf-8')).hexdigest()
+
 
 def fmet_path(metric: sym.Matrix, simplify=True):
     """

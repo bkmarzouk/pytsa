@@ -1,44 +1,77 @@
 import os
-import importlib
 import shutil
-import pickle as pk
+import dill as pk
 import numpy as np
 
 from PyTransport.PyTransSetup import pathSet
 
 pathSet()
 
-from PyTransport.Sampler.methods import samplers
+from PyTransport.cache_tools import hash_pars
 
 apriori = "apriori"
 latin = "latin"
 
 
-def get_builds_path(name=None):
+def _dist2pars(d):
+    """
+    Translate scipy distributions into hashable params
+
+    :param d: scipy.stats._xxx_distns.yyy_gen or Constant instance
+    :return: [dist_name, loc, scale] or [const]
+    """
+    if isinstance(d, Constant):
+        return [d.rvs()]
+
+    assert hasattr(d, "dist"), d
+    assert hasattr(d, "args"), d
+
+    pars = [str(d.dist).split("_gen")[0].split(".")[-1]]
+    for a in d.args:
+        pars.append(a)
+
+    return pars
+
+
+def _pars2path(PyT, *pars):
+    """
+    Construct path to directory for sampling module
+
+    :param PyT: PyTransport module
+    :param pars: params to construct hash string from, must have __str__ method
+    :return: path to sampling module directory
+    """
     import PyTransport.Sampler.builds as b
-    if name is None:
-        return os.path.dirname(os.path.abspath(b.__file__))
-    return os.path.join(get_builds_path(), name)
+
+    name = "{}_{}".format(PyT.__name__, hash_pars(*pars))
+
+    builds_dir = os.path.abspath(os.path.dirname(b.__file__))
+
+    return os.path.join(builds_dir, name)
 
 
-def check_method(m, mode):
-    if mode == apriori:
-        assert hasattr(m, "rvs"), m
-    elif mode == "latin":
-        assert hasattr(m, "ppf"), m
-    else:
-        raise AttributeError(m)
+def _check_method(m):
+    """
+    Checks methods are available for dists called by sampling mode
+
+    :param m: method
+    """
+    assert hasattr(m, "rvs"), m
+    assert hasattr(m, "ppf"), m
 
 
-class SamplingParameters(object):
+class _SamplingParameters(object):
 
-    def __init__(self, PyT, sampler_mode):
-        assert sampler_mode in ["apriori", "latin"], sampler_mode
+    def __init__(self, PyT):
+        """
+        Container for sampling parameters
+
+        :param PyT: PyTransport module
+        """
 
         self.PyT = PyT
         self.nF = PyT.nF()
         self.nP = PyT.nP()
-        self.sampler_mode = sampler_mode
 
         self.fields = {f: None for f in range(self.nF)}
         self.dot_fields = {f: None for f in range(self.nF)}
@@ -56,42 +89,66 @@ class SamplingParameters(object):
             assert self.params[p] is not None, p
 
     def set_field(self, *indices, method, latex: str or None = None, record=True):
-        if method == "sr":
-            pass
-        else:
-            check_method(method, self.sampler_mode)
+        """
+        Set initial values for fields
+
+        :param indices: field index
+        :param method: distribution to sample
+        :param latex: latex definition
+        :param record: if True, records IC in results
+        """
+        if method == "sr" or method == "SR":
+            method = Constant.slow_roll()
+
+        _check_method(method)
 
         for idx in indices:
             self.fields[idx] = method
             self.latex_f[idx] = (latex, record)
 
     def set_dot_field(self, *indices, method, latex: str or None = None, record=True):
-        if method == "sr":
-            pass
-        else:
-            check_method(method, self.sampler_mode)
+        """
+        Set initial values for initial field derivatives w.r.t. cosmic time
+
+        :param indices: field index
+        :param method: distribution to sample
+        :param latex: latex definition
+        :param record: if True, records IC in results
+        """
+        if method == "sr" or method == "SR":
+            method = Constant.slow_roll()
+
+        _check_method(method)
 
         for idx in indices:
             self.dot_fields[idx] = method
             self.latex_df[idx] = (latex, record)
 
     def set_param(self, *indices, method, latex: str or None = None, record=True):
-        check_method(method, self.sampler_mode)
+        """
+        Set model parameter values
+
+        :param indices: parameter index
+        :param method: distribution to sample
+        :param latex: latex definition
+        :param record: if True, records IC in results
+        """
+        _check_method(method)
 
         for idx in indices:
             self.params[idx] = method
             self.latex_p[idx] = (latex, record)
 
 
-class Setup(SamplingParameters):
+class Setup(_SamplingParameters):
 
-    def __init__(self, name, PyT, sampler_mode):
-        super(Setup, self).__init__(PyT, sampler_mode)
-        path = get_builds_path(name)
-        if os.path.exists(path):
-            print("WARNING: Sampler directory already exists"
-                  ": {}\n"
-                  "Error will be raised at build-time.".format(path))
+    def __init__(self, PyT):
+        """
+        Setup routine for sampler
+
+        :param PyT: PyTransport module
+        """
+        super(Setup, self).__init__(PyT)
 
         self.fieldspace_reject = {}
         self.dotfieldspace_reject = {}
@@ -99,7 +156,7 @@ class Setup(SamplingParameters):
         self.fieldspace_end_inflation = {}
         self.dotfieldspace_end_inflation = {}
 
-        self.path = path
+        self._analysis_pars_set = False
 
     def add_fieldspace_constraint(self, fidx, fmin=-np.inf, fmax=np.inf, dot_field=False):
         """
@@ -144,42 +201,80 @@ class Setup(SamplingParameters):
             self.fieldspace_end_inflation[fidx] = np.array([fmin, fmax])
 
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
-        print("Finish dev")
-        pass
+        assert 0, "DEV"
 
     def set_analysis_params(self, N_sub_evo=6., tols=np.array([1e-8, 1e-8]), N_adiabatic=1., N_min=60.):
+        """
+        Set integration parameters and efoldings for ICs, adiabicity and minimal inflation
+
+        :param N_sub_evo: efoldings of sub-horizon evolution to track
+        :param tols: integration tols (abs, rel)
+        :param N_adiabatic: Number of efoldings to probe the adiabaitic limit
+        :param N_min: min efolds of inflation
+        """
         self.N_sub_evo = N_sub_evo
         self.tols = tols
         self.N_adiabitc = N_adiabatic
         self.N_min = N_min
+        self._analysis_pars_set = True
 
     def build_sampler(self):
+        """
+        Execute construction of sampling module
+        """
 
         self._check()
 
+        if not self._analysis_pars_set:
+            self.set_analysis_params()  # use defaults
+
+        pars = [self.N_min, self.N_adiabitc, self.N_sub_evo, self.tols]
+
+        dict2list = lambda d: [_dist2pars(d[k]) for k in sorted(d.keys())]
+
+        for d in [self.fields, self.dot_fields, self.params,
+                  self.fieldspace_reject, self.fieldspace_end_inflation,
+                  self.dotfieldspace_reject, self.dotfieldspace_end_inflation]:
+            pars += dict2list(d)
+
+        self.path = _pars2path(PyT, *pars)
+
         if os.path.exists(self.path):
-            raise OSError("Sampler already constructed! {}".format(self.path))
+            print("Sampler already constructed! {}".format(self.path))
+        else:
+            os.makedirs(self.path)
+            self._dump_self()
+            src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "constructor.py")
+            dest = os.path.join(self.path, "constructor.py")
+            shutil.copy(src, dest)
 
-        os.makedirs(self.path)
+    def _dump_self(self):
+        """
+        Dump binary file of sampler
+        """
 
-if __name__=="__main__":
+        pk_path = os.path.join(self.path, "sampler.pk")
+
+        with open(pk_path, "wb") as f:
+            print("-- sampler configuration data @ {}".format(pk_path))
+            pk.dump(self, f)
+
+
+if __name__ == "__main__":
     run_build_test = True
 
     if run_build_test:
-
         import PyTransdquad_euclidean as PyT
+
         from PyTransport.Sampler.methods.samplers import Constant
         import scipy.stats as stats
 
-        sampler_setup = Setup("test", PyT, "latin")
+        sampler_setup = Setup(PyT)
 
-        sampler_setup.set_field(0, 1, method=Constant(0))
+        sampler_setup.set_field(0, 1, method=Constant(12))
         sampler_setup.set_dot_field(0, method=stats.norm(0, 1))
         sampler_setup.set_dot_field(1, method="sr")
         sampler_setup.set_param(0, 1, method=stats.loguniform(1e-5, 1e-2))
-        print(sampler_setup.fields)
-        print(sampler_setup.dot_fields)
-        print(sampler_setup.params)
         sampler_setup.build_sampler()
 
 #

@@ -13,8 +13,8 @@ class Constant(object):
         """
         self.val = val
 
-    def rvs(self):
-        return self.val
+    def rvs(self, n=1):
+        return np.array([self.val]).repeat(n) if n > 1 else n
 
     def ppf(self, *x):
         return self.val
@@ -74,7 +74,7 @@ class APriori(Sampler):
         :param n_samples: number of samples
         :return: array of samples with shape (n_samples, n_params)
         """
-        out = np.zeros((self.n_params, n_samples), dtype=float)
+        out = np.zeros((self.n_params, n_samples), dtype=object)
 
         np.random.seed(self.seed)
 
@@ -139,7 +139,7 @@ class LatinHypercube(Sampler):
         :return: samples of each parameter
         """
 
-        out = np.zeros(self.n_params, dtype=float)
+        out = np.zeros(self.n_params, dtype=object)
 
         for ii in range(self.n_params):
             out[ii] = self.dists[ii].ppf(values[ii])
@@ -179,7 +179,7 @@ class LatinHypercube(Sampler):
 
         if verbose:
             print("-- building samples")
-        samples = np.zeros((self.n_cells, self.n_params))
+        samples = np.zeros((self.n_cells, self.n_params), dtype=object)
         for ii in range(self.n_cells):
             samples[ii] = self.v2s(*unifs[ii])
 

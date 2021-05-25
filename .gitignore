@@ -5,6 +5,11 @@
 /.idea/*
 __pycache__
 
+# Ignore builds dir
+PyTransport/Sampler/builds
+!PyTransport/Sampler/builds/.gitkeep
+!PyTransport/Sampler/builds/__init__.py
+
 # Ignore curvature files everywhere, but maintain directory
 **/.curvature
 /PyTransport/PyTransport/PyTrans/CurvatureRecords/*
