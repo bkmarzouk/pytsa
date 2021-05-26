@@ -333,15 +333,12 @@ if __name__ == "__main__":
 
         sampler_setup = Setup(PyT)
 
-        # sampler_setup.set_field(0, 1, method=stats.uniform(-20, 20))
-        # sampler_setup.set_dot_field(0, 1, method="sr")
-        # sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
-        # sampler_setup.build_sampler()
+        sampler_setup.set_analysis_params(tols=np.array([1e-7, 1e-7]))
 
-        sampler_setup.set_field(0, 1, method=Constant(12))
-        sampler_setup.set_dot_field(0, 1, method="sr")
-        sampler_setup.set_param(0, method=Constant(1e-5))
-        sampler_setup.set_param(1, method=Constant(9 * 1e-5))
+        sampler_setup.set_field(0, 1, method=stats.uniform(-20, 20))
+        sampler_setup.set_dot_field(0, method="sr")
+        sampler_setup.set_dot_field(1, method=stats.norm(0, 1e-7))
+        sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
         sampler_setup.build_sampler()
 
 #

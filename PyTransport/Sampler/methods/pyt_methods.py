@@ -73,10 +73,17 @@ def compute_background(data):
     N_sub = data.N_sub
     N_eps = PyT.findEndOfInflation(ics, params, tols, True)
 
-    N_evo = np.linspace(0, N_eps, int(1.25 * N_eps))
-    bg_eps = PyT.backEvolve(N_evo, ics, params, tols, True, -1, True)
+    N_evo = np.linspace(0, N_eps, int(100 * N_eps))
+    bg_eps = PyT.backEvolve(N_evo, ics, params, tols, False, -1, True)
 
-    print(N_eps, bg_eps[-1][0])
+    N_fid = bg_eps[-1][0]
+
+
+
+
+
+def spline_bg(N, bg):
+
 
 #
 # def buildICPs(modelnumber, rerun_model=False):
