@@ -1,6 +1,6 @@
 import os
 import shutil
-import dill as pk
+import dill
 import numpy as np
 
 from PyTransport.PyTransSetup import pathSet
@@ -9,6 +9,8 @@ pathSet()
 
 from PyTransport.cache_tools import hash_pars
 from PyTransport.Sampler.methods import samplers
+
+Constant = samplers.Constant
 
 apriori = "apriori"
 latin = "latin"
@@ -238,7 +240,7 @@ class Setup(_SamplingParameters):
                   self.dotfieldspace_reject, self.dotfieldspace_end_inflation]:
             pars += dict2list(d)
 
-        self.path = _pars2path(PyT, *pars)
+        self.path = _pars2path(self.PyT, *pars)
 
         if os.path.exists(self.path):
             print("Sampler already constructed! {}".format(self.path))
@@ -254,11 +256,11 @@ class Setup(_SamplingParameters):
         Dump binary file of sampler
         """
 
-        pk_path = os.path.join(self.path, "sampler.pk")
+        path = os.path.join(self.path, "sampler")
 
-        with open(pk_path, "wb") as f:
-            print("-- sampler configuration data @ {}".format(pk_path))
-            pk.dump(self, f)
+        with open(path, "wb") as f:
+            print("-- sampler configuration data @ {}".format(path))
+            dill.dump(self, f)
 
 
 def build_catalogue(s: Setup, parsed_args, path_only=False):
@@ -323,7 +325,7 @@ def build_catalogue(s: Setup, parsed_args, path_only=False):
 
 
 if __name__ == "__main__":
-    run_build_test = True
+    run_build_test = False
 
     if run_build_test:
         import PyTransdquad_euclidean as PyT

@@ -58,6 +58,45 @@ pathSet()
 import importlib
 
 
+class ErrorValue(object):
+
+    def __init__(self, field: str, err_number: int):
+        self.field = field
+        self.err_n = err_number
+
+    @classmethod
+    def inflation_too_short(cls):
+        return cls("background", 0)
+
+    @classmethod
+    def field_space_violation(cls):
+        return cls("background", 1)
+
+    @classmethod
+    def int_background(cls):
+        return cls("integration", 0)
+
+    @classmethod
+    def int_2pf(cls):
+        return cls("integration", 1)
+
+    @classmethod
+    def int_3pf(cls, alpha, beta):
+        return cls("integration_{}_{}".format(alpha, beta), 2)
+
+    @classmethod
+    def ics(cls):
+        return cls("ics", 0)
+
+    @classmethod
+    def k_exit(cls):
+        return cls("momenta", 0)
+
+    @classmethod
+    def linalg(cls):
+        return cls("linalg", 0)
+
+
 def compute_background(data):
     PyT = importlib.import_module(data.PyT)
     model_number = data.model_number
@@ -68,22 +107,30 @@ def compute_background(data):
     ics = ics_params[:2 * PyT.nF()]
     params = ics_params[2 * PyT.nF():]
 
+    data.add_fields_dotfields(ics.copy())
+    data.add_params(params.copy())
+
+    del ics_params, ics, params
+
     tols = data.tols
     N_min = data.N_min
-    N_sub = data.N_sub
-    N_eps = PyT.findEndOfInflation(ics, params, tols, True)
+    N_eps = PyT.findEndOfInflation(data.fields_dotfields, data.params, tols, True)
 
-    N_evo = np.linspace(0, N_eps, int(100 * N_eps))
-    bg_eps = PyT.backEvolve(N_evo, ics, params, tols, False, -1, True)
+    if N_eps < N_min:
+        data.background = ErrorValue.inflation_too_short()
 
-    N_fid = bg_eps[-1][0]
+    else:
+        N_evo = np.linspace(0, N_eps, int(100 * N_eps))
+        bg_eps = PyT.backEvolve(N_evo, data.fields_dotfields, data.params, tols, False, -1, True)
 
+        if isinstance(bg_eps, tuple):
+            data.background = ErrorValue.int_background()
+        else:
+            data.background = bg_eps
 
+        # TODO: add NC background
 
-
-
-def spline_bg(N, bg):
-
+    return data
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

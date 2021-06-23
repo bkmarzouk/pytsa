@@ -226,180 +226,44 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
     return out
 
 
-def ICsBM(NBMassless, k, back, params, MTE, rerun=False):
-    """
-    
-    Computes initial conditions subject to NBMassless efolds before massless condition is realised.
-    
-    Massless condition: m^2 = (k/a)^2 : m is larges eigenvalue of the mass-squared matrix
-    
-    """
-    # Compute evolution of mass matrix eigenvalues along the background
-    massEvo = evolveMasses(back, params, MTE)
+def ICsBM(NBMassless, k, back, params, MTE, fit="spl"):
 
-    # Pick out the largest mass along the trajectory to infer the massless condition
-    mEvo = np.array([np.max(row[1:]) for row in massEvo])
+    assert fit in ["spl", "nearest"], fit
 
-    kSq = k ** 2
+    masses_array = evolveMasses(back, params, MTE)
 
-    NMArr = np.zeros(4, dtype=float)
-    zeroArr = np.zeros(4, dtype=float)
+    m_array = np.zeros((len(back), 3))
 
-    count = 0
+    for idx, (m_eigs, step) in enumerate(zip(masses_array, back)):
+        m_array[idx][0] = m_eigs[0]  # N
+        m_array[idx][1] = np.max(m_eigs[1:])  # M^2 / H^2
+        m_array[idx][2] = k ** 2 / MTE.H(step[1:], params) ** 2 / np.exp(2 * step[0])  # k^2 / (aH)^2
 
-    for ii in range(len(back) - 4):
+    sign_init = np.sign(m_array[0][1] - m_array[0][2])
 
-        Msq = mEvo[ii]
-        row = back[ii]
+    idx = None
+    N = None
 
-        N = row[0]
-        fdf = row[1:]
+    for idx, nmk in enumerate(m_array):
+        N, M, K = nmk
 
-        aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
-
-        MaHSq = Msq * aHsq
-
-        massless = MaHSq - kSq
-
-        NMArr = np.roll(NMArr, -1)
-        zeroArr = np.roll(zeroArr, -1)
-
-        NMArr[-1] = N
-        zeroArr[-1] = massless
-
-        count += 1
-
-        if massless > 0:
-
-            Msq = mEvo[ii + 1]
-            row = back[ii + 1]
-
-            N = row[0]
-            fdf = row[1:]
-
-            aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
-
-            MaHSq = Msq * aHsq
-
-            massless = MaHSq - kSq
-
-            NMArr = np.roll(NMArr, -1)
-            zeroArr = np.roll(zeroArr, -1)
-
-            NMArr[-1] = N
-            zeroArr[-1] = massless
-
-            count += 1
-
-            if count < 4:
-
-                for jj in range(4 - count):
-                    Msq = mEvo[ii + 1 + jj + 1]
-                    row = back[ii + 1 + jj + 1]
-
-                    N = row[0]
-                    fdf = row[1:]
-
-                    aHsq = np.exp(2 * N) * MTE.H(fdf, params) ** 2
-
-                    MaHSq = Msq * aHsq
-
-                    massless = MaHSq - kSq
-
-                    NMArr = np.roll(NMArr, -1)
-                    zeroArr = np.roll(zeroArr, -1)
-
-                    NMArr[-1] = N
-                    zeroArr[-1] = massless
-
-                    count += 1
-
+        if np.sign(M - K) != sign_init:
             break
 
-    try:
-        masslessSpl = UnivariateSpline(zeroArr, NMArr)
+    if idx is None:
+        raise ValueError("Unable to locate massless transition")
 
-        NMassless = masslessSpl(0)
+    N_start_subhorizon = N - NBMassless
 
-        NICs = NMassless - NBMassless
+    if N_start_subhorizon < 0:
+        raise ValueError("Unable to locate massless initial condition")
 
-    except ValueError:
-        print("\n\n\n\n warning, error fitting spline for massless condition \n\n\n\n")
-        return np.nan, np.nan
+    if fit == "nearest":
+        out = arr_eval_nearest_N(N_start_subhorizon, back)
 
-    if ii == len(back) - 2:
-        print("\n\n\n\n warning initial condition not found \n\n\n\n")
-        return np.nan, np.nan
+    out = arr_eval_spl_N(N_start_subhorizon, back)
 
-    FieldsArr = np.vstack([np.zeros(4) for ii in range(2 * MTE.nF())])
-
-    zeroArr2 = np.zeros(4, dtype=float)
-
-    count = 0
-
-    for ii in range(len(back) - 4):
-
-        row = back[ii]
-
-        N, fdf = row[0], row[1:]
-
-        zero = N - NICs
-
-        FieldsArr = np.roll(FieldsArr, -1, axis=1)
-        zeroArr2 = np.roll(zeroArr2, -1)
-
-        FieldsArr[:, -1] = fdf
-        zeroArr2[-1] = zero
-
-        count += 1
-
-        if zero > 0:
-
-            row = back[ii + 1]
-
-            N, fdf = row[0], row[1:]
-
-            zero = N - NICs
-            FieldsArr = np.roll(FieldsArr, -1, axis=1)
-            zeroArr2 = np.roll(zeroArr2, -1)
-
-            FieldsArr[:, -1] = fdf
-            zeroArr2[-1] = zero
-
-            count += 1
-
-            if count < 4:
-
-                for jj in range(4 - count):
-                    row = back[ii + 1 + jj + 1]
-
-                    N, fdf = row[0], row[1:]
-
-                    zero = N - NICs
-                    FieldsArr = np.roll(FieldsArr, -1, axis=1)
-                    zeroArr2 = np.roll(zeroArr2, -1)
-
-                    FieldsArr[:, -1] = fdf
-                    zeroArr2[-1] = zero
-
-                    count += 1
-
-            break
-
-    if ii == len(back) - 4:
-        print("\n\n\n\n warning initial condition not found \n\n\n\n")
-        return np.nan, np.nan
-
-    try:
-        FieldsSpl = np.array([UnivariateSpline(zeroArr2, row) for row in FieldsArr])
-
-        ICs = np.array([spl(0) for spl in FieldsSpl])
-
-    except ValueError:
-        print("\n\n\n\n warning failure to fit spline for field ICs \n\n\n\n")
-        return np.nan, np.nan
-
-    return NICs, ICs
+    return out[0], out[1:]
 
 
 def ICsBE(NBExit, k, back, params, MTE):
@@ -862,6 +726,10 @@ def matchKExitN(back, params, MTE, k=0.002):
         return np.nan
 
     try:
+
+        print(kExitArr)
+        print(HArr)
+
         HkSpl = UnivariateSpline(kExitArr, HArr)
 
         Hk = HkSpl(k)

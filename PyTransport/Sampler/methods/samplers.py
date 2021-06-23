@@ -24,7 +24,7 @@ class Constant(object):
         return cls("sr")
 
 
-class Sampler(object):
+class _Sampler(object):
 
     def __init__(self, seed=None):
         """
@@ -50,9 +50,12 @@ class Sampler(object):
         :param dist: distribution object. Must have methods 'rvs' for Apriori sampling, or 'ppf' for hypercube.
                      These conditions are satisfied by calling the standard scipy.stats modules.
         """
-        if issubclass(Sampler, LatinHypercube):
+
+        dist = Constant.slow_roll() if dist == "sr" else dist
+
+        if issubclass(_Sampler, LatinHypercube):
             assert hasattr(dist, "ppf"), "Must have inverse cdf, defined as 'ppf' method."
-        if issubclass(Sampler, APriori):
+        if issubclass(_Sampler, APriori):
             assert hasattr(dist, "rvs"), "Must have random variables generator, as defined as 'rvs' method."
 
         if isinstance(dist, Constant):
@@ -68,7 +71,7 @@ class Sampler(object):
         assert 0, "override method"
 
 
-class APriori(Sampler):
+class APriori(_Sampler):
 
     def __init__(self, seed=None):
         """
@@ -108,7 +111,7 @@ class APriori(Sampler):
         return out
 
 
-class LatinHypercube(Sampler):
+class LatinHypercube(_Sampler):
 
     def __init__(self, n_cells=10, seed=None, cube_seed=None):
         """
@@ -213,12 +216,17 @@ class LatinHypercube(Sampler):
 
         p_samples = p_samples.T
 
-        c_samples = np.zeros((self.n_consts, self.n_cells))
+        c_samples = np.zeros((self.n_consts, self.n_cells), dtype=object)
 
         for idx, c in enumerate(self.consts):
-            c_samples[idx] = c.rvs()
+            val = c.rvs()
 
-        out = np.zeros((self.n_params + self.n_consts, self.n_cells))
+            if val == "sr":
+                pass
+
+            c_samples[idx] = val
+
+        out = np.zeros((self.n_params + self.n_consts, self.n_cells), dtype=object)
 
         p_count = 0
         c_count = 0
