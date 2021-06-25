@@ -60,4 +60,3 @@ def main(pool, setup, args):
     # redefine pool data with successful trajectories
     pool_data = [dat for dat in r if isinstance(dat.background, np.ndarray)]
 
-    # TODO: add observables

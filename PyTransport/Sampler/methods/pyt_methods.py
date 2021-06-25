@@ -55,6 +55,8 @@ from PyTransport.PyTransSetup import pathSet
 
 pathSet()
 
+import PyTransport.PyTransScripts as PyS
+
 import importlib
 
 
@@ -123,12 +125,24 @@ def compute_background(data):
         N_evo = np.linspace(0, N_eps, int(100 * N_eps))
         bg_eps = PyT.backEvolve(N_evo, data.fields_dotfields, data.params, tols, False, -1, True)
 
+        bg_eps = PyS.adjust_back(bg_eps)
+
         if isinstance(bg_eps, tuple):
             data.background = ErrorValue.int_background()
         else:
             data.background = bg_eps
 
-        # TODO: add NC background
+            print(PyS.kexitN(N_eps - 55, data.background, data.params, PyT))
+            #
+            # ICs_subevo = PyS.ICsBM(data.N_sub, 1e-3, data.background, data.params, PyT, fit="spl")
+            # print(ICs_subevo)
+            #
+            # N_start_perturbations = data.background[-1][0] - PyS.matchKExitN(data.background, data.params, PyT)
+            # print(N_start_perturbations)
+            # k_pivot = PyS.kexitN(N_start_perturbations, data.background, data.params, PyT)
+            # ICs_subevo = PyS.ICsBM(data.N_sub, k_pivot, data.background, data.params, PyT, fit="spl")
+            # print(N_start_perturbations, k_pivot, ICs_subevo)
+            # # data.corr_ics = PyS.
 
     return data
 

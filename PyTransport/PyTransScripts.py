@@ -27,7 +27,8 @@ import sympy as sym
 from PyTransport.gravtools_pyt import curvatureObject
 from scipy import interpolate
 from scipy.interpolate import UnivariateSpline
-from scipy.optimize import minimize_scalar
+
+import spline_tools as splt
 
 
 # this script finds initial conditions at least NBMassless e-folds before the massless point
@@ -164,7 +165,7 @@ def arr_eval_nearest_N(N, arr):
             return arr[jj if dNjj < dNii else ii]
 
 
-def rescaleBack(bg, Nr=70.0, reposition=True):
+def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
     """
     
     Repositions background evolution to begin Nr efolds before the end of inflation.
@@ -176,6 +177,11 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
     accurate estimates of ICsBM can be made
     
     """
+
+    if remove_duplicate_steps:
+        for ii in range(1, len(bg))[::-1]:
+            if np.all(bg[ii] == bg[ii - 1]):
+                bg = np.delete(bg, ii, axis=0)
 
     # Get final efold of background evolution
     Nend = bg[-1][0]
@@ -226,9 +232,7 @@ def rescaleBack(bg, Nr=70.0, reposition=True):
     return out
 
 
-def ICsBM(NBMassless, k, back, params, MTE, fit="spl"):
-
-    assert fit in ["spl", "nearest"], fit
+def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
 
     masses_array = evolveMasses(back, params, MTE)
 
@@ -236,34 +240,41 @@ def ICsBM(NBMassless, k, back, params, MTE, fit="spl"):
 
     for idx, (m_eigs, step) in enumerate(zip(masses_array, back)):
         m_array[idx][0] = m_eigs[0]  # N
-        m_array[idx][1] = np.max(m_eigs[1:])  # M^2 / H^2
-        m_array[idx][2] = k ** 2 / MTE.H(step[1:], params) ** 2 / np.exp(2 * step[0])  # k^2 / (aH)^2
+        m_array[idx][1] = k ** 2 / MTE.H(step[1:], params) ** 2 / np.exp(2 * step[0])  # k^2 / (aH)^2  - \
+        m_array[idx][2] = np.max(m_eigs[1:])  # M^2 / H^2
 
-    sign_init = np.sign(m_array[0][1] - m_array[0][2])
+    N_i = None
+    N_f = None
 
-    idx = None
-    N = None
+    if m_array[0][2] < m_array[0][1]:
+        for idx, row in enumerate(m_array):
+            if row[2] > row[1]:
+                N_f = row[0]
+                N_i = m_array[idx-1][0]
+                break
+    else:
+        for idx, row in enumerate(m_array):
+            if row[2] < row[1]:
+                N_f = row[0]
+                N_i = m_array[idx-1][0]
+                break
 
-    for idx, nmk in enumerate(m_array):
-        N, M, K = nmk
+    if N_i is None or N_f is None:
+        raise ValueError("Unable to locate massless condition")
 
-        if np.sign(M - K) != sign_init:
-            break
+    N_massless = 0.5 * (N_f + N_i)
 
-    if idx is None:
-        raise ValueError("Unable to locate massless transition")
+    N_start = N_massless - NBMassless
 
-    N_start_subhorizon = N - NBMassless
+    if N_start < 0:
+        raise ValueError("Unable to locate massless condition!")
 
-    if N_start_subhorizon < 0:
-        raise ValueError("Unable to locate massless initial condition")
+    ics_start = splt.approx_row_spline(N_start, 1, back, 0)
 
-    if fit == "nearest":
-        out = arr_eval_nearest_N(N_start_subhorizon, back)
+    if return_all:
+        return ics_start, N_massless, m_array
 
-    out = arr_eval_spl_N(N_start_subhorizon, back)
-
-    return out[0], out[1:]
+    return ics_start
 
 
 def ICsBE(NBExit, k, back, params, MTE):
@@ -317,7 +328,7 @@ def pSpectra(kA, back, params, NB, tols, MTE):
         start_time = timeit.default_timer()
 
         if Nstart == np.nan:
-            twoPt = numpy.empty((2, 2))
+            twoPt = np.empty((2, 2))
             twoPt[:] = np.nan
         else:
             t = np.linspace(Nstart, back[-1, 0], 10)
@@ -392,8 +403,7 @@ def eqSpectra(kA, back, params, NB, tols, MTE):
         start_time = timeit.default_timer()
 
         if Nstart == np.nan:
-            nF = MTE.nF();
-            threePt = numpy.empty((2, 5))
+            threePt = np.empty((2, 5))
             threePt[:] = np.nan
         else:
             threePt = MTE.alphaEvolve(t, k1, k2, k3, backExitMinus, params, tols,
@@ -488,7 +498,7 @@ def alpBetSpectra(kt, alphaIn, betaIn, back, params, NB, nsnaps, tols, MTE):
                 # run solver for this triangle
                 t = np.concatenate((np.array([Nstart]), snaps))
                 if Nstart == np.nan:
-                    threePt = numpy.empty((2, 5))
+                    threePt = np.empty((2, 5))
                     threePt[:] = np.nan
                 else:
                     threePt = MTE.alphaEvolve(t, k1, k2, k3, backExitMinus, params, tols, True)
@@ -566,7 +576,17 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
             return (np.empty, np.empty, np.empty, np.empty, np.empty, snaps)
 
 
-def kexitN(Nexit, back, params, MTE):
+def kexitN(Nexit, back, params, MTE, fit="spl"):
+    assert Nexit > back[0][0], Nexit
+    assert Nexit < back[-1][0], Nexit
+    spl_idx = np.intersect1d(np.where(back.T[0] > Nexit - 1), np.where(back.T[0] < Nexit + 1))
+
+    back_spl = back.copy()[spl_idx]
+
+    back_exit = arr_eval_spl_val(Nexit, back_spl)
+
+    assert 0, back_exit
+
     backExitArr = np.vstack([np.zeros(4) for ii in range(2 * MTE.nF())])
     Narr = np.zeros(4)
 
