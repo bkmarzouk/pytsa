@@ -265,7 +265,7 @@ class Setup(_SamplingParameters):
 
 def build_catalogue(s: Setup, parsed_args, path_only=False):
     pars = [s.N_min, s.N_adiabitc, s.N_sub_evo, s.tols]
-    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_samples]
+    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_sample_params]
 
     hash = hash_pars(*pars)
 
@@ -289,7 +289,7 @@ def build_catalogue(s: Setup, parsed_args, path_only=False):
         if parsed_args.apriori:
             x = samplers.APriori(parsed_args.seed)
         else:
-            x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
+            x = samplers.LatinHypercube(parsed_args.n_sample_params, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
 
         print("-- Constructing catalogue for ICs & Params")
 
@@ -301,7 +301,7 @@ def build_catalogue(s: Setup, parsed_args, path_only=False):
             x.add_param(s.params[p])
 
         if parsed_args.apriori:
-            samples = x.get_samples(parsed_args.n_samples).T
+            samples = x.get_samples(parsed_args.n_sample_params).T
         else:
             samples = x.get_samples().T
 

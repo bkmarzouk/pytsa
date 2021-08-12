@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+from PyTransport.Sampler.methods.rng import APrioriRNG, LatinRNG
 
 
 class Constant(object):
@@ -239,6 +240,7 @@ class LatinHypercube(_Sampler):
                 c_count += 1
 
         return out
+
 
 if __name__ == "__main__":
 

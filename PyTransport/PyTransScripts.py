@@ -233,6 +233,17 @@ def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
 
 
 def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
+    """
+    Compute the initial conditions for correlation functions NBMassless efolds before the massless condition is realized
+
+    :param NBMassless: Number of efolds befpore the massless condition
+    :param k: Horizon exit scale (k = aH)
+    :param back: Background evolution
+    :param params: Model parameters
+    :param MTE: PyTransport module
+    :param return_all: if True, returns the ICs, efold at which the massless condition is attained, mass evolution
+    :return: ICs or (see return_all)
+    """
 
     masses_array = evolveMasses(back, params, MTE)
 
@@ -279,7 +290,7 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
 
 def ICsBE(NBExit, k, back, params, MTE):
     nF = np.size(back[0, 1:]) // 2
-    kvaH = -1.;
+    kvaH = -1.
     jj = 0
     while (kvaH < 0.0 and jj < np.size(back[:, 0]) - 1):
         H = MTE.H(back[jj, 1:1 + 2 * nF], params)
