@@ -51,9 +51,9 @@
 
 import numpy as np
 
-from PyTransport.PyTransSetup import pathSet
+from PyTransport.PyTransSetup import set_paths
 
-pathSet()
+set_paths()
 
 import PyTransport.PyTransScripts as PyS
 

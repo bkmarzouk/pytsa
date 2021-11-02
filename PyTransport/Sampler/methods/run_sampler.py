@@ -55,7 +55,7 @@ import writer as w
 sys.path.append(pathPyT)
 import PyTransSetup
 
-PyTransSetup.pathSet()
+PyTransSetup.set_paths()
 
 # Load _PyTransport module installation and scripts
 PyT = importlib.import_module(transportDict['transportModule'])

@@ -58,6 +58,13 @@ class RNGAPriori(_Generators):
         super(RNGAPriori, self).__init__(n_sample_params, base_seed, gen_dir)
 
     def rng(self, param_index, n):
+        """
+        This rng should be used to obtain the nth sample of a parameter of a given index
+
+        :param param_index:
+        :param n:
+        :return:
+        """
         assert param_index < self.n_generators, [param_index, self.n_generators]
 
         return default_rng(self._generators[param_index].jumped(n))
@@ -65,16 +72,30 @@ class RNGAPriori(_Generators):
 
 class RNGLatin(_Generators):
 
-    def __init__(self, n_sample_params: int, base_seed: int or None = None, gen_dir: str or None = None):
+    def __init__(self, n_sample_params: int, n_grid: int, base_seed: int or None = None, gen_dir: str or None = None):
         super(RNGLatin, self).__init__(n_sample_params + 1, base_seed, gen_dir)
+        self.n_grid = n_grid
 
     def rng(self, param_index, n):
+        """
+        This rng should be used to samples the nth grid point for a param of a given index
+
+        :param param_index:
+        :param n:
+        :return:
+        """
         assert param_index < self.n_generators - 1, [param_index, self.n_generators - 1]
+        assert n < self.n_grid, [n, self.n_grid]
 
         return default_rng(self._generators[param_index].jumped(n))
 
     def grid_rng(self):
-        return default_rng(self._generators[-1])
+        """
+        This rng should be used to determine the grid layout
+
+        :return:
+        """
+        return default_rng(self._generators[-1].jumped(0))
 
 
 if __name__ == "__main__":

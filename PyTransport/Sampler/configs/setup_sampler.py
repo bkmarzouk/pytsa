@@ -3,9 +3,9 @@ import shutil
 import dill
 import numpy as np
 
-from PyTransport.PyTransSetup import pathSet
+from PyTransport.PyTransSetup import set_paths
 
-pathSet()
+set_paths()
 
 from PyTransport.cache_tools import hash_pars
 from PyTransport.Sampler.methods import samplers

@@ -38,7 +38,7 @@ public:
    {
 // #FP
 nF=2;
-nP=2;
+nP=3;
 	
    }
 	
@@ -49,8 +49,11 @@ nP=2;
 		vector<double> FM((2*nF)*(2*nF),0.0) ;
         
 // metric
+  auto x0 = std::pow(p[2], 2);
+  auto x1 = 1.0/x0;
+  auto x2 = std::pow(std::sin(f[0]), 2);
 
- FM[0]=1;
+ FM[0]=x1;
 
  FM[1]=0;
 
@@ -60,7 +63,7 @@ nP=2;
 
  FM[4]=0;
 
- FM[5]=1;
+ FM[5]=x1/x2;
 
  FM[6]=0;
 
@@ -70,7 +73,7 @@ nP=2;
 
  FM[9]=0;
 
- FM[10]=1;
+ FM[10]=x0;
 
  FM[11]=0;
 
@@ -80,7 +83,7 @@ nP=2;
 
  FM[14]=0;
 
- FM[15]=1;
+ FM[15]=x0*x2;
 
          return FM;
 	}
@@ -93,6 +96,7 @@ nP=2;
 		vector<double> CS((2*nF)*(2*nF)*(2*nF),0.0);
 	
 // Christoffel
+  auto x0 = 1.0/std::tan(f[0]);
 
  CS[0]=0;
 
@@ -124,7 +128,7 @@ nP=2;
 
  CS[14]=0;
 
- CS[15]=0;
+ CS[15]=-1.0/2.0*std::sin(2*f[0]);
 
  CS[16]=0;
 
@@ -148,13 +152,13 @@ nP=2;
 
  CS[26]=0;
 
- CS[27]=0;
+ CS[27]=x0;
 
  CS[28]=0;
 
  CS[29]=0;
 
- CS[30]=0;
+ CS[30]=x0;
 
  CS[31]=0;
 
@@ -233,6 +237,9 @@ nP=2;
 		vector<double> RM((nF)*(nF)*(nF)*(nF),0.0);
 		
 // Riemann
+  auto x0 = 2*f[0];
+  auto x1 = std::pow(p[2], 2)*((1.0/2.0)*std::sin(x0)/std::tan(f[0]) - std::cos(x0));
+  auto x2 = -x1;
 
  RM[0]=0;
 
@@ -244,17 +251,17 @@ nP=2;
 
  RM[4]=0;
 
- RM[5]=0;
+ RM[5]=x1;
 
- RM[6]=0;
+ RM[6]=x2;
 
  RM[7]=0;
 
  RM[8]=0;
 
- RM[9]=0;
+ RM[9]=x2;
 
- RM[10]=0;
+ RM[10]=x1;
 
  RM[11]=0;
 
@@ -275,6 +282,11 @@ nP=2;
 		vector<double> RMcd((nF)*(nF)*(nF)*(nF)*(nF),0.0);
 		
 // Riemanncd
+  auto x0 = std::tan(f[0]);
+  auto x1 = 2*f[0];
+  auto x2 = std::sin(x1);
+  auto x3 = (3.0/2.0)*std::pow(p[2], 2)*(x2 + 2*std::cos(x1)/x0 - x2/std::pow(x0, 2));
+  auto x4 = -x3;
 
  RMcd[0]=0;
 
@@ -286,17 +298,17 @@ nP=2;
 
  RMcd[4]=0;
 
- RMcd[5]=0;
+ RMcd[5]=x3;
 
- RMcd[6]=0;
+ RMcd[6]=x4;
 
  RMcd[7]=0;
 
  RMcd[8]=0;
 
- RMcd[9]=0;
+ RMcd[9]=x4;
 
- RMcd[10]=0;
+ RMcd[10]=x3;
 
  RMcd[11]=0;
 

@@ -3,7 +3,7 @@ from PyTransport.Sampler.configs.setup_sampler import Setup
 # Import PyTransSetup module to set paths to compiled cpp module files
 from PyTransport import PyTransSetup
 
-PyTransSetup.pathSet()
+PyTransSetup.set_paths()
 
 # Now we can import the compiled module
 import PyTransdquad_euclidean as PyT
