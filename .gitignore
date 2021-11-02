@@ -2,8 +2,8 @@
 *.pyc
 
 # Ignore .idea
-/.idea/*
-__pycache__
+**/__pycache__
+.idea
 
 # Ignore builds dir
 PyTransport/Sampler/builds
