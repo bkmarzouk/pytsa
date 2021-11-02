@@ -27,25 +27,23 @@ import shutil
 import time as t
 from PyTransport import sym_tools
 
-try:
-    import multiprocessing
 
-    n_cores = multiprocessing.cpu_count()
-    j_avail = True
-except ImportError:
+def _delta_ctime(a, b):
+    """
+    Translates time.ctime() outputs into time difference in seconds
 
-    multiprocessing = None
-    n_cores = 0
-    j_avail = False
+    :param a: inital time
+    :param b: final time
+    :return: seconds difference
+    """
+    h = lambda t: int(t.split(":")[0][-2:])
+    m = lambda t: int(t.split(":")[1])
+    s = lambda t: int(t.split(":")[2][:2])
 
+    i = h(a) * 60 * 60 + m(a) * 60 + s(a)
+    j = h(b) * 60 * 60 + m(b) * 60 + s(b)
 
-def compile_str(name, use_j=False):
-    if not use_j:
-        return 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans"])#setup\n'
-
-    j_str = " -j {}".format(int(1.5 * n_cores))
-
-    return 'setup(name="PyTrans' + name + '", version="1.0", ext_modules=[Extension("PyTrans' + name + '", [filename, filename2 ])], include_dirs=[numpy.get_include(), dirs], extra_compile_args = ["-std=c++11 -frounding-math -fsignaling-nans' + j_str + '"])#setup\n'
+    return j - i
 
 
 def directory(NC: bool):
@@ -109,80 +107,68 @@ def directory(NC: bool):
                     f.write('#include' + '"' + fileT + '"' + '//stepper' + '\n')
 
 
-def pathSet():
+def set_paths():
     """
-    Sets path structure for internal navigation
+    This sets the target directories for custom-built PyTransport modules. I.e. this is where compiled objects
+    and __bootstrap__ methods to load the Python builds are stored.
 
-    :return: None
+    'site-packages' belong to the default search path for Python, so these destinations are straightforward to find.
+
+    For python only packages, conventionally these are stored in:
+    - somewhere/lib/pythonX.Y/site-packages
+
+    For hybrid packages, e.g. compiled c++ to python
+    - somewhere/lib/
     """
 
-    dir = os.path.dirname(__file__)
-    site.addsitedir(dir)
+    root = os.path.dirname(__file__)
+    site.addsitedir(root)
 
     p = platform.system()
+
+    version_str = ".".join(platform.python_version().split(".")[:2])
+
     if p == 'Windows':
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'Python', 'site-packages'))
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'Python', 'Lib', 'site-packages'))
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'Python' + sys.version[:3].translate(None, '.'), 'site-packages'))
-        site.addsitedir(
-            os.path.join(dir, 'PyTrans', 'Python' + sys.version[:3].translate(None, '.'), 'Lib', 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'Python', 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'Python', 'Lib', 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'Python' + version_str, 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'Python' + version_str, 'Lib', 'site-packages'))
     else:
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'python', 'site-packages'))
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'python' + sys.version[:3], 'site-packages'))
-        site.addsitedir(os.path.join(dir, 'PyTrans', 'lib', 'site-python'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'python', 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'python' + version_str, 'site-packages'))
+        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'site-python'))
 
-    site.addsitedir(os.path.join(dir, 'PyTransScripts'))
+    site.addsitedir(os.path.join(root, 'PyTransScripts'))
 
-def delta_ctime(a, b):
 
-    h = lambda t: int(t.split(":")[0][-2:])
-    m = lambda t: int(t.split(":")[1])
-    s = lambda t: int(t.split(":")[2][:2])
+def compile_module(name, NC=False):
+    """
+    Compiles template-built code into module
 
-    i = h(a) * 60 * 60 + m(a) * 60 + s(a)
-    j = h(b) * 60 * 60 + m(b) * 60 + s(b)
-
-    return j - i
-
-def compileName(name, NC=False, use_j=False):
-
+    :param name: module name
+    :param NC: if True, assumes field space metric is Euclidean # TODO: Check this, looks redundant
+    :param use_j: if True attempts to use multiple processors in compile step
+    :return:
+    """
     t_start = t.ctime()
-    print('[{time}] compile start'.format(time=t_start))
+    print('[{time}] start'.format(time=t_start))
 
     directory(NC)
-    dir = os.path.dirname(__file__)
-    location = os.path.join(dir, 'PyTrans')
-    filename1 = os.path.join(dir, 'PyTrans', 'moduleSetup.py')
+    cwd = os.path.dirname(__file__)
+    location = os.path.join(cwd, 'PyTrans')
+    setup_file_path = os.path.join(cwd, 'PyTrans', 'moduleSetup.py')
 
-    if use_j and j_avail:
-        use_j = True
-    else:
-        use_j = False
+    with open(setup_file_path, "r") as f:
+        lines = f.readlines()
 
-    # if NC is True:
-    #     # There should exist a temporary file fom the calling 'potential'
-    #     curv_path = os.path.join(dir, 'PyTrans', 'CurvatureRecords', 'TEMP.curvature')
-    #     assert os.path.exists(curv_path), "Temporary curvature file not found! {}".format(curv_path)
-    #
-    #     # Rename temporary curvature file with compilation name!
-    #     new_curv_path = curv_path.replace('TEMP', name)
-    #     os.rename(curv_path, new_curv_path)
+    with open(setup_file_path, "w") as f:
+        for line in lines:
+            if "PYT_MODNAME" in line:
+                f.write("mod_name = '{}'  # PYT_MODNAME\n".format(name))
+            else:
+                f.write(line)
 
-    # assert 0, compile_str(name, use_j=use_j)
-
-    f = open(filename1, "r")
-    lines = f.readlines()
-    f.close()
-
-    f = open(filename1, "w")
-    for line in lines:
-        if not line.endswith("#setup\n"):
-            f.write(line)
-        if line.endswith("#setup\n"):
-            f.write(compile_str(name, use_j=use_j))
-    f.close()
-
-    filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
+    filename = os.path.join(cwd, 'PyTrans', 'PyTrans.cpp')
     f = open(filename, "r")
     lines = f.readlines()
     f.close()
@@ -206,103 +192,72 @@ def compileName(name, NC=False, use_j=False):
 
     my_env = os.environ.copy()
     my_env["PYTHONUSERBASE"] = location
-    p = subprocess.Popen(["python", filename1, "install", "--user"], cwd=location, stdin=subprocess.PIPE,
-                         stderr=subprocess.PIPE, env=my_env)
 
-    stdout, stderr = p.communicate()
+    t_start_compile = t.ctime()
+    print('[{time}] start compile phase'.format(time=t_start_compile))
 
-    pathSet()
+    set_paths()
+
+    # Build interface to cmd line and execute installation
+    p = subprocess.Popen(["python", setup_file_path, "install", "--user"], cwd=location,
+                         stdin=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
+    std_err, std_out = p.communicate()
+
+    def print_std(std, header):
+        if std is None:
+            return
+        try:
+            print(header)
+            for l in std:
+                print(l)
+        except TypeError:
+            pass
+
+    print_std(std_err, "\n\nSTD ERR")
+    print_std(std_err, "\n\nSTD OUT")
 
     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
 
     t_end = t.ctime()
+    print('[{time}] ALL COMPLETE'.format(time=t_end))
+    print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
+                                                                             _delta_ctime(t_start, t_end)))
 
-    print('[{time}] compile complete'.format(time=t_end))
 
-    print("\n-- Compiled source in {} seconds".format(delta_ctime(t_start, t_end)))
+def delete_module(name):
+    """
+    Deletes module based on compile name
 
-
-def deleteModule(name):
-    location = os.path.join(dir, 'PyTrans')
+    :param name: module name
+    """
+    location = os.path.join(os.path.dirname(__file__), 'PyTrans')
     [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("PyTrans" + name)]
-
-
-def tol(rtol, atol):
-    dir = os.path.dirname(__file__)
-    filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
-    f = open(filename, "r")
 
 
 def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=False, G: sym.Matrix or None = None,
               silent=False, recache=False):
-    # Define symbols for fields and parameters
-    # f = sym.symarray('f', nF)
-    # p = sym.symarray('p', nP)
-    #
-    # # build curvature records directory if not found
-    # dir = os.path.dirname(__file__)
-    # curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-    # if not os.path.exists(curv_dir):
-    #     os.makedirs(curv_dir)
+    """
+    Wrapper for compile source for potential, field metric and derivatives / combinations thereof
 
+    :param V: Symbolic potential
+    :param nF: Number of fields
+    :param nP: Number of parameters
+    :param simplify_fmet: if True, simplifies symbolic expressions related to field space metric
+    :param simplify_pot: if True, simplifies symbolic expressions related to the potential
+    :param simplify_covd: if True, simplifies symbolic expressions for covariant derivatives
+    :param G: Symbolic field space metric
+    :param silent: if True, no output
+    :param recache: uf True, recomputes results
+    :return:
+    """
+
+    # Get symbolic expressions for covariant derivatives
     covd_sym = sym_tools.CovDSym(nF, nP, G, V, simplify_fmet=simplify_fmet, simplify_pot=simplify_pot,
                                  simplify=simplify_covd, recache=recache)
 
+    #
     fieldmetric(nF, nP, G, V, recache=recache, simple_fmet=simplify_fmet, simple_potential=simplify_pot,
                 simple_covd=simplify_covd, silent=silent)
-
-    # fmet_sym = covd_sym.fmet_sym
-    # pot_sym = covd_sym.pot_sym
-
-    # # Make a temporary name for the curvature file (will be renamed by in compile process)
-    # curv_tmp = os.path.join(curv_dir, "TEMP.curvature")
-    # if not silent:
-    #     timer = t.process_time()
-    #     print('[{time}] constructing curvature class instance'.format(time=t.ctime()))
-    #
-    # # Initialize curvature class instance: This will handle all symbolic computations requried
-    # """ TODO: add kwargs for simplifying curv. and pots. """
-    # curv_instance = gravtools_pyt.curvatureObject(
-    #     G, f, V, params=p, simpleGeometric=simpleGeometric, simplePotentials=simplePotentials)
-    #
-    # if not silent:
-    #     print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
-    #
-    # # Save record of curvature class (this can then be callable from PyTransScripts)
-    # curv_file = open(curv_tmp, 'wb')
-    # with curv_file as cf:
-    #     pk.dump(curv_instance, cf)
-
-    # if not silent:
-    #     timer = t.process_time()
-    #     print('[{time}] writing curvature expressions'.format(time=t.ctime()))
-    #
-    # # Pass curvature instance to fieldmetric function: Will write PyTrans files
-    # fieldmetric(G, nF, nP, simple=simpleGeometric, silent=silent, curv_obj=curv_instance)
-    #
-    # # Construct (flattened) symbolic arrays to hold 2st, 2nd and 3rd order derivatives
-    # vd = sym.symarray('vd', nF)
-    # vdd = sym.symarray('vdd', nF * nF)
-    # vddd = sym.symarray('vddd', nF * nF * nF)
-    #
-    # # Load precomputed arrays and remap to flattened configuration
-    # dV_arr = curv_instance.dV
-    # ddV_arr = curv_instance.ddV
-    # dddV_arr = curv_instance.dddV
-
-    # # We then flatten these arrays and (hopefully) match indices for the cpp writer
-    # ddV_arr_flat = ddV_arr.flatten()
-    # dddV_arr_flat = dddV_arr.T.flatten()  # Transpose of canonical matrix coords. + flatten seems to agree
-    #
-    # for i in range(nF):
-    #     vd[i] = dV_arr[i]
-    #     for j in range(nF):
-    #         vdd[i + j * nF] = ddV_arr_flat[i + j * nF]
-    #         for k in range(nF):
-    #             vddd[i + j * nF + k * nF * nF] = dddV_arr_flat[i + j * nF + k * nF * nF]
-
-    # if not silent:
-    #     print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
 
     v, vd, vdd, vddd = covd_sym.get_potential_sym_arrays()
 
@@ -332,6 +287,7 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
             if not silent:
                 timer_cse = t.process_time()
                 print('[{time}] performing CSE for V'.format(time=t.ctime()))
+
             decls, new_expr = sym.cse(V, order='none')
             if not silent:
                 print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
@@ -345,10 +301,10 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
             g.write('  sum=' + str(rw_expr) + ';\n')
 
         if line == "// dPot\n":
-
             if not silent:
                 timer_cse = t.process_time()
                 print('[{time}] performing CSE for dV'.format(time=t.ctime()))
+
             decls, new_exprs = sym.cse(vd, order='none')
             if not silent:
                 print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
@@ -366,6 +322,7 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
             if not silent:
                 timer_cse = t.process_time()
                 print('[{time}] performing CSE for ddV'.format(time=t.ctime()))
+
             decls, new_exprs = sym.cse(vdd, order='none')
             if not silent:
                 print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
@@ -384,6 +341,7 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
             if not silent:
                 timer_cse = t.process_time()
                 print('[{time}] performing CSE for dddV'.format(time=t.ctime()))
+
             decls, new_exprs = sym.cse(vddd, order='none')
             if not silent:
                 print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
@@ -406,6 +364,14 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
 
 
 def write_cse_decls(decls, g, nF, nP):
+    """
+    Wrapper for performing CSE on a set of declarations
+
+    :param decls: rules / declarations
+    :param g: field space metric
+    :param nF: number of fields
+    :param nP: number of paramters
+    """
     # emit declarations for common subexpressions
     for rule in decls:
         symb = sym.printing.cxxcode(rule[0])
@@ -425,6 +391,19 @@ def rewrite_indices(expr, nF, nP):
 
 
 def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential=False, simple_covd=False, silent=True):
+    """
+    Prepare and compile codes relevant to field space metric
+
+    :param nF: Number of fields
+    :param nP: Number of parameters
+    :param G: Field space metric (symbolic)
+    :param V: Potential (symbolic)
+    :param recache: if True, recomputes / recaches symbolic expressions
+    :param simple_fmet: if True, simplifies expressions related to field space
+    :param simple_potential: if True, simplifies expressions related to potential
+    :param simple_covd: if True, simplifies expressions of covariant derivatives
+    :param silent: if True, not output is printed
+    """
     dir = os.path.dirname(__file__)
     filename1 = os.path.join(dir, 'CppTrans', 'fieldmetricProto.h')
     filename2 = os.path.join(dir, 'CppTrans', 'fieldmetric.h')
