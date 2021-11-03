@@ -169,22 +169,24 @@ def compile_module(name, NC=False):
             f.write(line)
         if line.endswith("//FuncDef\n"):
             f.write(
-                'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+                # 'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+                'static PyMethodDef ' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
 
         if line.endswith("//modDef\n"):
             f.write(
-                'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTrans' + name + '", PyTrans_docs, -1, PyTrans' + name + '_funcs}; //modDef\n')
+                # 'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTrans' + name + '", PyTrans_docs, -1, PyTrans' + name + '_funcs}; //modDef\n')
+                'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "' + name + '", PyTrans_docs, -1, ' + name + '_funcs}; //modDef\n')
 
         if line.endswith("//initFunc\n"):
             f.write(
-                'PyMODINIT_FUNC PyInit_PyTrans' + name + '(void)    {    PyObject *m = PyModule_Create(&PyTransModule); import_array(); return m;} //initFunc\n')
+                # 'PyMODINIT_FUNC PyInit_PyTrans' + name + '(void)    {    PyObject *m = PyModule_Create(&PyTransModule); import_array(); return m;} //initFunc\n')
+                'PyMODINIT_FUNC PyInit_' + name + '(void)    {return PyModule_Create(&PyTransModule);} //initFunc\n')
     f.close()
 
     t_start_compile = t.ctime()
     print('   [{time}] start compile phase'.format(time=t_start_compile))
 
-    os.system("export CFLAGS='-I {}'".format(np.get_include()))
-
+    # os.system("export CFLAGS='-I {}'".format(np.get_include()))
     install_lib = os.path.join(os.path.dirname(__file__), "PyTrans")
     subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
                    cwd=location)
@@ -194,10 +196,10 @@ def compile_module(name, NC=False):
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
 
-    try:
-        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
-    except:
-        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    # try:
+    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    # except:
+    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
 
 
 def delete_module(name):
@@ -231,7 +233,6 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
     covd_sym = sym_tools.CovDSym(nF, nP, G, V, simplify_fmet=simplify_fmet, simplify_pot=simplify_pot,
                                  simplify=simplify_covd, recache=recache)
 
-    #
     fieldmetric(nF, nP, G, V, recache=recache, simple_fmet=simplify_fmet, simple_potential=simplify_pot,
                 simple_covd=simplify_covd, silent=silent)
 
