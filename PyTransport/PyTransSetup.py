@@ -180,7 +180,7 @@ def compile_module(name, NC=False):
         if line.endswith("//initFunc\n"):
             f.write(
                 # 'PyMODINIT_FUNC PyInit_PyTrans' + name + '(void)    {    PyObject *m = PyModule_Create(&PyTransModule); import_array(); return m;} //initFunc\n')
-                'PyMODINIT_FUNC PyInit_' + name + '(void)    {return PyModule_Create(&PyTransModule);} //initFunc\n')
+                'PyMODINIT_FUNC PyInit_' + name + '(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc\n')
     f.close()
 
     t_start_compile = t.ctime()

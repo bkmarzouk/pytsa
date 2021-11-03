@@ -18,10 +18,7 @@ import os
 import time
 import numpy as np
 
-try:
-    n_threads = os.environ['OMP_NUM_THREADS']
-except KeyError:
-    n_threads = 1
+n_cpu = os.cpu_count()
 
 cwd = os.path.dirname(__file__)
 template_path = os.path.join(cwd, "PyTrans.cpp")
@@ -54,6 +51,7 @@ module_extension = Extension(
     mod_name,
     sources=[template_path, stepper_path],
     language='c++',
+    extra_compile_args=['-pipe'],
     extra_link_args=["-I{}".format(np.get_include())]
 )
 
