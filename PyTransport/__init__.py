@@ -1,4 +1,6 @@
 import os
+import site
+import platform
 
 sym_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sym_cache")  # cache locations for sym calcs
 fmet_cache = os.path.join(sym_cache, "fmet")
@@ -13,3 +15,12 @@ os.environ["model_cache"] = sym_cache
 os.environ["fmet_cache"] = fmet_cache
 os.environ["pot_cache"] = pot_cache
 os.environ["covd_cache"] = covd_cache
+
+root = os.path.dirname(__file__)
+site.addsitedir(root)
+install_lib = os.path.join(root, "PyTrans")
+version_str = ".".join(platform.python_version().split(".")[:2])
+site_lib = os.path.join(install_lib, "lib", 'python' + version_str, "site-packages")
+site.addsitedir(site_lib)
+os.environ['PYTHONPATH'] += ":{}".format(install_lib)
+os.environ['PYTHONPATH'] += ":{}".format(site_lib)

@@ -17,6 +17,7 @@
 # This file contains python scripts used to setup the compiled PyTrans module
 import time
 
+import numpy as np
 import sympy as sym
 import sys
 import site
@@ -121,24 +122,13 @@ def set_paths():
     - somewhere/lib/
     """
 
-    root = os.path.dirname(__file__)
-    site.addsitedir(root)
+    pass  # UPDATE
 
-    p = platform.system()
-
-    version_str = ".".join(platform.python_version().split(".")[:2])
-
-    if p == 'Windows':
-        site.addsitedir(os.path.join(root, 'PyTrans', 'Python', 'site-packages'))
-        site.addsitedir(os.path.join(root, 'PyTrans', 'Python', 'Lib', 'site-packages'))
-        site.addsitedir(os.path.join(root, 'PyTrans', 'Python' + version_str, 'site-packages'))
-        site.addsitedir(os.path.join(root, 'PyTrans', 'Python' + version_str, 'Lib', 'site-packages'))
-    else:
-        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'python', 'site-packages'))
-        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'python' + version_str, 'site-packages'))
-        site.addsitedir(os.path.join(root, 'PyTrans', 'lib', 'site-python'))
-
-    site.addsitedir(os.path.join(root, 'PyTransScripts'))
+    #
+    # for sub_dir in [os.path.join(install_dir, sd) for sd in os.listdir(install_dir)]:
+    #     if os.path.isdir(sub_dir) and sub_dir.endswith(".egg"):
+    #         print("adding site {}".format(sub_dir))
+    #         site.addsitedir(sub_dir)
 
 
 def compile_module(name, NC=False):
@@ -151,7 +141,7 @@ def compile_module(name, NC=False):
     :return:
     """
     t_start = t.ctime()
-    print('[{time}] start'.format(time=t_start))
+    print('   [{time}] start'.format(time=t_start))
 
     directory(NC)
     cwd = os.path.dirname(__file__)
@@ -190,38 +180,24 @@ def compile_module(name, NC=False):
                 'PyMODINIT_FUNC PyInit_PyTrans' + name + '(void)    {    PyObject *m = PyModule_Create(&PyTransModule); import_array(); return m;} //initFunc\n')
     f.close()
 
-    my_env = os.environ.copy()
-    my_env["PYTHONUSERBASE"] = location
-
     t_start_compile = t.ctime()
-    print('[{time}] start compile phase'.format(time=t_start_compile))
+    print('   [{time}] start compile phase'.format(time=t_start_compile))
 
-    set_paths()
+    os.system("export CFLAGS='-I {}'".format(np.get_include()))
 
-    # Build interface to cmd line and execute installation
-    p = subprocess.Popen(["python", setup_file_path, "install", "--user"], cwd=location,
-                         stdin=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env)
-    std_err, std_out = p.communicate()
-
-    def print_std(std, header):
-        if std is None:
-            return
-        try:
-            print(header)
-            for l in std:
-                print(l)
-        except TypeError:
-            pass
-
-    print_std(std_err, "\n\nSTD ERR")
-    print_std(std_err, "\n\nSTD OUT")
-
-    shutil.rmtree(os.path.join(location, 'build'), ignore_errors=True)
+    install_lib = os.path.join(os.path.dirname(__file__), "PyTrans")
+    subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
+                   cwd=location)
 
     t_end = t.ctime()
-    print('[{time}] ALL COMPLETE'.format(time=t_end))
+    print('   [{time}] ALL COMPLETE'.format(time=t_end))
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
+
+    try:
+        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    except:
+        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
 
 
 def delete_module(name):
@@ -269,7 +245,7 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
 
     if not silent:
         timer = t.process_time()
-        print('[{time}] writing to potential.h'.format(time=t.ctime()))
+        print('   [{time}] writing to potential.h'.format(time=t.ctime()))
 
     for line in f:
 
@@ -286,11 +262,11 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
             # extract common subexpressions from V
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for V'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for V'.format(time=t.ctime()))
 
             decls, new_expr = sym.cse(V, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
@@ -303,11 +279,11 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
         if line == "// dPot\n":
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for dV'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for dV'.format(time=t.ctime()))
 
             decls, new_exprs = sym.cse(vd, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
@@ -321,11 +297,11 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for ddV'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for ddV'.format(time=t.ctime()))
 
             decls, new_exprs = sym.cse(vdd, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
@@ -340,11 +316,11 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for dddV'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for dddV'.format(time=t.ctime()))
 
             decls, new_exprs = sym.cse(vddd, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, g, nF, nP)
@@ -357,7 +333,7 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
                         g.write('\n sum[' + str(i + nF * j + nF * nF * k) + ']=' + str(rw_expr) + ';\n')
 
     if not silent:
-        print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
+        print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer))
 
     g.close()
     f.close()
@@ -423,10 +399,10 @@ def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for field metric'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for field metric'.format(time=t.ctime()))
             decls, new_expr = sym.cse(G_array, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
@@ -442,10 +418,10 @@ def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for Christoffel symbols'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for Christoffel symbols'.format(time=t.ctime()))
             decls, new_expr = sym.cse(Gamma_array, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
@@ -463,11 +439,11 @@ def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for Riemann tensor'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for Riemann tensor'.format(time=t.ctime()))
 
             decls, new_expr = sym.cse(R_array, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)
@@ -488,10 +464,10 @@ def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential
 
             if not silent:
                 timer_cse = t.process_time()
-                print('[{time}] performing CSE for Riemann tensor'.format(time=t.ctime()))
+                print('   [{time}] performing CSE for Riemann tensor'.format(time=t.ctime()))
             decls, new_expr = sym.cse(gradR_array, order='none')
             if not silent:
-                print('[{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
+                print('   [{time}] complete in {x} sec'.format(time=t.ctime(), x=t.process_time() - timer_cse))
 
             # emit declarations for CSE variables
             write_cse_decls(decls, h, nF, nP)

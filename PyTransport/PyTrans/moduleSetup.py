@@ -53,12 +53,13 @@ mod_name = 'PyTransTEST'  # PYT_MODNAME
 module_extension = Extension(
     mod_name,
     sources=[template_path, stepper_path],
-    language='c'
+    language='c',
+    extra_link_args=["-undefined", "-dynamic_lookup"]
 )
 
 setup(
     name=mod_name,
     version=1.0,
     ext_modules=[module_extension],
-    include_dirs=[np.get_include(), cppt_dir]
+    include_dirs=[np.get_include(), cppt_dir, os.path.join(cppt_dir, "NC"), os.path.join(cppt_dir, "stepper")]
 )
