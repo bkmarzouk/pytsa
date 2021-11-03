@@ -17,7 +17,7 @@ from setuptools import setup, Extension
 import os
 import numpy as np
 
-track_recompile = True
+track_recompile = False
 
 if track_recompile:
     import time
