@@ -15,33 +15,39 @@
 
 from setuptools import setup, Extension
 import os
-import time
 import numpy as np
 
-n_cpu = os.cpu_count()
+track_recompile = True
 
+if track_recompile:
+    import time
+
+#  Get path to sources we want to compile and directories that contain header files
 cwd = os.path.dirname(__file__)
 template_path = os.path.join(cwd, "PyTrans.cpp")
-
-assert os.path.exists(template_path), template_path
-
-with open(template_path, "r") as f:
-    lines = f.readlines()
-
-with open(template_path, "w") as f:
-    for line in lines:
-
-        if not line.startswith("// Package recompile"):
-            f.write(line)
-
-        if line.startswith("// Package recompile"):
-            f.write('// Package recompile attempted at: ' + time.strftime("%c") + '\n')
-
 cppt_dir = os.path.abspath(os.path.join(cwd, "../CppTrans"))
 stepper_path = os.path.join(cppt_dir, "stepper/rkf45.cpp")
 
+assert os.path.exists(template_path), template_path
 assert os.path.exists(cppt_dir), cppt_dir
 assert os.path.exists(stepper_path), stepper_path
+
+if track_recompile:
+    # In general, this can be a lot of things to hold in ram, so let's only do this if we really want to ...
+
+    with open(template_path, "r") as f:
+        lines = f.readlines()
+
+    with open(template_path, "w") as f:
+        for line in lines:
+
+            if not line.startswith("// Package recompile"):
+                f.write(line)
+
+            if line.startswith("// Package recompile"):
+                f.write('// Package recompile attempted at: ' + time.strftime("%c") + '\n')
+
+    del lines
 
 # Do not modify comment at end of following line
 mod_name = 'PyTransTEST'  # PYT_MODNAME
