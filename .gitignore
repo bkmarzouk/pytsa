@@ -1,52 +1,47 @@
 # Ignore compiled python files everywhere
-*.pyc
+**/*.pyc
 
 # Ignore .idea
 **/__pycache__
 .idea
+**/*.egg
 
 # Ignore builds dir
-PyTransport/Sampler/builds
-!PyTransport/Sampler/builds/.gitkeep
-!PyTransport/Sampler/builds/__init__.py
-
-# Ignore curvature files everywhere, but maintain directory
-**/.curvature
-/PyTransport/PyTransport/PyTrans/CurvatureRecords/*
-!/PyTransport/PyTransport/PyTrans/CurvatureRecords/.gitkeep
-
-# Ignore Pytransport model compile files
-/**/.egg-info
-/**/.so
-
-# Ignore Installation Directory (except for examples)
-/Install/*
-!/Install/.gitkeep
-!/Install/dquad_euclidean.py
-!/Install/dquad_2sphere.py
-!/Install/path_root.py
-
-# Ignore sampler builds, but keep directory
-/Sampler/sampler-builds/*
-!/Sampler/sampler-builds/.gitkeep
-
-# Ignore sampler configs (except for examples)
-/Sampler/sampler-configs/*
-!/Sampler/sampler-configs/.gitkeep
-!/Sampler/sampler-configs/EXAMPLE.py
-!/Sampler/sampler-configs/EXAMPLE_NC.py
-!/Sampler/sampler-configs/setup_sampler.py
+PyTransport/sampler/builds
+!PyTransport/sampler/builds/.gitkeep
+!PyTransport/sampler/builds/__init__.py
 
 # Ignore compile modules
-/PyTransport/PyTrans/lib/python3.8/site-packages/*
-!/PyTransport/PyTrans/lib/python3.8/site-packages/.gitkeep
+/pytransport/pyt/lib/python3.8/site-packages/*
+**/*.egg-info
+**/*.so
+**/build
+**/dist
+
+# Ignore Installation Directory (except for examples)
+/install/*
+!/install/dquad_euclidean.py
+!/install/dquad_2sphere.py
+!/install/path_root.py
+
+# Ignore sampler builds, but keep directory
+/pytransport/sampler/builds/*
+!/pytransport/sampler/builds/.gitkeep
+
+# Ignore sampler configs (except for examples)
+/pytransport/sampler/configs/*
+!/pytransport/sampler/configs/EXAMPLE.py
+!/pytransport/sampler/configs/EXAMPLE_NC.py
+!/pytransport/sampler/configs/simple_example.py
+!/pytransport/sampler/configs/setup_sampler.py
+
 
 # Ignore cached symbolic files
-/PyTransport/sym_cache/*
+/pytransport/sym_cache/*
 
 # Ignore .h header files that are generated from proto
-/PyTransport/PyTransport/CppTrans/fieldmetric.h
-/PyTransport/PyTransport/CppTrans/potential.h
+/pytransport/cppt/fieldmetric.h
+/pytransport/cppt/potential.h
 
 # Ignore correlation files
 **.pdf

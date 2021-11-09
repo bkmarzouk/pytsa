@@ -566,7 +566,8 @@ class _CovariantDerivativesSym(object):
         self._configure_covdcovdcovd_potential()
         self._configure_covd_riemann()
 
-        cache_tools.cache_covd(metric, potential, self, simplify_fmet=simple_metric, simplify_pot=simple_potential, simplify=simple_covd)
+        cache_tools.cache_covd(metric, potential, self, simplify_fmet=simple_metric, simplify_pot=simple_potential,
+                               simplify=simple_covd)
 
     def get_symb_and_coord(self, symb_or_coord):
         return self.fmet_sym.get_symb_and_coord(symb_or_coord)
@@ -882,33 +883,35 @@ class _CovariantDerivativesSym(object):
         return metric, christoffel, riemann, covd_riemann
 
 
-# nF = 2
-# nP = 3
-# f = sym.symarray('f', nF)
-# p = sym.symarray('p', nP)
-#
-# V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2 + sym.Rational(1, 2) * p[1] ** 2 * f[1] ** 2
-# G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2 * sym.sin(f[0]) ** 2]])
-#
-# # fs = FieldSpaceSym(2, 2, G, recache=False)
-# # ps = PotentialSym(2, 2, V)
-# ms = CovDSym(2, 3, G, V)
+if __name__ == "__main__":
 
-# n = 6
-# OM = OperationMatrix(n)
-#
-# print OM
+    nF = 2
+    nP = 3
+    f = sym.symarray('f', nF)
+    p = sym.symarray('p', nP)
 
-# for i in range(n):
-#     for j in range(n):
-#         for k in range(n):
-#             for l in range(n):
-#                 if len(list(set([i, j, k, l])))==4:
-#                     print [i, j, k, l], OM[i, j, k, l]
+    V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2 + sym.Rational(1, 2) * p[1] ** 2 * f[1] ** 2
+    G = sym.Matrix([[p[2] ** 2.0, 0], [0, p[2] ** 2 * sym.sin(f[0]) ** 2]])
 
-# print OM[0, 3, 1, 3], OM[3, 1, 0, 3]
-# print OM[0, 3, 2, 3], OM[3, 2, 0, 3]
-# print OM[0, 4, 1, 4], OM[4, 1, 0, 4]
-# print OM[0, 4, 2, 4], OM[4, 2, 0, 4]
-# print OM[0, 5, 1, 5], OM[5, 1, 0, 5]
-# print OM[0, 5, 2, 5], OM[5, 2, 0, 5]
+    # fs = FieldSpaceSym(2, 2, G, recache=False)
+    # ps = PotentialSym(2, 2, V)
+    ms = CovDSym(2, 3, G, V)
+
+    n = 6
+    OM = riemann_operation_matrix(n)
+
+    print(OM)
+
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                for l in range(n):
+                    if len(list(set([i, j, k, l]))) == 4:
+                        print([i, j, k, l], OM[i, j, k, l])
+
+    print(OM[0, 3, 1, 3], OM[3, 1, 0, 3])
+    print(OM[0, 3, 2, 3], OM[3, 2, 0, 3])
+    print(OM[0, 4, 1, 4], OM[4, 1, 0, 4])
+    print(OM[0, 4, 2, 4], OM[4, 2, 0, 4])
+    print(OM[0, 5, 1, 5], OM[5, 1, 0, 5])
+    print(OM[0, 5, 2, 5], OM[5, 2, 0, 5])

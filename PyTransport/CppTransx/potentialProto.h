@@ -27,7 +27,6 @@
 using namespace std;
 
 // #Rewrite
-// Potential file rewriten at Wed Nov  3 15:56:05 2021
 
 class potential
 {
@@ -41,8 +40,6 @@ public:
 	potential()
 	{
 // #FP
-nF=2;
-nP=3;
 
 //        p.resize(nP);
         
@@ -59,7 +56,6 @@ nP=3;
 		double sum ;
         
 // Pot
-  sum=(1.0/2.0)*std::pow(f[0], 2)*std::pow(p[0], 2) + (1.0/2.0)*std::pow(f[1], 2)*std::pow(p[1], 2);
          return sum;
 	}
 	
@@ -69,10 +65,6 @@ nP=3;
 		vector<double> sum(nF,0.0);
 	
 // dPot
-
- sum[0]=f[0]*std::pow(p[0], 2);
-
- sum[1]=f[1]*std::pow(p[1], 2);
         
 		return sum;
 	}
@@ -83,16 +75,6 @@ nP=3;
 		vector<double> sum(nF*nF,0.0);
 		
 // ddPot
-  auto x0 = std::pow(p[0], 2);
-  auto x1 = std::pow(p[1], 2);
-
- sum[0]=x0;
-
- sum[2]=-f[1]*x1/std::tan(f[0]);
-
- sum[1]=0;
-
- sum[3]=(1.0/2.0)*f[0]*x0*std::sin(2*f[0]) + x1;
      
         return sum;
 	}
@@ -102,34 +84,6 @@ nP=3;
 	{
         vector<double> sum(nF*nF*nF,0.0);
 // dddPot
-  auto x0 = std::tan(f[0]);
-  auto x1 = 2/std::pow(x0, 2);
-  auto x2 = std::pow(p[1], 2);
-  auto x3 = f[1]*x2;
-  auto x4 = x3*(x1 + 1);
-  auto x5 = 1.0/x0;
-  auto x6 = std::pow(p[0], 2);
-  auto x7 = 2*f[0];
-  auto x8 = std::sin(x7);
-  auto x9 = x6*x8;
-  auto x10 = -f[0]*x9;
-  auto x11 = (1.0/2.0)*x5*(x0*x9 + x10 - 4*x2);
-
- sum[0]=0;
-
- sum[4]=x1*x3;
-
- sum[2]=x4;
-
- sum[6]=x11;
-
- sum[1]=x4;
-
- sum[5]=x11;
-
- sum[3]=x5*((1.0/2.0)*x0*x6*(x7*std::cos(x7) + x8) + x10 - 2*x2);
-
- sum[7]=0;
        
         return sum;
 	}

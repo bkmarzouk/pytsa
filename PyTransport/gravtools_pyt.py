@@ -3,7 +3,7 @@ import numpy as np
 import scipy as sp
 from sympy.matrices import Matrix
 
-from PyTransport.idp import OperationMatrix
+from pytransport.idp import OperationMatrix
 
 
 class curvatureObject:
