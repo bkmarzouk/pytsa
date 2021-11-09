@@ -18,7 +18,7 @@ os.environ["covd_cache"] = covd_cache
 
 root = os.path.dirname(__file__)
 site.addsitedir(root)
-install_lib = os.path.join(root, "PyTrans")
+install_lib = os.path.join(root, "pyt")
 version_str = ".".join(platform.python_version().split(".")[:2])
 site_lib = os.path.join(install_lib, "lib", 'python' + version_str, "site-packages")
 site.addsitedir(site_lib)

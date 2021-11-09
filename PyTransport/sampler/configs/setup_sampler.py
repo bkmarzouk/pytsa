@@ -40,7 +40,7 @@ def _pars2path(PyT, *pars):
     """
     Construct path to directory for sampling module
 
-    :param PyT: PyTransport module
+    :param PyT: pytransport module
     :param pars: params to construct hash string from, must have __str__ method
     :return: path to sampling module directory
     """
@@ -69,7 +69,7 @@ class _SamplingParameters(object):
         """
         Container for sampling parameters
 
-        :param PyT: PyTransport module
+        :param PyT: pytransport module
         """
 
         self.PyT = PyT
@@ -149,7 +149,7 @@ class Setup(_SamplingParameters):
         """
         Setup routine for sampler
 
-        :param PyT: PyTransport module
+        :param PyT: pytransport module
         """
         super(Setup, self).__init__(PyT)
 

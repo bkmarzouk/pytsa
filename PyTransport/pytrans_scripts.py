@@ -14,7 +14,7 @@
 # along with _PyTransport.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# python code contains some useful scripts to use with the compiled PyTrans module.
+# python code contains some useful scripts to use with the compiled pyt module.
 
 import gc
 import os
@@ -240,7 +240,7 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
     :param k: Horizon exit scale (k = aH)
     :param back: Background evolution
     :param params: Model parameters
-    :param MTE: PyTransport module
+    :param MTE: pytransport module
     :param return_all: if True, returns the ICs, efold at which the massless condition is attained, mass evolution
     :return: ICs or (see return_all)
     """
@@ -1057,7 +1057,7 @@ def GetCurvatureObject(MTE):
 
     # Find curvature records directory and create file instance to lead curvature class obj.
     dir = os.path.dirname(__file__)
-    curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
+    curv_dir = os.path.join(dir, 'pyt', 'CurvatureRecords')
     curv_name = str(MTE).split("'")[1][7:] + ".curvature"
     curv_path = os.path.join(curv_dir, curv_name)
     curv_file = open(curv_path, 'rb')

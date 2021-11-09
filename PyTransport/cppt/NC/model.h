@@ -139,6 +139,65 @@ public:
         return Epsilon;
 	}
 
+	// function returns eta
+	double Eta(vector<double> fdf, vector<double> p)
+	{
+
+        // Unpack fieldsdotfields
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        for(int ii = 0; ii < nF; ii++){
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
+
+        // Field metric
+		vector<double> FMi = fmet.fmetric(fdf,p);
+
+		// Lower index on field-space velocities
+		vector<long double> phidot_d(nF);
+		for (int ii = 0; ii < nF; ii++)
+		{
+		    phidot_d[ii] = 0.;
+		    for (int jj = 0; jj < nF; jj++)
+		    {
+		        phidot_d[ii] += FMi[2*nF*nF + nF + 2*nF*ii + jj] * v[jj];
+		    }
+		}
+
+        // Get hubble rate
+        double Hi = H(fdf, p);
+        // vector<double> ddVi;
+        vector<double> dVi;
+        // ddVi = pot.dVV(fdf,p);
+		dVi =  pot.dV(fdf,p);
+
+
+		// Covariant time derivatives of lowered-index field-space velocities
+		vector<long double> cdt_phidot_d(nF);
+		for (int ii = 0; ii < nF; ii++)
+		{
+            cdt_phidot_d[ii] = -3.*Hi*phidot_d[ii] - dVi[ii];
+		}
+
+	    // Compute Hubble, and KE
+	    double KE = ke(fdf, p);
+        double out = 0.;
+
+        for(int ii = 0; ii < nF; ii++)
+	    {
+	        out += v[ii] * cdt_phidot_d[ii];
+	    }
+
+	    out /= (Hi * KE);
+
+	    out += 2 * Ep(fdf, p);
+
+	    return out;
+
+	}
+
 
     // function returns a double dot
     double addot(vector<double> f, vector<double> p)
@@ -162,7 +221,8 @@ public:
     }
 
     // function returns the slow-roll approximation for velocities
-    vector<double> dfSR(vector<double> fields, vector<double> p){
+    vector<double> dfSR(vector<double> fields, vector<double> p)
+    {
 
         // We build a fieldsdotfields vector with zero velocities (this is the canonical object passed to other funcs)
         vector<double> fdf(2*nF);

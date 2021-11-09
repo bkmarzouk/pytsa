@@ -25,7 +25,7 @@ if track_recompile:
 #  Get path to sources we want to compile and directories that contain header files
 cwd = os.path.dirname(__file__)
 template_path = os.path.join(cwd, "PyTrans.cpp")
-cppt_dir = os.path.abspath(os.path.join(cwd, "../CppTrans"))
+cppt_dir = os.path.abspath(os.path.join(cwd, "../cppt"))
 stepper_path = os.path.join(cppt_dir, "stepper/rkf45.cpp")
 
 assert os.path.exists(template_path), template_path

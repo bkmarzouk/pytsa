@@ -20,10 +20,10 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsample/PyTransport/CppTrans/NC/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsample/PyTransport/CppTrans/NC/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsample/PyTransport/CppTrans/NC/model.h"//model
-#include"/home/kareem/cosmo-share/repos/pytsample/PyTransport/CppTrans/stepper/rkf45.hpp"//stepper
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/model.h"//model
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
 #include <math.h>
@@ -172,6 +172,56 @@ static PyObject* MT_paramNumber(PyObject* self,  PyObject *args)
     model mm;
     return Py_BuildValue("i",mm.getnP());
 }
+
+
+// Compute slow roll epsilon param
+static PyObject* MT_Ep(PyObject* self, PyObject *args)
+{
+    PyArrayObject *fields_dfieldsIn, *params;
+
+    double *Cfields_dfields, *Cparams;
+    if (!PyArg_ParseTuple(args, "O!O!",  &PyArray_Type, &fields_dfieldsIn,&PyArray_Type,&params)) {
+        return NULL;}
+
+    Cfields_dfields = pyvector_to_Carray(fields_dfieldsIn);
+    model mm;
+
+    int nF = mm.getnF(); if (2*nF!=size_pyvector(fields_dfieldsIn)){cout<< "\n \n \n field space array not of correct length\n \n \n ";    Py_RETURN_NONE;}
+    vector<double> vectIn;
+    vectIn = vector<double>(Cfields_dfields, Cfields_dfields + 2*nF);
+
+    int nP = mm.getnP(); if (nP!=size_pyvector(params)){cout<< "\n \n \n parameters array not of correct length \n \n \n";  Py_RETURN_NONE;}
+    Cparams = pyvector_to_Carray(params);
+    vector<double> Vparams; Vparams = vector<double>(Cparams, Cparams +  nP);
+
+    return Py_BuildValue("d", mm.Ep(vectIn, Vparams));
+
+}
+
+// Compute slow roll epsilon param
+static PyObject* MT_Eta(PyObject* self, PyObject *args)
+{
+    PyArrayObject *fields_dfieldsIn, *params;
+
+    double *Cfields_dfields, *Cparams;
+    if (!PyArg_ParseTuple(args, "O!O!",  &PyArray_Type, &fields_dfieldsIn,&PyArray_Type,&params)) {
+        return NULL;}
+
+    Cfields_dfields = pyvector_to_Carray(fields_dfieldsIn);
+    model mm;
+
+    int nF = mm.getnF(); if (2*nF!=size_pyvector(fields_dfieldsIn)){cout<< "\n \n \n field space array not of correct length\n \n \n ";    Py_RETURN_NONE;}
+    vector<double> vectIn;
+    vectIn = vector<double>(Cfields_dfields, Cfields_dfields + 2*nF);
+
+    int nP = mm.getnP(); if (nP!=size_pyvector(params)){cout<< "\n \n \n parameters array not of correct length \n \n \n";  Py_RETURN_NONE;}
+    Cparams = pyvector_to_Carray(params);
+    vector<double> Vparams; Vparams = vector<double>(Cparams, Cparams +  nP);
+
+    return Py_BuildValue("d", mm.Eta(vectIn, Vparams));
+
+}
+
 
 // evaluates the full mass-matrix of the model subject to params + fieldsdotfields
 static PyObject* MT_massMatrix(PyObject* self, PyObject *args)
@@ -1167,7 +1217,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransTEST_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef PyTransTEST_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"Epsilon", (PyCFunction)MT_Ep,           METH_VARARGS, PyTrans_docs},{"Eta", (PyCFunction)MT_Eta,           METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

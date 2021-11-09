@@ -11,7 +11,7 @@ if __name__ == "__main__":
     # Import argument parser for cmd args
     from argparse import ArgumentParser
 
-    parser = ArgumentParser(description="Configure PyTransport sampler Routine")
+    parser = ArgumentParser(description="Configure pytransport sampler Routine")
 
     # Build mutually exclusive group for schwimmbad processes
     sb_group = parser.add_mutually_exclusive_group()

@@ -14,7 +14,7 @@
 # along with _PyTransport.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# This file contains python scripts used to setup the compiled PyTrans module
+# This file contains python scripts used to setup the compiled pyt module
 import time
 
 import numpy as np
@@ -49,28 +49,19 @@ def _delta_ctime(a, b):
 
 def directory(NC: bool):
     """
-    Configures directory structure for PyTransport
+    Configures directory structure for pytransport
 
     :param NC: if True methods use non-canonical field metric
-    :return: None, configure PyTrans.cpp file
+    :return: None, configure pyt.cpp file
     """
     dir = os.path.dirname(__file__)
 
-    filename = os.path.join(dir, 'PyTrans', 'PyTrans.cpp')
+    filename = os.path.join(dir, 'pyt', 'PyTrans.cpp')
 
     with open(filename, "r") as f:
         lines = f.readlines()
 
     with open(filename, "w") as f:
-
-        # Create directory to hold records of curvature objects;
-        # We will compute inverse metrics in sympy notation which then can
-        # quickly generate christoffel symbols and riemann tensors relevant for mass matrix computations
-        curv_dir = os.path.join(dir, 'PyTrans', 'CurvatureRecords')
-
-        if not os.path.exists(curv_dir):
-            print("Building curvature directory")
-            os.makedirs(curv_dir)
 
         if NC is False:
             for line in lines:
@@ -78,16 +69,16 @@ def directory(NC: bool):
                         "//model\n") and not line.endswith("//stepper\n"):
                     f.write(line)
                 if line.endswith("//evolve\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'evolve.h')
+                    fileT = os.path.join(dir, 'cppt', 'evolve.h')
                     f.write('#include' + '"' + fileT + '"' + '//evolve' + '\n')
                 if line.endswith("//moments\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'moments.h')
+                    fileT = os.path.join(dir, 'cppt', 'moments.h')
                     f.write('#include' + '"' + fileT + '"' + '//moments' + '\n')
                 if line.endswith("//model\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'model.h')
+                    fileT = os.path.join(dir, 'cppt', 'model.h')
                     f.write('#include' + '"' + fileT + '"' + '//model' + '\n')
                 if line.endswith("//stepper\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'stepper', 'rkf45.hpp')
+                    fileT = os.path.join(dir, 'cppt', 'stepper', 'rkf45.hpp')
                     f.write('#include' + '"' + fileT + '"' + '//stepper' + '\n')
         else:
             for line in lines:
@@ -95,22 +86,22 @@ def directory(NC: bool):
                         "//model\n") and not line.endswith("//stepper\n"):
                     f.write(line)
                 if line.endswith("//evolve\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'NC', 'evolve.h')
+                    fileT = os.path.join(dir, 'cppt', 'NC', 'evolve.h')
                     f.write('#include' + '"' + fileT + '"' + '//evolve' + '\n')
                 if line.endswith("//moments\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'NC', 'moments.h')
+                    fileT = os.path.join(dir, 'cppt', 'NC', 'moments.h')
                     f.write('#include' + '"' + fileT + '"' + '//moments' + '\n')
                 if line.endswith("//model\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'NC', 'model.h')
+                    fileT = os.path.join(dir, 'cppt', 'NC', 'model.h')
                     f.write('#include' + '"' + fileT + '"' + '//model' + '\n')
                 if line.endswith("//stepper\n"):
-                    fileT = os.path.join(dir, 'CppTrans', 'stepper', 'rkf45.hpp')
+                    fileT = os.path.join(dir, 'cppt', 'stepper', 'rkf45.hpp')
                     f.write('#include' + '"' + fileT + '"' + '//stepper' + '\n')
 
 
 def set_paths():
     """
-    This sets the target directories for custom-built PyTransport modules. I.e. this is where compiled objects
+    This sets the target directories for custom-built pytransport modules. I.e. this is where compiled objects
     and __bootstrap__ methods to load the Python builds are stored.
 
     'site-packages' belong to the default search path for Python, so these destinations are straightforward to find.
@@ -145,8 +136,8 @@ def compile_module(name, NC=False):
 
     directory(NC)
     cwd = os.path.dirname(__file__)
-    location = os.path.join(cwd, 'PyTrans')
-    setup_file_path = os.path.join(cwd, 'PyTrans', 'moduleSetup.py')
+    location = os.path.join(cwd, 'pyt')
+    setup_file_path = os.path.join(cwd, 'pyt', 'moduleSetup.py')
 
     with open(setup_file_path, "r") as f:
         lines = f.readlines()
@@ -158,7 +149,7 @@ def compile_module(name, NC=False):
             else:
                 f.write(line)
 
-    filename = os.path.join(cwd, 'PyTrans', 'PyTrans.cpp')
+    filename = os.path.join(cwd, 'pyt', 'PyTrans.cpp')
     f = open(filename, "r")
     lines = f.readlines()
     f.close()
@@ -169,12 +160,12 @@ def compile_module(name, NC=False):
             f.write(line)
         if line.endswith("//FuncDef\n"):
             f.write(
-                # 'static PyMethodDef PyTrans' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
-                'static PyMethodDef ' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+                # 'static PyMethodDef pyt' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+                'static PyMethodDef ' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"Epsilon", (PyCFunction)MT_Ep,           METH_VARARGS, PyTrans_docs},{"Eta", (PyCFunction)MT_Eta,           METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
 
         if line.endswith("//modDef\n"):
             f.write(
-                # 'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTrans' + name + '", PyTrans_docs, -1, PyTrans' + name + '_funcs}; //modDef\n')
+                # 'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "pyt' + name + '", PyTrans_docs, -1, pyt' + name + '_funcs}; //modDef\n')
                 'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "' + name + '", PyTrans_docs, -1, ' + name + '_funcs}; //modDef\n')
 
         if line.endswith("//initFunc\n"):
@@ -187,19 +178,18 @@ def compile_module(name, NC=False):
     print('   [{time}] start compile phase'.format(time=t_start_compile))
 
     # os.system("export CFLAGS='-I {}'".format(np.get_include()))
-    install_lib = os.path.join(os.path.dirname(__file__), "PyTrans")
+    install_lib = os.path.join(os.path.dirname(__file__), "pyt")
     subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
                    cwd=location)
 
     t_end = t.ctime()
-    print('   [{time}] ALL COMPLETE'.format(time=t_end))
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
 
-    # try:
-    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
-    # except:
-    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    try:
+        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    except:
+        pass
 
 
 def delete_module(name):
@@ -208,8 +198,8 @@ def delete_module(name):
 
     :param name: module name
     """
-    location = os.path.join(os.path.dirname(__file__), 'PyTrans')
-    [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("PyTrans" + name)]
+    location = os.path.join(os.path.dirname(__file__), 'pyt')
+    [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("pyt" + name)]
 
 
 def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=False, G: sym.Matrix or None = None,
@@ -239,8 +229,8 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
     v, vd, vdd, vddd = covd_sym.get_potential_sym_arrays()
 
     dir = os.path.dirname(__file__)
-    filename1 = os.path.join(dir, 'CppTrans', 'potentialProto.h')
-    filename2 = os.path.join(dir, 'CppTrans', 'potential.h')
+    filename1 = os.path.join(dir, 'cppt', 'potentialProto.h')
+    filename2 = os.path.join(dir, 'cppt', 'potential.h')
     f = open(filename1, 'r')
     g = open(filename2, 'w')
 
@@ -382,8 +372,8 @@ def fieldmetric(nF, nP, G, V, recache=False, simple_fmet=False, simple_potential
     :param silent: if True, not output is printed
     """
     dir = os.path.dirname(__file__)
-    filename1 = os.path.join(dir, 'CppTrans', 'fieldmetricProto.h')
-    filename2 = os.path.join(dir, 'CppTrans', 'fieldmetric.h')
+    filename1 = os.path.join(dir, 'cppt', 'fieldmetricProto.h')
+    filename2 = os.path.join(dir, 'cppt', 'fieldmetric.h')
     e = open(filename1, 'r')
     h = open(filename2, 'w')
 

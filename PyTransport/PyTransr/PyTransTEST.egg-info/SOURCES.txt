@@ -1,9 +1,0 @@
-moduleSetup.py
-setup.cfg
-setup.py
-/home/kareem/cosmo-share/repos/pytsample/PyTransport/CppTrans/stepper/rkf45.cpp
-/home/kareem/cosmo-share/repos/pytsample/PyTransport/PyTrans/PyTrans.cpp
-PyTransTEST.egg-info/PKG-INFO
-PyTransTEST.egg-info/SOURCES.txt
-PyTransTEST.egg-info/dependency_links.txt
-PyTransTEST.egg-info/top_level.txt

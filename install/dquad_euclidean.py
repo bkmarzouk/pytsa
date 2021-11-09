@@ -1,4 +1,4 @@
-from path_root import *  # Sets path to import PyTransport files
+from path_root import *  # Sets path to import pytransport files
 import sympy as sym
 from pytransport import pytrans_setup
 

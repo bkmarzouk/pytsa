@@ -1,2 +1,0 @@
-Details of this ODE solver can be found at this link:
-https://people.sc.fsu.edu/~jburkardt/cpp_src/rkf45/rkf45.html
