@@ -133,6 +133,7 @@ public:
 	    return out;
 	}
 
+
     // function returns a double dot
     double addot(vector<double> f, vector<double> p)
     {
@@ -158,8 +159,92 @@ public:
         // Compute epsilon via definition
         return 3. - Vi / (Hubble*Hubble);
 	}
-    
-    
+
+	// funtion returns eta
+	double Eta(vector<double>) fdf, vector<double> p)
+	{
+
+        // Unpack fieldsdotfields
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        for(int ii = 0; ii < nF; ii++){
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
+
+        double eps = Ep(f, p);
+        double hub = H(f, p);
+        double dothub = Hdot(f, p);
+        double ddothub = Hddot(fdf, p);
+
+        return (ddothub * hub - 2 * dothub * dothub) / (2 * eps * hub * hub * hub * hub);
+	}
+
+    // function returns mass-squared-matrix
+    vector<double> Mij(vector<double> fdf, vector<double> p, bool hessianApprox, bool covariantExpression)
+    {
+        // Retains covariant output kwarg for signature consistency with NC
+
+        // Unpack fieldsdotfields
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        for(int ii = 0; ii < nF; ii++){
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
+
+        // Potential derivatives
+        vector<double> ddVi;
+        vector<double> dVi;
+        ddVi = pot.dVV(fdf,p);
+		dVi =  pot.dV(fdf,p);
+
+        // Get epsilon
+        double eps = Ep(fdf, p);
+
+        // Get hubble rate
+        double Hi = H(fdf, p);
+
+		// double time derivatives of fields (just background eom)
+		vector<long double> cdt_phidot_d(nF);
+		for (int ii = 0; ii < nF; ii++)
+		{
+            cdt_phidot_d[ii] = -3.*Hi*v[ii] - dVi[ii];
+		}
+
+        // Output
+        vector<double> mijout(nF*nF);
+
+
+		for (int ii=0; ii < nF; ii++)
+		{
+
+		    for (int jj=0; jj < nF; jj++)
+		    {
+
+                double hij_sum = 0;  // Hessian term
+                double kij_sum = 0;  // Kinetic term
+
+		        hij_sum += ddVi[ii*nF + jj];
+
+		        if (hessianApprox == false)
+		        {
+
+                    kij_sum -= (v[ii] * cdt_phidot_d[jj] + v[jj] * cdt_phidot_d[ii]) / Hi;
+                    kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
+
+                }
+
+                mijout[ii*nF + jj] = hij_sum + kij_sum;
+
+		    }
+		}
+
+        return mijout;
+    }
+
     // function returns number of fields
     int getnF()
     {
