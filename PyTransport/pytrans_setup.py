@@ -24,8 +24,8 @@ from pytransport import sym_tools
 
 _PyMethodDefs = ",".join([
     '{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"}',
-    '{"nF", (PyCFunction)MT_fieldNumber,   METH_VARARGS, "Get number of fields for model"}',
-    '{"nP", (PyCFunction)MT_paramNumber,   METH_VARARGS, "Get number of params for model"}',
+    '{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "Get number of fields for model"}',
+    '{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "Get number of params for model"}',
     '{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"}',
     '{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"}',
     '{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"}',
@@ -158,7 +158,7 @@ def compile_module(name, NC=False):
 
     import numpy as np
     os.system("export CFLAGS='-I {}'".format(np.get_include()))
-    install_lib = os.path.join(os.path.dirname(__file__), "pyt")
+    # install_lib = os.path.join(os.path.dirname(__file__), "pyt")
     # subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
     #                cwd=location)
     subprocess.run(["python", setup_file_path, "install"],
@@ -182,6 +182,9 @@ def delete_module(name):
     """
     location = os.path.join(os.path.dirname(__file__), 'pyt')
     [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("pyt" + name)]
+
+
+# TODO: Tidy translator; wrap into single call?
 
 
 def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=False, G: sym.Matrix or None = None,
