@@ -22,6 +22,23 @@ import shutil
 import time as t
 from pytransport import sym_tools
 
+_PyMethodDefs = ",".join([
+    '{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"}',
+    '{"nF", (PyCFunction)MT_fieldNumber,   METH_VARARGS, "Get number of fields for model"}',
+    '{"nP", (PyCFunction)MT_paramNumber,   METH_VARARGS, "Get number of params for model"}',
+    '{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"}',
+    '{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"}',
+    '{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"}',
+    '{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"}',
+    '{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"}',
+    '{"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,   METH_VARARGS, "REMOVE"}',  # REMOVE DEP
+    '{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"}',
+    '{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"}',
+    '{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"}',
+    '{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "Evolve 2pt correlation functions"}',
+    '{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "Evolve 3pt correlation functions"}',
+])
+
 
 def _delta_ctime(a, b):
     """
@@ -41,7 +58,7 @@ def _delta_ctime(a, b):
     return j - i
 
 
-def directory(NC: bool):
+def set_template_headers(NC: bool):
     """
     Configures directory structure for pytransport
 
@@ -99,7 +116,7 @@ def compile_module(name, NC=False):
     t_start = t.ctime()
     print('   [{time}] start'.format(time=t_start))
 
-    directory(NC)
+    set_template_headers(NC)
     cwd = os.path.dirname(__file__)
     location = os.path.join(cwd, 'pyt')
     setup_file_path = os.path.join(cwd, 'pyt', 'moduleSetup.py')
@@ -122,26 +139,29 @@ def compile_module(name, NC=False):
 
     with open(pytrans_cpp_path, "w") as f:
         for line in pytrans_cpp_lines:
-            if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith("//modDef\n"):
+            if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith(
+                    "//modDef\n"):
                 f.write(line)
             if line.endswith("//FuncDef\n"):
-                f.write(
-                    'static PyMethodDef ' + name + '_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"Epsilon", (PyCFunction)MT_Ep,           METH_VARARGS, PyTrans_docs},{"Eta", (PyCFunction)MT_Eta,           METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef\n')
+                f.write('static PyMethodDef ' + name + '_funcs[] = {' + _PyMethodDefs + ',   {NULL}};//FuncDef\n')
 
             if line.endswith("//modDef\n"):
-                f.write(
-                    'static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "' + name + '", PyTrans_docs, -1, ' + name + '_funcs}; //modDef\n')
+                f.write('static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "' +
+                        name + '", PyTrans_docs, -1, ' + name + '_funcs}; //modDef\n')
 
             if line.endswith("//initFunc\n"):
-                f.write(
-                    'PyMODINIT_FUNC PyInit_' + name + '(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc\n')
+                f.write('PyMODINIT_FUNC PyInit_' +
+                        name + '(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc\n')
 
     t_start_compile = t.ctime()
     print('   [{time}] start compile phase'.format(time=t_start_compile))
 
-    # os.system("export CFLAGS='-I {}'".format(np.get_include()))
+    import numpy as np
+    os.system("export CFLAGS='-I {}'".format(np.get_include()))
     install_lib = os.path.join(os.path.dirname(__file__), "pyt")
-    subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
+    # subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
+    #                cwd=location)
+    subprocess.run(["python", setup_file_path, "install"],
                    cwd=location)
 
     t_end = t.ctime()
