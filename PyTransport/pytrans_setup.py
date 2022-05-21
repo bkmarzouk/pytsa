@@ -157,11 +157,9 @@ def compile_module(name, NC=False):
 
     import numpy as np
     os.system("export CFLAGS='-I {}'".format(np.get_include()))
-    # install_lib = os.path.join(os.path.dirname(__file__), "pyt")
-    # subprocess.run(["python", setup_file_path, "install", "--prefix={}".format(install_lib)],
+    # subprocess.run(["python", setup_file_path, "install", " -f"],
     #                cwd=location)
-    subprocess.run(["python", setup_file_path, "install"],
-                   cwd=location)
+    subprocess.run(["bash", "moduleSetup.sh"], cwd=location)
 
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
