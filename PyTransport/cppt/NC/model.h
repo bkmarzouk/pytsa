@@ -154,15 +154,15 @@ public:
             for(int jj = 0; jj < nF; jj++){
 
                 // Down down convention for ij indices
-                G_ij = FMi[(2*nF)*(i+nF)+(j+nF)];
+                G_ij = FMi[(2*nF)*(ii+nF)+(jj+nF)];
 
                 out += G_ij * 6 * hubble * v[ii] * v[jj];
 
                 for(int kk = 0; kk < nF; kk++){
 
-                    G_ik = FMi[nf * ii * 2 + kk];
-                    G_jk = FMi[nf * jj * 2 + kk];
-                    out += G_ij * (G_ik * v[j] + G_jk * v[i]) * dv[k];
+                    G_ik = FMi[nF * ii * 2 + kk];
+                    G_jk = FMi[nF * jj * 2 + kk];
+                    out += G_ij * (G_ik * v[jj] + G_jk * v[ii]) * dv[kk];
 
                 }
             }

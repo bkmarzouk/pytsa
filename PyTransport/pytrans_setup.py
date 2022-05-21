@@ -22,20 +22,20 @@ import shutil
 import time as t
 from pytransport import sym_tools
 
-_PyMethodDefs = ",".join([
-    '{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"}',
-    '{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "Get number of fields for model"}',
-    '{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "Get number of params for model"}',
-    '{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"}',
-    '{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"}',
-    '{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"}',
-    '{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"}',
-    '{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"}',
-    '{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"}',
-    '{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"}',
-    '{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"}',
-    '{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "Evolve 2pt correlation functions"}',
-    '{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "Evolve 3pt correlation functions"}',
+_PyMethodDefs = ",".join([  # Note that doc strings are defined in PyTrans.cpp file
+    '{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H}',
+    '{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF}',
+    '{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP}',
+    '{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, doc_Epsilon}',
+    '{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, doc_Eta}',
+    '{"V", (PyCFunction)MT_V,   METH_VARARGS, doc_V}',
+    '{"dV", (PyCFunction)MT_dV,   METH_VARARGS, doc_dV}',
+    '{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, doc_ddV}',
+    '{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, doc_massMatrix}',
+    '{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, doc_findEndOfInflation}',
+    '{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, doc_backEvolve}',
+    '{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve}',
+    '{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve}',
 ])
 
 

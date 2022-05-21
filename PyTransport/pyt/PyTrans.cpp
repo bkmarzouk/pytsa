@@ -20,9 +20,9 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/model.h"//model
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/model.h"//model
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
@@ -1171,12 +1171,25 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     return PyArray_Return(alpOut);
 }
 
+PyDoc_STRVAR(doc_H, "Compute the Hubble rate from background");
+PyDoc_STRVAR(doc_nF, "Get number of fields in model");
+PyDoc_STRVAR(doc_nP, "Get number of params in model");
+PyDoc_STRVAR(doc_Epsilon, "Compute epsilon SR param (Hubble not Potential)");
+PyDoc_STRVAR(doc_Eta, "Compute eta SR param (Hubble not Potential");
+PyDoc_STRVAR(doc_V, "Evaluate the potential at given field values");
+PyDoc_STRVAR(doc_dV, "Evaluate 1st (covariant) derivative of potential at given field values");
+PyDoc_STRVAR(doc_ddV, "Evaluate 2nd (covariant) derivative of potential at given field values");
+PyDoc_STRVAR(doc_findEndOfInflation, "Find the end of inflation from initial conditions");
+PyDoc_STRVAR(doc_massMatrix, "Compute mass (squared) matrix from background");
+PyDoc_STRVAR(doc_backEvolve, "Compute background evolution for a range of efoldings");
+PyDoc_STRVAR(doc_sigEvolve, "Evolve 2pt correlation functions");
+PyDoc_STRVAR(doc_alphaEvolve, "Evolve 3pt correlation functions";)
 
 static char PyTrans_docs[] =
-"This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
+"This is PyTransport, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef dquad_euclidean_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "Get number of fields for model"},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "Get number of params for model"},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"},{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "Evolve 2pt correlation functions"},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "Evolve 3pt correlation functions"},   {NULL}};//FuncDef
+static PyMethodDef PyTransTEST_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "doc_nF"},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "doc_nP"},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "doc_Epsilon"},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "doc_Eta"},{"V", (PyCFunction)MT_V,   METH_VARARGS, "doc_V"},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "doc_dV"},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "doc_ddV"},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "doc_massMatrix"},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "doc_findEndOfInflation"},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "doc_backEvolve"},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "doc_sigEvolve"},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "doc_alphaEvolve"},   {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1184,11 +1197,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "dquad_euclidean", PyTrans_docs, -1, dquad_euclidean_funcs}; //modDef
+static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTransTEST", PyTrans_docs, -1, PyTransTEST_funcs}; //modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_dquad_euclidean(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+PyMODINIT_FUNC PyInit_PyTransTEST(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
