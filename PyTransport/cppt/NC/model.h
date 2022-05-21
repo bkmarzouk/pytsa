@@ -34,7 +34,7 @@ private:
 	int nF;  // field number
 	int nP; // params number which definFs potential
 	potential pot; // potential which defines model
-    fieldmetric fmet;
+    fieldmetric fmet;  // Field space metric
 
 public:
 	// constructor
@@ -204,7 +204,7 @@ public:
 	}
 
 	// funtion returns eta
-	double Eta(vector<double>) fdf, vector<double> p)
+	double Eta(vector<double> fdf, vector<double> p)
 	{
 
         // Unpack fieldsdotfields

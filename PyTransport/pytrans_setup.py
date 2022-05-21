@@ -31,7 +31,6 @@ _PyMethodDefs = ",".join([
     '{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"}',
     '{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"}',
     '{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"}',
-    '{"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,   METH_VARARGS, "REMOVE"}',  # REMOVE DEP
     '{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"}',
     '{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"}',
     '{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"}',

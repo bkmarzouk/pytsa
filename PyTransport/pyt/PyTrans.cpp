@@ -20,9 +20,9 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/model.h"//model
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/model.h"//model
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
@@ -503,70 +503,6 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     else{
         return Py_BuildValue("d", N);
     }
-}
-
-// Compute slowroll velocities
-static PyObject* MT_dotfieldsSR(PyObject* self, PyObject *args)
-{
-
-    // Initialize python array objects
-    PyArrayObject *fields, *params, *dfSR_out;
-
-    // initialize corresponding cpp objects
-    double *Cfields, *Cparams;
-
-    // Parse python args
-    if (!PyArg_ParseTuple(args, "O!O!",&PyArray_Type, &fields, &PyArray_Type, &params)){
-        return NULL;
-    }
-
-    // Get model
-    model mm;
-    int nF=mm.getnF();
-    int nP = mm.getnP();
-
-    // Cross check number of fields / params passed
-    if (nF!=size_pyvector(fields)) {
-        cout<< "\n \n \n field space array not of correct length \n \n \n";
-        Py_RETURN_NONE;
-    }
-    if (nP!=size_pyvector(params)) {
-        cout<< "\n \n \n parameters array not of correct length \n \n \n";
-        Py_RETURN_NONE;
-    }
-
-    // Translate Python arrays into C arrays
-    Cfields = pyvector_to_Carray(fields);
-    Cparams = pyvector_to_Carray(params);
-
-    // Now translate into C vectors
-    vector<double> Cvec_fields;
-    vector<double> Cvec_params;
-    Cvec_fields = vector<double>(Cfields, Cfields+nF);
-    Cvec_params = vector<double>(Cparams, Cparams+nP);
-
-
-    // Now we can compute the slowroll values using the vector obj.
-    vector<double> CdfSR = mm.dfSR(Cvec_fields, Cvec_params);
-
-
-    // Construct numpy output object
-    npy_intp dims[1];
-    dims[0] = nF;
-    dfSR_out = (PyArrayObject*) PyArray_SimpleNew(1, dims, NPY_DOUBLE);
-
-    // Assign pointer to python object
-    double * CdfSR_out;
-    CdfSR_out = (double *) PyArray_DATA(dfSR_out);
-
-    // Populate array with SR vals
-    for (int ii = 0; ii < nF; ii++){
-        CdfSR_out[ii] = CdfSR[ii];
-    }
-
-    // Return python object
-    return PyArray_Return(dfSR_out);
-
 }
 
 // function to calculate background evolution
@@ -1240,7 +1176,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransTEST_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "Get number of fields for model"},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "Get number of params for model"},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"},{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"},{"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,   METH_VARARGS, "REMOVE"},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "Evolve 2pt correlation functions"},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "Evolve 3pt correlation functions"},   {NULL}};//FuncDef
+static PyMethodDef dquad_euclidean_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, "Compute Hubble rate"},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, "Get number of fields for model"},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, "Get number of params for model"},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, "Compute Epsilon slow roll value"},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, "Compute Eta slow roll value"},{"V", (PyCFunction)MT_V,   METH_VARARGS, "Compute potential"},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, "Compute 1st derivative of potential"},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, "Compute 2nd derivative of potential"},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, "Compute mass-matrix"},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, "End of inflation (SR violation)"},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, "Compute background evolution"},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, "Evolve 2pt correlation functions"},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, "Evolve 3pt correlation functions"},   {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1248,11 +1184,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTransTEST", PyTrans_docs, -1, PyTransTEST_funcs}; //modDef
+static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "dquad_euclidean", PyTrans_docs, -1, dquad_euclidean_funcs}; //modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_PyTransTEST(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+PyMODINIT_FUNC PyInit_dquad_euclidean(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

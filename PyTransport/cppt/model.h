@@ -69,9 +69,7 @@ public:
             double pd = phidot[i];
 
             // Compute product
-            else {
-                dotsigmasq += pd * pd;
-            }
+            dotsigmasq += pd * pd;
         }
 
         // Return field kinetic energy
@@ -161,7 +159,7 @@ public:
 	}
 
 	// funtion returns eta
-	double Eta(vector<double>) fdf, vector<double> p)
+	double Eta(vector<double> fdf, vector<double> p)
 	{
 
         // Unpack fieldsdotfields
@@ -233,7 +231,7 @@ public:
 		        {
 
                     kij_sum -= (v[ii] * cdt_phidot_d[jj] + v[jj] * cdt_phidot_d[ii]) / Hi;
-                    kij_sum -= (3. - eps) * phidot_d[ii] * phidot_d[jj];
+                    kij_sum -= (3. - eps) * v[ii] * v[jj];
 
                 }
 
@@ -275,7 +273,7 @@ public:
         double k = 1.0;
         double a = exp(N);
         double Hi = H(f,p);
-        double Hdi = Hdot(f);
+        double Hdi = Hdot(f, p);
         //return a*Hi;
        // return  a*Hi - a *Hi/pow(1. + k/a/Hi,2.0) + (1.0-a)*2.0*k/a/a/Hi/Hi*(a*Hi*Hi+a*Hdi)/pow(1. + k/a/Hi,3.0);
         return  -Hdi/Hi/Hi*a/(1.+a*Hi/k) + a/(1.+a*Hi/k) -a*(a*Hi*Hi/k + a*Hdi/k)/(1.+a*Hi/k)/(1.+a*Hi/k)/Hi; //+ 10.0*k/a/a/Hi/Hi*(a*Hi*Hi+a*Hdi)/pow(1. + k/a/Hi,11.0);
@@ -516,7 +514,7 @@ public:
 //calculates N1
 vector<double> N1(vector<double> f,vector<double> p, double N)
 {
-    double Hd=Hdot(f);
+    double Hd=Hdot(f,p);
     double Hi=H(f,p);
     //double a = exp(N);
     vector<double> dVi;
@@ -534,7 +532,7 @@ vector<double> N1(vector<double> f,vector<double> p, double N)
 
 vector<double> N2(vector<double> f, vector<double> p, double k1, double k2, double k3, double N)
 {
-    double Hd=Hdot(f);
+    double Hd=Hdot(f, p);
     double Hin=H(f,p);
     vector<double> dVi, dVVi;
     vector<double> Nii(2*nF*2*nF);
