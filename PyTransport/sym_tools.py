@@ -305,6 +305,12 @@ class _FieldSpaceSym(object):
                 hg2[i, j] = self.metric_du[i, j]
                 hg2[i, self.nf + j] = self.metric[i, j]
 
+        # My understanding of the readout in cppt:
+        # G^{IJ} = nf * ii * 2 + jj
+        # G^I_J = nf * (1 + ii *2) + jj
+        # G_I^J = 2 * nf^2 + nf * ii * 2 + jj
+        # G_{IJ} = 2 * nf^2 + nf * (1 + ii * 2) + jj
+
         combined_matrix_flattened = np.vstack((hg1, hg2)).flatten()
         sympy_matrix_flattened = sym.symarray("G", 2 * self.nf * 2 * self.nf)
 

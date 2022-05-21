@@ -45,32 +45,94 @@ public:
         nP=pot.getnP();
         nF=pot.getnF();
     }
-    
+
+    double ke(vector<double> fdf, vector<double> p)
+        {
+
+        // Unpack velocities from fields-dotfields
+        vector<double> phi(nF);
+        vector<double> phidot(nF);
+
+        for(int ii = 0; ii < nF; ii++)
+        {
+            phi[ii] = fdf[ii];
+            phidot[ii] = fdf[ii + nF];
+        }
+
+        // Double-contract field space velocities with cov. field metric
+		double dotsigmasq = 0;
+
+        // Iterate over field indices
+        for (int i = 0; i < nF; i++){
+
+            // dotphi^i
+            double pd = phidot[i];
+
+            // Compute product
+            else {
+                dotsigmasq += pd * pd;
+            }
+        }
+
+        // Return field kinetic energy
+		return 0.5 * dotsigmasq;
+    }
+
     // function returns Hubble rate
 	double H(vector<double> f, vector<double> p   )
 	{
-		double Hi2;
+	    // Compute potential
 		double Vi;
 		Vi=pot.V(f,p);
-		Hi2=0.;
-		for(int i=0; i<nF; i++)
-		{
-			Hi2=Hi2+1./3.*(f[nF+i]*f[nF+i]/2.);
-		}
-		Hi2=Hi2 + 1./3.*Vi;
-        return sqrt(Hi2);
+
+        // Compute field-space kinetic energy
+        double dotsigmasq = ke(f, p);
+
+        // Compute hubble rate directly from background EoM
+		double hubble = sqrt((dotsigmasq + Vi)/3.);
+
+		return hubble;
 	}
 
+
     // function returns H dot
-    double Hdot(vector<double> f)
+    double Hdot(vector<double> f, vector<double> p)
 	{
-        double sum=0.;
-		for(int i=0; i<nF; i++)
-		{
-			sum= sum - 1./2.*(f[nF+i]*f[nF+i]);
-		}
-		return sum;
+        // Hdot is simply minus the kinetic energy of the fields
+        double dotsigmasq = ke(f, p);
+
+		return -dotsigmasq;
 	}
+
+	// function returns H dot dot
+	double Hddot(vector<double> fdf, vector<double> p)
+	{
+	    // We can get the second derivative from the background equations
+
+        // Unpack fieldsdotfields
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        for(int ii = 0; ii < nF; ii++){
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
+
+	    // first derivative of potential
+	    vector<double> dv = pot.dV(fdf, p);
+
+	    // hubble rate
+	    double hubble = H(fdf, p);
+
+	    double out = 0;
+
+	    for (int ii=0; ii < nF; ii++){
+	        out +=  v[ii] * (3 * hubble * v[ii] + dv[ii]);
+	    }
+
+	    return out;
+	}
+
     // function returns a double dot
     double addot(vector<double> f, vector<double> p)
     {
@@ -89,13 +151,12 @@ public:
     // function returns epsilon
 	double Ep(vector<double> f,vector<double> p)
 	{
-		double Hi = H(f,p);
-		double mdotH=0.;
-		for(int i=0; i<nF; i++)
-		{
-			mdotH= mdotH + 1./2.*(f[nF+i]*f[nF+i]);
-		}
-  		return mdotH/(Hi*Hi);
+        // Compute potential and Hubble rate
+        double Vi = pot.V(f, p);
+        double Hubble = H(f, p);
+
+        // Compute epsilon via definition
+        return 3. - Vi / (Hubble*Hubble);
 	}
     
     

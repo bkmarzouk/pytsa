@@ -102,10 +102,6 @@ public:
 		double Vi;
 		Vi=pot.V(f,p);
 
-        // Get field space metric
-		vector<double> FMi;
-		FMi = fmet.fmetric(f,p);
-
         // Compute field-space kinetic energy
         double dotsigmasq = ke(f, p);
 
@@ -125,6 +121,76 @@ public:
 		return -dotsigmasq;
 	}
 
+	// function returns H dot dot
+	double Hddot(vector<double> fdf, vector<double> p)
+	{
+	    // We can get the second derivative from the background equations
+
+        // Unpack fieldsdotfields
+        vector<double> f(nF);
+        vector<double> v(nF);
+
+        // get fmet
+        vector<double> FMi = fmet.fmetric(fdf,p);
+
+        for(int ii = 0; ii < nF; ii++){
+            f[ii] = fdf[ii];
+            v[ii] = fdf[ii + nF];
+        }
+
+	    // first derivative of potential
+	    vector<double> dv = pot.dV(fdf, p);
+
+	    // hubble rate
+	    double hubble = H(fdf, p);
+
+	    double out = 0;
+
+	    double G_ij;  // down down
+	    double G_ik;  // up up
+	    double G_jk;  // up up
+
+        for(int ii = 0; ii < nF; ii++){
+            for(int jj = 0; jj < nF; jj++){
+
+                // Down down convention for ij indices
+                G_ij = FMi[(2*nF)*(i+nF)+(j+nF)];
+
+                out += G_ij * 6 * hubble * v[ii] * v[jj];
+
+                for(int kk = 0; kk < nF; kk++){
+
+                    G_ik = FMi[nf * ii * 2 + kk];
+                    G_jk = FMi[nf * jj * 2 + kk];
+                    out += G_ij * (G_ik * v[j] + G_jk * v[i]) * dv[k];
+
+                }
+            }
+        }
+
+	    return out;
+	}
+
+    // function returns a double dot
+    double addot(vector<double> f, vector<double> p)
+    {
+        double sum=0.;
+        double addot;
+        double Vi;
+		vector<double> FMi;
+		FMi = fmet.fmetric(f,p);
+        Vi=pot.V(f,p);
+        for(int i=0; i<nF; i++)
+        {for(int j=0; j<nF; j++)
+			{
+				sum= sum -1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);
+			}
+        }
+        addot=-1./3.*(sum+Vi);
+
+
+        return addot;
+    }
 
     // function returns epsilon
 	double Ep(vector<double> f,vector<double> p)
@@ -134,9 +200,7 @@ public:
         double Hubble = H(f, p);
 
         // Compute epsilon via definition
-        double Epsilon = 3. - Vi / (Hubble*Hubble);
-
-        return Epsilon;
+        return 3. - Vi / (Hubble*Hubble);
 	}
 
 	// function returns eta
@@ -173,7 +237,6 @@ public:
         // ddVi = pot.dVV(fdf,p);
 		dVi =  pot.dV(fdf,p);
 
-
 		// Covariant time derivatives of lowered-index field-space velocities
 		vector<long double> cdt_phidot_d(nF);
 		for (int ii = 0; ii < nF; ii++)
@@ -199,77 +262,7 @@ public:
 	}
 
 
-    // function returns a double dot
-    double addot(vector<double> f, vector<double> p)
-    {
-        double sum=0.;
-        double addot;
-        double Vi;
-		vector<double> FMi;
-		FMi = fmet.fmetric(f,p);
-        Vi=pot.V(f,p);
-        for(int i=0; i<nF; i++)
-        {for(int j=0; j<nF; j++)
-			{
-				sum= sum -1./2.*(FMi[(2*nF)*(i+nF)+(j+nF)]*f[nF+i]*f[nF+j]);
-			}
-        }
-        addot=-1./3.*(sum+Vi);
-		
-		
-        return addot;
-    }
 
-    // function returns the slow-roll approximation for velocities
-    vector<double> dfSR(vector<double> fields, vector<double> p)
-    {
-
-        // We build a fieldsdotfields vector with zero velocities (this is the canonical object passed to other funcs)
-        vector<double> fdf(2*nF);
-
-        for (int ii=0; ii<2*nF; ii++){
-            if (ii < nF){
-                fdf[ii] = fields[ii];
-            }
-            else{
-                fdf[ii] = 0;
-            }
-        }
-
-        // Now we compute the potential and first potential derivative
-        double Vi = pot.V(fdf, p);
-        vector<double> dVi = pot.dV(fdf, p);
-
-        // Field metric
-		vector<double> FMi = fmet.fmetric(fdf,p);
-
-        // Build array of dV cotnracted with metric
-        vector<double> GV(nF);
-
-        for (int ii = 0; ii < nF; ii++){
-            GV[ii] = 0;
-            for (int jj = 0; jj < nF; jj++){
-                GV[ii] -= FMi[ii*2*nF + jj]*dVi[jj];
-            }
-        }
-
-        // Build vector for slow roll values
-        vector<double> dotfieldsSR(nF);
-
-        if (Vi < 0){
-            cout << "\n \n \n Warning: Potential < 0 is not valid for SR approximation, returning 0 \n \n \n"<<endl;
-            for (int ii=0;ii<nF;ii++){
-                dotfieldsSR[ii] = 0;
-            }
-        }
-        else{
-            for (int ii=0;ii<nF;ii++){
-                dotfieldsSR[ii] = GV[ii]/sqrt(3*Vi);
-            }
-        }
-
-        return dotfieldsSR;
-    }
 
     // function returns mass-squared-matrix
     vector<double> Mij(vector<double> fdf, vector<double> p, bool hessianApprox, bool covariantExpression)
