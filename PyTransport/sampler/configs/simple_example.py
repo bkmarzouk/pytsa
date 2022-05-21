@@ -3,10 +3,9 @@ from pytransport.sampler.configs.setup_sampler import Setup
 # Import PyTransSetup module to set paths to compiled cpp module files
 from pytransport import pytrans_setup
 
-PyTransSetup.set_paths()
 
 # Now we can import the compiled module
-import PyTransdquad_euclidean as PyT
+import dquad_euclidean as PyT
 
 # We will make use of scipy's statistical libraries to sample parameter space
 import scipy.stats as stats

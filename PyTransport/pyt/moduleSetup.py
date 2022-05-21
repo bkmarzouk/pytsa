@@ -17,11 +17,6 @@ from setuptools import setup, Extension
 import os
 import numpy as np
 
-track_recompile = False
-
-if track_recompile:
-    import time
-
 #  Get path to sources we want to compile and directories that contain header files
 cwd = os.path.dirname(__file__)
 template_path = os.path.join(cwd, "PyTrans.cpp")
@@ -32,25 +27,8 @@ assert os.path.exists(template_path), template_path
 assert os.path.exists(cppt_dir), cppt_dir
 assert os.path.exists(stepper_path), stepper_path
 
-if track_recompile:
-    # In general, this can be a lot of things to hold in ram, so let's only do this if we really want to ...
-
-    with open(template_path, "r") as f:
-        lines = f.readlines()
-
-    with open(template_path, "w") as f:
-        for line in lines:
-
-            if not line.startswith("// Package recompile"):
-                f.write(line)
-
-            if line.startswith("// Package recompile"):
-                f.write('// Package recompile attempted at: ' + time.strftime("%c") + '\n')
-
-    del lines
-
 # Do not modify comment at end of following line
-mod_name = 'PyTransTEST'  # PYT_MODNAME
+mod_name = '5quad_euclidean'  # PYT_MODNAME
 
 # module extension for c++ source contributions
 module_extension = Extension(
@@ -63,7 +41,7 @@ module_extension = Extension(
 
 setup(
     name=mod_name,
-    version=1.0,
+    version="1.0",
     ext_modules=[module_extension],
     include_dirs=[np.get_include(), cppt_dir]
 )

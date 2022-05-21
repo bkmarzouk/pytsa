@@ -51,10 +51,6 @@
 
 import numpy as np
 
-from pytransport.pytrans_setup import set_paths
-
-set_paths()
-
 import pytransport.pytrans_scripts as PyS
 
 import importlib

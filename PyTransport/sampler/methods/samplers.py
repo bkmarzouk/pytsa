@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.stats
-from pytransport.sampler.methods.rng import APrioriRNG, LatinRNG
+from pytransport.sampler.methods.rng import RNGAPriori, RNGLatin
 
 
 class Constant(object):

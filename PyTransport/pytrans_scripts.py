@@ -261,13 +261,13 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
         for idx, row in enumerate(m_array):
             if row[2] > row[1]:
                 N_f = row[0]
-                N_i = m_array[idx-1][0]
+                N_i = m_array[idx - 1][0]
                 break
     else:
         for idx, row in enumerate(m_array):
             if row[2] < row[1]:
                 N_f = row[0]
-                N_i = m_array[idx-1][0]
+                N_i = m_array[idx - 1][0]
                 break
 
     if N_i is None or N_f is None:
@@ -327,7 +327,7 @@ def ICs(NB, k, back, params, MTE):
 
 
 # calculates the power spectrum at each element in kA at the end of the background evolution (back)
-def pSpectra(kA, back, params, NB, tols, MTE):
+def pSpectra(kA, back, params, NB, tols, MTE, tmax_2pf=-1, flagReturn=False):
     zzOut = np.array([])
     times = np.array([])
     num = np.size(kA)
@@ -590,88 +590,17 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
 def kexitN(Nexit, back, params, MTE, fit="spl"):
     assert Nexit > back[0][0], Nexit
     assert Nexit < back[-1][0], Nexit
-    spl_idx = np.intersect1d(np.where(back.T[0] > Nexit - 1), np.where(back.T[0] < Nexit + 1))
 
-    back_spl = back.copy()[spl_idx]
+    if fit == "spl":
+        back_exit = arr_eval_spl_val(Nexit, back, 0)
+    elif fit == "nearest":
+        back_exit = arr_eval_nearest_N(Nexit, back)
+    else:
+        raise KeyError(fit)
 
-    back_exit = arr_eval_spl_val(Nexit, back_spl)
+    Hexit = MTE.H(back_exit[1:], params)
 
-    assert 0, back_exit
-
-    backExitArr = np.vstack([np.zeros(4) for ii in range(2 * MTE.nF())])
-    Narr = np.zeros(4)
-
-    count = 0
-
-    for ii in range(len(back) - 1):
-
-        row = back[ii]
-
-        N, fdf = row[0], row[1:]
-
-        Narr = np.roll(Narr, -1)
-        Narr[-1] = N
-
-        backExitArr = np.roll(backExitArr, -1, axis=1)
-        backExitArr[:, -1] = fdf
-
-        count += 1
-
-        if N > Nexit:
-
-            row = back[ii + 1]
-
-            N, fdf = row[0], row[1:]
-
-            Narr = np.roll(Narr, -1)
-            Narr[-1] = N
-
-            backExitArr = np.roll(backExitArr, -1, axis=1)
-            backExitArr[:, -1] = fdf
-
-            count += 1
-
-            if count < 4:
-
-                for jj in range(4 - count):
-                    row = back[ii + 1 + jj + 1]
-
-                    N, fdf = row[0], row[1:]
-
-                    Narr = np.roll(Narr, -1)
-                    Narr[-1] = N
-
-                    backExitArr = np.roll(backExitArr, -1, axis=1)
-                    backExitArr[:, -1] = fdf
-
-                    count += 1
-
-            break
-
-    if ii == len(back):
-        print("** Warning, kExit not found in background **")
-        return np.nan
-
-    fdfSpl = np.array([UnivariateSpline(Narr, row) for row in backExitArr])
-
-    # fdfOut = np.array([spl(0) for spl in fdfSpl])
-    fdfOut = np.array([spl(Nexit) for spl in fdfSpl])
-
-    HOut = MTE.H(fdfOut, params)
-
-    # if HOut is None:
-
-    #    HEvo = []
-    #    Nevo = []
-
-    #    for row in back:
-    #        N, fdf = row[0], row[1:]
-
-    #        H = MTE.H(fdf, params)
-
-    k = np.exp(Nexit + np.log(HOut))
-
-    # print MTE.V(fdfOut[:6], params), HOut, k
+    k = np.exp(Nexit + np.log(Hexit))
 
     return k
 

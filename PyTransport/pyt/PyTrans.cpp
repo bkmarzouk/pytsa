@@ -24,6 +24,7 @@
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/moments.h"//moments
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/model.h"//model
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
 #include <math.h>
@@ -40,6 +41,28 @@ using namespace std;
 // The line below is updated evey time the moduleSetup file is run.
 // Package recompile attempted at: Wed Nov  3 15:56:05 2021
 
+
+// Look for environment variable that indicates we should be running in sampler mode, i.e. flag returns
+bool _SamplerMode(){
+    char const* tmp = getenv( "SAMPLER_MODE" );
+    bool sampler_mode;
+        if ( tmp == NULL ) {
+            cout << "NOT USING SAMPLER MODE" << endl;
+            sampler_mode = false;
+        }
+        else {
+            std::string s( tmp );
+            if (s == "TRUE") {
+                cout << "USING SAMPLER MODE" << endl;
+                sampler_mode = true;
+            }
+            else {
+                cout << "NOT USING SAMPLER MODE" << endl;
+                sampler_mode = false;
+            }
+        }
+    return sampler_mode;
+}
 
 // Changes python array into C array (or rather points to pyarray data)
 //    Assumes PyArray is contiguous in memory.             */
@@ -333,7 +356,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     int eternalFlag     = -35;        // Unable to find end of inflation flag
 
     // Indicate whether to return flag tuple, or eFold at failure
-    bool flagReturn = false;
+    bool flagReturn = _SamplerMode();
 
     // parse arguments; args after | are optional (https://docs.python.org/3/c-api/arg.html)
     if(!PyArg_ParseTuple(args, "O!O!O!|dddb", &PyArray_Type, &initialCs, &PyArray_Type, &params, &PyArray_Type, &tols,
@@ -567,7 +590,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     double tmax_back = -1;
 
     // If true, returns tuple with error flag, else N
-    bool flagReturn = false;
+    bool flagReturn = _SamplerMode();
 
     // Parse python arguments
     if (!PyArg_ParseTuple(args, "O!O!O!O!b|db",&PyArray_Type, &t, &PyArray_Type, &initialCs, &PyArray_Type, &params,
@@ -834,7 +857,7 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
     int integrationFlag = -22;
 
     // Report tuple flag or N at fail
-    bool flagReturn = false;
+    bool flagReturn = _SamplerMode();
 
     // Set max integration time
     double tmax_2pf = -1;
@@ -1015,7 +1038,7 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     // Setup flags
     int timeoutFlag = -13;
     int integrationFlag = -23;
-    bool flagReturn = false;
+    bool flagReturn = _SamplerMode();
 
     // Maximum integration time, if < 0 then no max
     double tmax_3pf = -1;
@@ -1217,7 +1240,7 @@ static char PyTrans_docs[] =
 "This is PyTrans, a package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef PyTransTEST_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"Epsilon", (PyCFunction)MT_Ep,           METH_VARARGS, PyTrans_docs},{"Eta", (PyCFunction)MT_Eta,           METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
+static PyMethodDef 5quad_euclidean_funcs[] = {{"H", (PyCFunction)MT_H,    METH_VARARGS, PyTrans_docs},{"nF", (PyCFunction)MT_fieldNumber,        METH_VARARGS, PyTrans_docs},{"nP", (PyCFunction)MT_paramNumber,        METH_VARARGS, PyTrans_docs},{"Epsilon", (PyCFunction)MT_Ep,           METH_VARARGS, PyTrans_docs},{"Eta", (PyCFunction)MT_Eta,           METH_VARARGS, PyTrans_docs},{"V", (PyCFunction)MT_V,            METH_VARARGS, PyTrans_docs},{"dV", (PyCFunction)MT_dV,                METH_VARARGS, PyTrans_docs},  {"ddV", (PyCFunction)MT_ddV,                METH_VARARGS, PyTrans_docs}, {"dotfieldsSR", (PyCFunction)MT_dotfieldsSR,        METH_VARARGS, PyTrans_docs}, {"massMatrix", (PyCFunction)MT_massMatrix,        METH_VARARGS, PyTrans_docs}, {"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,        METH_VARARGS, PyTrans_docs}, {"backEvolve", (PyCFunction)MT_backEvolve,        METH_VARARGS, PyTrans_docs},    {"sigEvolve", (PyCFunction)MT_sigEvolve,        METH_VARARGS, PyTrans_docs},    {"alphaEvolve", (PyCFunction)MT_alphaEvolve,        METH_VARARGS, PyTrans_docs},    {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1225,11 +1248,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "PyTransTEST", PyTrans_docs, -1, PyTransTEST_funcs}; //modDef
+static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "5quad_euclidean", PyTrans_docs, -1, 5quad_euclidean_funcs}; //modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_PyTransTEST(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+PyMODINIT_FUNC PyInit_5quad_euclidean(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

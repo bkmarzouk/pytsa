@@ -1,5 +1,6 @@
 import os
 import site
+import sys
 import platform
 
 sym_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sym_cache")  # cache locations for sym calcs
@@ -24,3 +25,7 @@ site_lib = os.path.join(install_lib, "lib", 'python' + version_str, "site-packag
 site.addsitedir(site_lib)
 os.environ['PYTHONPATH'] += ":{}".format(install_lib)
 os.environ['PYTHONPATH'] += ":{}".format(site_lib)
+
+assert os.path.exists(site_lib)
+
+print(os.environ['PYTHONPATH'])

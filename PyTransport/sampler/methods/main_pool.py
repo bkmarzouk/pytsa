@@ -29,7 +29,7 @@ class _Data(object):
 
 
 def main(pool, setup, args):
-    n_samples = args.n_sample_params
+    n_samples = args.n_samples
 
     build_catalogue(setup, args)
 

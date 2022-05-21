@@ -5,13 +5,15 @@ from pytransport.sampler.configs import setup_sampler
 from pytransport.sampler.methods import main_pool
 
 if __name__ == "__main__":
+    os.environ['SAMPLER_MODE'] = "TRUE"
+
     # Import schwimmbad for MPI pool processes
     import schwimmbad
 
     # Import argument parser for cmd args
     from argparse import ArgumentParser
 
-    parser = ArgumentParser(description="Configure pytransport sampler Routine")
+    parser = ArgumentParser(description="Configure PyTransport sampler Routine")
 
     # Build mutually exclusive group for schwimmbad processes
     sb_group = parser.add_mutually_exclusive_group()

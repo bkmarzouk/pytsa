@@ -3,10 +3,6 @@ import shutil
 import dill
 import numpy as np
 
-from pytransport.pytrans_setup import set_paths
-
-set_paths()
-
 from pytransport.cache_tools import hash_pars
 from pytransport.sampler.methods import samplers
 
@@ -145,7 +141,7 @@ class _SamplingParameters(object):
 
 class Setup(_SamplingParameters):
 
-    def __init__(self, PyT):
+    def __init__(self, PyT, name):
         """
         Setup routine for sampler
 
@@ -153,6 +149,7 @@ class Setup(_SamplingParameters):
         """
         super(Setup, self).__init__(PyT)
 
+        self.name = name
         self.fieldspace_reject = {}
         self.dotfieldspace_reject = {}
 
@@ -265,7 +262,7 @@ class Setup(_SamplingParameters):
 
 def build_catalogue(s: Setup, parsed_args, path_only=False):
     pars = [s.N_min, s.N_adiabitc, s.N_sub_evo, s.tols]
-    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_sample_params]
+    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_samples]
 
     hash = hash_pars(*pars)
 
@@ -289,7 +286,8 @@ def build_catalogue(s: Setup, parsed_args, path_only=False):
         if parsed_args.apriori:
             x = samplers.APriori(parsed_args.seed)
         else:
-            x = samplers.LatinHypercube(parsed_args.n_sample_params, seed=parsed_args.seed, cube_seed=parsed_args.grid_seed)
+            x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed,
+                                        cube_seed=parsed_args.grid_seed)
 
         print("-- Constructing catalogue for ICs & Params")
 
@@ -301,7 +299,7 @@ def build_catalogue(s: Setup, parsed_args, path_only=False):
             x.add_param(s.params[p])
 
         if parsed_args.apriori:
-            samples = x.get_samples(parsed_args.n_sample_params).T
+            samples = x.get_samples(parsed_args.n_samples).T
         else:
             samples = x.get_samples().T
 
