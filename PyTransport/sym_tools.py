@@ -174,7 +174,7 @@ def riemann_operation_matrix(N, verbose=True):
 
 def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, recache=False, simplify=True):
     if metric is None:
-        metric = sym.matrices.eye(n_fields)
+        metric = sym.eye(n_fields)
 
     try:
         fs_derived = cache_tools.load_fmet(metric, delete=recache, simplify=simplify)
@@ -266,7 +266,7 @@ class _FieldSpaceSym(object):
 
         kronecker = sym.eye(self.nf)
 
-        if metric is None:
+        if metric is None or metric == kronecker:
             self.metric = kronecker
             self.canonical = True
         else:
@@ -305,7 +305,7 @@ class _FieldSpaceSym(object):
                 hg2[i, j] = self.metric_du[i, j]
                 hg2[i, self.nf + j] = self.metric[i, j]
 
-        # My understanding of the readout in cppt:
+        # Index convention for reading metric components from flattened array:
         # G^{IJ} = nf * ii * 2 + jj
         # G^I_J = nf * (1 + ii *2) + jj
         # G_I^J = 2 * nf^2 + nf * ii * 2 + jj
@@ -324,15 +324,12 @@ class _FieldSpaceSym(object):
 
     def _compute_christoffel(self, a, b, c):
 
-        if self.canonical:
-            christoffel = 0
+        christoffel = sym.Rational(0)
 
-        else:
+        if not self.canonical:
             a, a_idx = self.get_symb_and_coord(a)
             b, b_idx = self.get_symb_and_coord(b)
             c, c_idx = self.get_symb_and_coord(c)
-
-            christoffel = 0
 
             # Iterate over the repeated index, d
             for d_idx, d in enumerate(self.f_syms):
@@ -348,11 +345,9 @@ class _FieldSpaceSym(object):
 
         print("-- Computing Christoffel symbols")
 
-        if self.canonical:
-            self.christoffel_symbols = 0
+        self.christoffel_symbols = np.zeros((self.nf, self.nf, self.nf), dtype=object)
 
-        else:
-            self.christoffel_symbols = np.zeros((self.nf, self.nf, self.nf), dtype=object)
+        if not self.canonical:
 
             for a in self.nf_range:
                 for b in self.nf_range:
@@ -369,9 +364,9 @@ class _FieldSpaceSym(object):
         :return:R^f_{cab}
         """
 
-        if self.canonical:
-            Rfcab = 0
-        else:
+        Rfcab = sym.Rational(0)
+
+        if not self.canonical:
             f, f_idx = self.get_symb_and_coord(f)
             c, c_idx = self.get_symb_and_coord(c)
             a, a_idx = self.get_symb_and_coord(a)
@@ -394,9 +389,9 @@ class _FieldSpaceSym(object):
         :return:R_{dcab}
         """
 
-        if self.canonical:
-            Rdcab = 0
-        else:
+        Rdcab = sym.Rational(0)
+
+        if not self.canonical:
             d, d_idx = self.get_symb_and_coord(d)
             c, c_idx = self.get_symb_and_coord(c)
             a, a_idx = self.get_symb_and_coord(a)
@@ -891,6 +886,8 @@ class _CovariantDerivativesSym(object):
 
 if __name__ == "__main__":
 
+    print("Curved double quadratic model test")
+
     nF = 2
     nP = 3
     f = sym.symarray('f', nF)
@@ -904,6 +901,39 @@ if __name__ == "__main__":
     ms = CovDSym(2, 3, G, V)
 
     n = 6
+    OM = riemann_operation_matrix(n)
+
+    print(OM)
+
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                for l in range(n):
+                    if len(list(set([i, j, k, l]))) == 4:
+                        print([i, j, k, l], OM[i, j, k, l])
+
+    print(OM[0, 3, 1, 3], OM[3, 1, 0, 3])
+    print(OM[0, 3, 2, 3], OM[3, 2, 0, 3])
+    print(OM[0, 4, 1, 4], OM[4, 1, 0, 4])
+    print(OM[0, 4, 2, 4], OM[4, 2, 0, 4])
+    print(OM[0, 5, 1, 5], OM[5, 1, 0, 5])
+    print(OM[0, 5, 2, 5], OM[5, 2, 0, 5])
+
+    print("Single field quadratic model test")
+
+    nF = 1
+    nP = 1
+    f = sym.symarray('f', nF)
+    p = sym.symarray('p', nP)
+
+    V = sym.Rational(1, 2) * p[0] ** 2.0 * f[0] ** 2
+    G = None
+
+    # fs = FieldSpaceSym(2, 2, G, recache=False)
+    # ps = PotentialSym(2, 2, V)
+    ms = CovDSym(1, 1, G, V)
+
+    n = 1
     OM = riemann_operation_matrix(n)
 
     print(OM)

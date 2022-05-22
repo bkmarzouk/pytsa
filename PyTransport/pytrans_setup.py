@@ -22,7 +22,11 @@ import shutil
 import time as t
 from pytransport import sym_tools
 
-_PyMethodDefs = ",".join([  # Note that doc strings are defined in PyTrans.cpp file
+# 1st in {} defines function name for python calls
+# 2nd in {} defines function name in C++ extension
+# 3rd in {} defines the input for the method; e.g. METH_NOARGS -> no arguments expected for function
+# 4th in {} defines the doc string, user can then yield info using help(<module>.method). docs define in PyTrans.cpp
+_PyMethodDefs = ",".join([
     '{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H}',
     '{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF}',
     '{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP}',
@@ -181,7 +185,7 @@ def delete_module(name):
     [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("pyt" + name)]
 
 
-# TODO: Tidy translator; wrap into single call?
+# TODO: Tidy translators; wrap into single call?
 
 
 def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=False, G: sym.Matrix or None = None,

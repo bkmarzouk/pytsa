@@ -96,7 +96,7 @@ def cache_fmet(metric: sym.Matrix, fmet_derived, recache=False, simplify=True):
         if recache:
             os.remove(path)
         else:
-            raise OSError("Metric caclulations already cached: {}".format(path))
+            raise OSError("Metric calculations already cached: {}".format(path))
 
     with open(path, "wb") as f:
         pk.dump(fmet_derived, f)

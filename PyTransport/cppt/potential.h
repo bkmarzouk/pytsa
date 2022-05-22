@@ -27,7 +27,7 @@
 using namespace std;
 
 // #Rewrite
-// Potential file rewriten at Sat May 21 21:04:13 2022
+// Potential file rewriten at Sun May 22 15:37:06 2022
 
 class potential
 {
@@ -41,8 +41,8 @@ public:
 	potential()
 	{
 // #FP
-nF=2;
-nP=2;
+nF=1;
+nP=1;
 
 //        p.resize(nP);
         
@@ -59,7 +59,7 @@ nP=2;
 		double sum ;
         
 // Pot
-  sum=(1.0/2.0)*std::pow(f[0], 2)*std::pow(p[0], 2) + (1.0/2.0)*std::pow(f[1], 2)*std::pow(p[1], 2);
+  sum=(1.0/2.0)*std::pow(f[0], 2)*std::pow(p[0], 2);
          return sum;
 	}
 	
@@ -71,8 +71,6 @@ nP=2;
 // dPot
 
  sum[0]=f[0]*std::pow(p[0], 2);
-
- sum[1]=f[1]*std::pow(p[1], 2);
         
 		return sum;
 	}
@@ -85,12 +83,6 @@ nP=2;
 // ddPot
 
  sum[0]=std::pow(p[0], 2);
-
- sum[2]=0;
-
- sum[1]=0;
-
- sum[3]=std::pow(p[1], 2);
      
         return sum;
 	}
@@ -102,20 +94,6 @@ nP=2;
 // dddPot
 
  sum[0]=0;
-
- sum[4]=0;
-
- sum[2]=0;
-
- sum[6]=0;
-
- sum[1]=0;
-
- sum[5]=0;
-
- sum[3]=0;
-
- sum[7]=0;
        
         return sum;
 	}
