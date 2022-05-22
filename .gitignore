@@ -22,6 +22,7 @@ PyTransport/sampler/builds
 /install/*
 !/install/dquad_euclidean.py
 !/install/dquad_2sphere.py
+!/install/quad_euclidean.py
 !/install/path_root.py
 
 # Ignore sampler builds, but keep directory
