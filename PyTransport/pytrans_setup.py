@@ -116,6 +116,9 @@ def compile_module(name, NC=False):
     :param NC: Non-canonical field metric if True, else Euclidean
     """
 
+    if not name.startswith("pyt_"):
+        name = "pyt_{}".format(name)
+
     t_start = t.ctime()
     print('   [{time}] start'.format(time=t_start))
 
@@ -131,7 +134,7 @@ def compile_module(name, NC=False):
     with open(setup_file_path, "w") as f:
         for line in module_setup_lines:
             if "PYT_MODNAME" in line:
-                f.write("mod_name = 'pyt_{}'  # PYT_MODNAME\n".format(name))
+                f.write("mod_name = '{}'  # PYT_MODNAME\n".format(name))
             else:
                 f.write(line)
 
