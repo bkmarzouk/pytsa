@@ -4,7 +4,7 @@ import pyt_quad
 import pyt_dquad_euclidean
 import pyt_dquad_2sphere
 
-_GLOBAL_TOLS = np.array([1e-5, 1e-5])  # tols for testing; relatively weak for speed. Tests may fail if edited
+_GLOBAL_TOLS = np.array([1e-4, 1e-4])  # tols for testing; relatively weak for speed. Tests may fail if edited
 
 
 class ModelDefs:
@@ -84,12 +84,31 @@ class TestQuadratic(unittest.TestCase):
     # Test quadratic model
 
     pyt_model = pyt_quad
+    ics = np.array([20., 1e-4], dtype=float)
+    pars = np.array([1e-3], dtype=float)
+    n_end = 101.17024620322667
+    n_arr = np.linspace(0, n_end, 1000)
+    eps_arr = np.array([7.499812504629944e-05, 1.1057319168321953], dtype=float)
+
+    def get_back(self):
+        return self.pyt_model.backEvolve(self.n_arr, self.ics, self.pars, _GLOBAL_TOLS, True)
 
     def test_nf(self):
         assert self.pyt_model.nF() == 1
 
     def test_np(self):
         assert self.pyt_model.nP() == 1
+
+    def test_n_end(self):
+        assert np.isclose(self.pyt_model.findEndOfInflation(self.ics, self.pars, _GLOBAL_TOLS), self.n_end)
+
+    def test_eps(self):
+        back = self.get_back()
+
+        eps_start = self.pyt_model.Epsilon(back[0][1:1 + 2 * self.pyt_model.nF()], self.pars)
+        eps_end = self.pyt_model.Epsilon(back[-1][1:1 + 2 * self.pyt_model.nF()], self.pars)
+
+        assert np.allclose(self.eps_arr, np.array([eps_start, eps_end]))
 
 
 class TestDoubleQuadratic(unittest.TestCase):
