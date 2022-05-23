@@ -244,7 +244,7 @@ class LatinHypercube(_Sampler):
 
 if __name__ == "__main__":
 
-    make_demo_fig = False
+    make_demo_fig = True
 
     if make_demo_fig:
 

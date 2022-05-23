@@ -32,17 +32,17 @@ def _dist2pars(d):
     return pars
 
 
-def _pars2path(PyT, *pars):
+def _pars2path(pyt_model, *pars):
     """
     Construct path to directory for sampling module
 
-    :param PyT: pytransport module
+    :param pyt_model: pytransport module
     :param pars: params to construct hash string from, must have __str__ method
     :return: path to sampling module directory
     """
     import pytransport.sampler.builds as b
 
-    name = "{}_{}".format(PyT.__name__, hash_pars(*pars))
+    name = "{}_{}".format(pyt_model.__name__, hash_pars(*pars))
 
     builds_dir = os.path.abspath(os.path.dirname(b.__file__))
 
@@ -61,16 +61,16 @@ def _check_method(m):
 
 class _SamplingParameters(object):
 
-    def __init__(self, PyT):
+    def __init__(self, pyt_model):
         """
         Container for sampling parameters
 
-        :param PyT: pytransport module
+        :param pyt_model: pytransport module
         """
 
-        self.PyT = PyT
-        self.nF = PyT.nF()
-        self.nP = PyT.nP()
+        self.PyT = pyt_model
+        self.nF = pyt_model.nF()
+        self.nP = pyt_model.nP()
 
         self.fields = {f: None for f in range(self.nF)}
         self.dot_fields = {f: None for f in range(self.nF)}
@@ -138,16 +138,29 @@ class _SamplingParameters(object):
             self.params[idx] = method
             self.latex_p[idx] = (latex, record)
 
+    def _get_hash_data(self):
+
+        hd = {}
+
+        for idx in range(self.nF):
+            hd[f"f_{idx}"] = _dist2pars(self.fields[idx])
+            hd[f"v_{idx}"] = _dist2pars(self.dot_fields[idx])
+
+        for idx in range(self.nF):
+            hd[f"p_{idx}"] = _dist2pars(self.params[idx])
+
+        return hd
+
 
 class Setup(_SamplingParameters):
 
-    def __init__(self, PyT, name):
+    def __init__(self, pyt_model, name):
         """
         Setup routine for sampler
 
-        :param PyT: pytransport module
+        :param pyt_model: pytransport module
         """
-        super(Setup, self).__init__(PyT)
+        super(Setup, self).__init__(pyt_model)
 
         self.name = name
         self.fieldspace_reject = {}
@@ -201,7 +214,7 @@ class Setup(_SamplingParameters):
             self.fieldspace_end_inflation[fidx] = np.array([fmin, fmax])
 
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
-        assert 0, "DEV"
+        assert 0, "implement"
 
     def set_analysis_params(self, N_sub_evo=6., tols=np.array([1e-8, 1e-8]), N_adiabatic=1., N_min=60.):
         """
@@ -217,6 +230,24 @@ class Setup(_SamplingParameters):
         self.N_adiabitc = N_adiabatic
         self.N_min = N_min
         self._analysis_pars_set = True
+
+    def get_hash_data(self):
+
+        assert self._analysis_pars_set, "Analysis parameters not set!"
+
+        base = self._get_hash_data()
+
+        prefixes = ['fields_rej', 'dotfields_rej', 'fields_end', 'dotfields_end']
+
+        for conditions, p in zip([self.fieldspace_reject, self.dotfieldspace_reject,
+                                  self.fieldspace_end_inflation, self.dotfieldspace_end_inflation], prefixes):
+            for key in conditions:
+                base[p + f"_{key}"] = conditions[key]
+
+        keys = ['Nsub', 'tols', 'Nadi', 'Nmin']
+
+        for value, key in zip([self.N_sub_evo, self.tols, self.N_adiabitc, self.N_min], keys):
+            base[key] = value
 
     def build_sampler(self):
         """

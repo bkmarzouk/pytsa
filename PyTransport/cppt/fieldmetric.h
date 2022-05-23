@@ -37,8 +37,8 @@ public:
     fieldmetric()
    {
 // #FP
-nF=1;
-nP=1;
+nF=2;
+nP=3;
 	
    }
 	
@@ -49,14 +49,41 @@ nP=1;
 		vector<double> FM((2*nF)*(2*nF),0.0) ;
         
 // metric
+  auto x0 = std::pow(p[2], 2);
+  auto x1 = 1.0/x0;
+  auto x2 = std::pow(std::sin(f[0]), 2);
 
- FM[0]=1;
+ FM[0]=x1;
 
  FM[1]=0;
 
  FM[2]=0;
 
- FM[3]=1;
+ FM[3]=0;
+
+ FM[4]=0;
+
+ FM[5]=x1/x2;
+
+ FM[6]=0;
+
+ FM[7]=0;
+
+ FM[8]=0;
+
+ FM[9]=0;
+
+ FM[10]=x0;
+
+ FM[11]=0;
+
+ FM[12]=0;
+
+ FM[13]=0;
+
+ FM[14]=0;
+
+ FM[15]=x0*x2;
 
          return FM;
 	}
@@ -69,6 +96,7 @@ nP=1;
 		vector<double> CS((2*nF)*(2*nF)*(2*nF),0.0);
 	
 // Christoffel
+  auto x0 = 1.0/std::tan(f[0]);
 
  CS[0]=0;
 
@@ -85,6 +113,118 @@ nP=1;
  CS[6]=0;
 
  CS[7]=0;
+
+ CS[8]=0;
+
+ CS[9]=0;
+
+ CS[10]=0;
+
+ CS[11]=0;
+
+ CS[12]=0;
+
+ CS[13]=0;
+
+ CS[14]=0;
+
+ CS[15]=-1.0/2.0*std::sin(2*f[0]);
+
+ CS[16]=0;
+
+ CS[17]=0;
+
+ CS[18]=0;
+
+ CS[19]=0;
+
+ CS[20]=0;
+
+ CS[21]=0;
+
+ CS[22]=0;
+
+ CS[23]=0;
+
+ CS[24]=0;
+
+ CS[25]=0;
+
+ CS[26]=0;
+
+ CS[27]=x0;
+
+ CS[28]=0;
+
+ CS[29]=0;
+
+ CS[30]=x0;
+
+ CS[31]=0;
+
+ CS[32]=0;
+
+ CS[33]=0;
+
+ CS[34]=0;
+
+ CS[35]=0;
+
+ CS[36]=0;
+
+ CS[37]=0;
+
+ CS[38]=0;
+
+ CS[39]=0;
+
+ CS[40]=0;
+
+ CS[41]=0;
+
+ CS[42]=0;
+
+ CS[43]=0;
+
+ CS[44]=0;
+
+ CS[45]=0;
+
+ CS[46]=0;
+
+ CS[47]=0;
+
+ CS[48]=0;
+
+ CS[49]=0;
+
+ CS[50]=0;
+
+ CS[51]=0;
+
+ CS[52]=0;
+
+ CS[53]=0;
+
+ CS[54]=0;
+
+ CS[55]=0;
+
+ CS[56]=0;
+
+ CS[57]=0;
+
+ CS[58]=0;
+
+ CS[59]=0;
+
+ CS[60]=0;
+
+ CS[61]=0;
+
+ CS[62]=0;
+
+ CS[63]=0;
         
 		return CS;
 	}
@@ -97,8 +237,41 @@ nP=1;
 		vector<double> RM((nF)*(nF)*(nF)*(nF),0.0);
 		
 // Riemann
+  auto x0 = 2*f[0];
+  auto x1 = std::pow(p[2], 2)*((1.0/2.0)*std::sin(x0)/std::tan(f[0]) - std::cos(x0));
+  auto x2 = -x1;
 
  RM[0]=0;
+
+ RM[1]=0;
+
+ RM[2]=0;
+
+ RM[3]=0;
+
+ RM[4]=0;
+
+ RM[5]=x1;
+
+ RM[6]=x2;
+
+ RM[7]=0;
+
+ RM[8]=0;
+
+ RM[9]=x2;
+
+ RM[10]=x1;
+
+ RM[11]=0;
+
+ RM[12]=0;
+
+ RM[13]=0;
+
+ RM[14]=0;
+
+ RM[15]=0;
      
         return RM;
 	}
@@ -109,8 +282,75 @@ nP=1;
 		vector<double> RMcd((nF)*(nF)*(nF)*(nF)*(nF),0.0);
 		
 // Riemanncd
+  auto x0 = std::tan(f[0]);
+  auto x1 = 2*f[0];
+  auto x2 = std::sin(x1);
+  auto x3 = (3.0/2.0)*std::pow(p[2], 2)*(x2 + 2*std::cos(x1)/x0 - x2/std::pow(x0, 2));
+  auto x4 = -x3;
 
  RMcd[0]=0;
+
+ RMcd[1]=0;
+
+ RMcd[2]=0;
+
+ RMcd[3]=0;
+
+ RMcd[4]=0;
+
+ RMcd[5]=x3;
+
+ RMcd[6]=x4;
+
+ RMcd[7]=0;
+
+ RMcd[8]=0;
+
+ RMcd[9]=x4;
+
+ RMcd[10]=x3;
+
+ RMcd[11]=0;
+
+ RMcd[12]=0;
+
+ RMcd[13]=0;
+
+ RMcd[14]=0;
+
+ RMcd[15]=0;
+
+ RMcd[16]=0;
+
+ RMcd[17]=0;
+
+ RMcd[18]=0;
+
+ RMcd[19]=0;
+
+ RMcd[20]=0;
+
+ RMcd[21]=0;
+
+ RMcd[22]=0;
+
+ RMcd[23]=0;
+
+ RMcd[24]=0;
+
+ RMcd[25]=0;
+
+ RMcd[26]=0;
+
+ RMcd[27]=0;
+
+ RMcd[28]=0;
+
+ RMcd[29]=0;
+
+ RMcd[30]=0;
+
+ RMcd[31]=0;
      
         return RMcd;
 	}
