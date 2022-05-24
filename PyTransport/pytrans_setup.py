@@ -21,7 +21,8 @@ import subprocess
 import os
 import shutil
 import time as t
-from pytransport import sym_tools
+import numpy as np
+from . import sym_tools
 
 # 1st in {} defines function name for python calls
 # 2nd in {} defines function name in C++ extension
@@ -42,7 +43,6 @@ _PyMethodDefs = ",".join([
     '{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve}',
     '{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve}',
 ])
-
 
 MODELS_LOC = os.path.abspath(os.path.join(os.path.dirname(__file__), "models"))
 
@@ -111,11 +111,13 @@ def set_template_headers(NC: bool):
 def set_paths():  # Remove dep
     pass
 
+
 def garbage_removal():
     t.sleep(1)
     cwd = os.path.dirname(__file__)
     location = os.path.join(cwd, 'pyt')
     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+
 
 def compile_module(name, NC=False):
     """
@@ -171,10 +173,7 @@ def compile_module(name, NC=False):
     t_start_compile = t.ctime()
     print('   [{time}] start compile phase'.format(time=t_start_compile))
 
-    import numpy as np
     os.system("export CFLAGS='-I {}'".format(np.get_include()))
-    # subprocess.run(["python", setup_file_path, "install", " -f"],
-    #                cwd=location)
     subprocess.run(["bash", "moduleSetup.sh"], cwd=location)
 
     subprocess.run(["rm", "-r", "build"], cwd=location)
@@ -183,13 +182,6 @@ def compile_module(name, NC=False):
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
-    #
-    # garbage_removal()
-    # try:
-    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
-    # except:
-    #     print("\n\n\nUNABLE TO REMOVE\n\n\n")
-    #     pass
 
 
 def delete_module(name):

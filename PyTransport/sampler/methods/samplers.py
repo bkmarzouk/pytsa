@@ -1,6 +1,8 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
-from pytransport.sampler.methods.rng import RNGAPriori, RNGLatin
+
+from pytransport.sampler.configs.rng_states import RandomStates
 
 
 class Constant(object):
@@ -13,6 +15,7 @@ class Constant(object):
         :param val: constant value to return
         """
         self.val = val
+        self.random_state = None
 
     def rvs(self, n=1):
         return np.array([self.val]).repeat(n) if n > 1 else self.val
@@ -27,7 +30,7 @@ class Constant(object):
 
 class _Sampler(object):
 
-    def __init__(self, seed=None):
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list, param_methods: list):
         """
         Base class for samplers.
 
@@ -35,86 +38,79 @@ class _Sampler(object):
                         Note: in LatinHypercube method, this is called earlier, during the distribution
                                 of grid squares.
         """
-        self.seed = seed
-        self.n_params = 0
-        self.dists = []
+        self.random_states = random_states
 
-        self.n_consts = 0
-        self.consts = []
+        self.n_field = len(field_methods)
+        self.field_methods = field_methods
 
-        self.order = {}
+        assert len(dotfield_methods) == self.n_field, [len(dotfield_methods), self.n_field]
+        self.dotfield_methods = dotfield_methods
 
-    def add_param(self, dist=scipy.stats.uniform(0, 1)):
-        """
-        Adds parameter to be sampled via a specified distribution.
+        self.n_params = len(param_methods)
+        self.param_methods = param_methods
 
-        :param dist: distribution object. Must have methods 'rvs' for Apriori sampling, or 'ppf' for hypercube.
-                     These conditions are satisfied by calling the standard scipy.stats modules.
-        """
+        if isinstance(self, LatinHypercube):
+            print("-- I am latin")
+            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+                assert hasattr(m, "ppf"), m
 
-        dist = Constant.slow_roll() if dist == "sr" else dist
+        elif isinstance(self, APriori):
+            print("-- I am apriori")
+            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+                assert hasattr(m, "rvs"), m
 
-        if issubclass(_Sampler, LatinHypercube):
-            assert hasattr(dist, "ppf"), "Must have inverse cdf, defined as 'ppf' method."
-        if issubclass(_Sampler, APriori):
-            assert hasattr(dist, "rvs"), "Must have random variables generator, as defined as 'rvs' method."
-
-        if isinstance(dist, Constant):
-            self.consts.append(dist)
-            self.n_consts += 1
-            self.order[len(self.order)] = "c"
         else:
-            self.dists.append(dist)
-            self.n_params += 1
-            self.order[len(self.order)] = "p"
+            raise TypeError(self)
 
-    def get_samples(self):
-        assert 0, "override method"
+    def get_sample(self, *args, **kwargs) -> tuple:
+        pass
 
 
 class APriori(_Sampler):
 
-    def __init__(self, seed=None):
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
+                 param_methods: list):
         """
         Draws values apriori from statistical distributions defined with paramters
 
         :param seed: integer or None, defining a random (or absence of) random seed
         """
-        super(APriori, self).__init__(seed)
+        super(APriori, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
 
-    def get_samples(self, n_samples=1):
+    def get_sample(self, sample_index: int):
         """
         Get samples for parameters as defined by corresponding statistical distributions
 
         :param n_samples: number of samples
         :return: array of samples with shape (n_samples, n_params)
         """
-        out = np.zeros((self.n_params + self.n_consts, n_samples), dtype=object)
 
-        p_samples = np.zeros((self.n_params, n_samples))
-        c_samples = np.array([c.rvs() for c in self.consts]).repeat(n_samples).reshape((self.n_consts, n_samples))
+        dotfields_out = np.zeros(self.n_field * 2, dtype=object)
+        params_out = np.zeros(self.n_params, dtype=object)
 
-        np.random.seed(self.seed)
+        state = self.random_states.get_state(sample_index)
 
-        for idx, d in enumerate(self.dists):
-            p_samples[idx] = d.rvs(n_samples)
+        for idx in range(self.n_field):
+            m = self.field_methods[idx]
+            m.random_state = state
+            dotfields_out[idx] = m.rvs()
 
-        p_count = 0
-        c_count = 0
-        for idx in range(len(self.order)):
-            if self.order[idx] == "p":
-                out[idx] = p_samples[p_count]
-                p_count += 1
-            else:
-                out[idx] = c_samples[c_count]
-                c_count += 1
+            m = self.dotfield_methods[idx]
+            m.random_state = state
+            dotfields_out[idx + self.n_field] = m.rvs()
 
-        return out
+        for idx in range(self.n_params):
+            m = self.param_methods[idx]
+            m.random_state = state
+            params_out[idx] = m.rvs()
+
+        return dotfields_out, params_out
 
 
 class LatinHypercube(_Sampler):
 
-    def __init__(self, n_cells=10, seed=None, cube_seed=None):
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
+                 param_methods: list):
         """
         Constructs latin hypercube for inverse sampling the CDF of a given distribution
 
@@ -122,11 +118,13 @@ class LatinHypercube(_Sampler):
         :param seed: prng seed for constructing samples
         :param cube_seed: prng seed for constructing hypercube
         """
-        super(LatinHypercube, self).__init__(seed)
-        self.n_cells = n_cells
-        self.cube_seed = cube_seed
+        super(LatinHypercube, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
+        self.n_samples = random_states.n_states - 1
+        self.grid = self.build_grid()
+        g = np.linspace(0, 1, self.n_samples + 1)
+        self.unif = list(zip(g, np.roll(g, -1)))[:-1]  # const density intervals
 
-    def coords_1d(self):
+    def coords_1d(self, grid_state):
         """
         Construct non-repeating list of integers on the interval [0, n_cells-1], that represent
         sampling intervals for a single parameter of a unique sample
@@ -134,15 +132,17 @@ class LatinHypercube(_Sampler):
         :return: interval coords
         """
 
-        n_cells = self.n_cells
+        n_samples = self.n_samples
 
-        avail = list(range(n_cells))
-        coords = np.zeros(n_cells, dtype=int)
+        avail = list(range(n_samples))
+        coords = np.zeros(n_samples, dtype=int)
 
-        for ii in range(n_cells):
-            coords[ii] = avail.pop(np.random.randint(n_cells - ii))
+        for ii in range(n_samples):
+            m = scipy.stats.randint(0, len(avail))
+            m.random_state = grid_state
+            coords[ii] = avail.pop(m.rvs())
 
-        return coords
+        return coords, grid_state
 
     def build_grid(self):
         """
@@ -150,14 +150,17 @@ class LatinHypercube(_Sampler):
 
         :return: nxn coordinate grid
         """
-        np.random.seed(self.cube_seed)
 
-        coords = np.zeros((self.n_params, self.n_cells), dtype=int)
+        n_tot = self.n_params + self.n_field * 2
 
-        for ii in range(self.n_params):
-            coords[ii] = self.coords_1d()
+        coords = np.zeros((n_tot, self.n_samples), dtype=int)
 
-        return coords
+        grid_state = self.random_states.get_state(0)
+
+        for ii in range(n_tot):
+            coords[ii], grid_state = self.coords_1d(grid_state)
+
+        return coords.T
 
     def v2s(self, *values):
         """
@@ -173,16 +176,7 @@ class LatinHypercube(_Sampler):
             out[ii] = self.dists[ii].ppf(values[ii])
         return out
 
-    def uniform_domains(self):
-        """
-        Splits the interval [0, 1] into equal sized subsets, s.t. Union([s1, s2], ..., [sn-1, sn]) = [0, 1]
-
-        :return: uniform domains to sample from
-        """
-        g = np.linspace(0, 1, self.n_cells + 1)
-        return list(zip(g, np.roll(g, -1)))[:-1]
-
-    def get_samples(self, verbose=False):
+    def get_sample(self, sample_index: int):
         """
         Get samples for parameters as defined by corresponding statistical distributions
 
@@ -190,56 +184,36 @@ class LatinHypercube(_Sampler):
         :return: array of samples with shape (n_cells, n_params)
         """
 
-        if verbose:
-            print("-- building grid")
-        coords = self.build_grid()
+        # +1 to state index since we reserve the zeroth for grid building
+        state = self.random_states.get_state(sample_index + 1)
 
-        if verbose:
-            print("-- building domains")
-        domains = self.uniform_domains()
+        fdf_out = np.zeros(2 * self.n_field, dtype=object)
+        par_out = np.zeros(self.n_params, dtype=object)
 
-        unifs = np.zeros((self.n_cells, self.n_params), dtype=float)
+        grid_indices = self.grid[sample_index]
+        unif_regions = self.unif
 
-        if verbose:
-            print("-- building uniform samples")
-        for idx, domain_indices in enumerate(coords.T):
-            unifs[idx] = [np.random.uniform(*domains[d]) for d in domain_indices]
+        for idx in range(self.n_field):
+            lb, ub = unif_regions[grid_indices[idx]]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            fdf_out[idx] = self.field_methods[idx].ppf(unif_rv)  # Get sampled value
 
-        if verbose:
-            print("-- building samples")
+            lb, ub = unif_regions[grid_indices[idx + self.n_field]]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            fdf_out[idx + self.n_field] = self.dotfield_methods[idx].ppf(unif_rv)  # Get sampled value
 
-        p_samples = np.zeros((self.n_cells, self.n_params), dtype=object)
-        for ii in range(self.n_cells):
-            p_samples[ii] = self.v2s(*unifs[ii])
+        for idx in range(self.n_params):
+            lb, ub = self.unif[grid_indices[idx + self.n_field * 2]]
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            par_out[idx] = self.param_methods[idx].ppf(unif_rv)  # Get sampled value
 
-        if verbose:
-            print("-- done")
-
-        p_samples = p_samples.T
-
-        c_samples = np.zeros((self.n_consts, self.n_cells), dtype=object)
-
-        for idx, c in enumerate(self.consts):
-            val = c.rvs()
-
-            if val == "sr":
-                pass
-
-            c_samples[idx] = val
-
-        out = np.zeros((self.n_params + self.n_consts, self.n_cells), dtype=object)
-
-        p_count = 0
-        c_count = 0
-        for idx in range(len(self.order)):
-            if self.order[idx] == "p":
-                out[idx] = p_samples[p_count]
-                p_count += 1
-            else:
-                out[idx] = c_samples[c_count]
-                c_count += 1
-
-        return out
+        return fdf_out, par_out
 
 
 if __name__ == "__main__":
@@ -248,42 +222,39 @@ if __name__ == "__main__":
 
     if make_demo_fig:
 
-        import os
-        import matplotlib.pyplot as plt
+        N = 2
 
-        n_samples = 5000
+        n_samples = 1000
 
-        a = APriori()
-        l = LatinHypercube(n_cells=n_samples)
+        states_lh = RandomStates(n_samples + 1, entropy=438473848392)
+        states_ap = RandomStates(n_samples, entropy=438473848392)
 
-        dists = [scipy.stats.uniform(0, 1), scipy.stats.norm(0, 1), scipy.stats.betaprime(5, 6)]
+        m1 = scipy.stats.uniform(loc=-20, scale=40)
+        m2 = scipy.stats.norm(1e-3)
+        m3 = scipy.stats.lognorm(1e-6, 1e-3)
 
-        for d in dists:
-            a.add_param(d)
-            l.add_param(d)
+        lh = LatinHypercube(states_lh, [m1] * N, [m2] * N, [m3] * N)
+        ap = APriori(states_ap, [m1] * N, [m2] * N, [m3] * N)
 
-        samples_a = a.get_samples(n_samples)
-        samples_l = l.get_samples()
+        lh_fdfs = np.zeros((n_samples, N * 2), dtype=float)
+        lh_pars = np.zeros((n_samples, N), dtype=float)
 
-        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        ap_fdfs = lh_fdfs.copy()
+        ap_pars = lh_pars.copy()
 
-        dist_lims = [[0, 1], [-5, 5], [0, 5]]
+        for ii in range(n_samples):
+            lh_fdfs[ii], lh_pars[ii] = lh.get_sample(ii)
+            ap_fdfs[ii], ap_pars[ii] = ap.get_sample(ii)
 
-        for ax, sa, sl, d, l, t in zip(axs, samples_a, samples_l, dists, dist_lims,
-                                       ['Uniform', 'Normal', '$\\beta$-prime']):
+        fig, axs = plt.subplots(2, 3, figsize=(10, 5))
 
-            ax.hist(sa, density=True, bins=40, alpha=0.33, label="Apriori")
-            ax.hist(sl, density=True, bins=40, alpha=0.33, label="Latin")
-            v = np.linspace(l[0], l[1], 1000)
-            ax.plot(v, d.pdf(v), ls="--", c="k", lw=2, label="PDF")
-            ax.set_title(t)
-            ax.set_xlabel("$x$", size=13)
-            ax.set_ylabel("$\mathbb{P}(x)$", size=13)
+        for idx, ax in enumerate(axs.flatten()[:4]):
+            ax.hist(lh_fdfs.T[idx], density=True, bins="auto", alpha=0.3)
+            ax.hist(ap_fdfs.T[idx], density=True, bins="auto", alpha=0.3)
 
-        axs[-1].legend()
-
-        plt.tight_layout()
-
-        plt.savefig(os.path.join("/home/kareem/cosmo-share", "apriori_latin_demo.pdf"), bbox_inches="tight")
+        for idx, ax in enumerate(axs.flatten()[4:]):
+            ax.hist(lh_pars.T[idx], density=True, bins="auto", alpha=0.3)
+            ax.hist(ap_pars.T[idx], density=True, bins="auto", alpha=0.3)
 
         plt.show()
+        plt.tight_layout()

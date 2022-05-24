@@ -1,10 +1,42 @@
-import argparse
-import os
-import dill as pk
 import numpy as np
-
 from pytransport.sampler.configs.setup_sampler import build_catalogue, Setup  # Import Setup for dill handling
 from pytransport.sampler.methods import pyt_methods
+
+
+class _2pt:
+
+    def __int__(self):
+        self.ns = None
+        self.running = None
+        self.error_code = None
+
+    def add_result(self, ns, running, error_code):
+        assert self.ns is None, self.ns
+        self.ns = ns
+        assert self.running is None, self.running
+        self.running = running
+        self.error_code = error_code
+
+
+class _3pt:
+
+    def __init__(self, alpha: int or float, beta: int or float):
+        self.alpha = alpha
+        self.beta = beta
+        self.result = None
+        self.error_code = None
+
+    def add_result(self, result, error_code):
+        assert self.result is None, self.result
+        self.result = result
+        self.error_code = error_code
+
+
+class _Sample:
+    def __int__(self, index, cache_loc):
+
+        self.index = index
+        self.cache_loc = cache_loc
 
 
 class _Data(object):
@@ -28,7 +60,7 @@ class _Data(object):
         self._add_value("Nend", None if background is None else background[-1][0])
 
 
-def main(pool, setup, args):
+def main(pool, setup: Setup, args):
     n_samples = args.n_samples
 
     build_catalogue(setup, args)
@@ -59,4 +91,3 @@ def main(pool, setup, args):
 
     # redefine pool data with successful trajectories
     pool_data = [dat for dat in r if isinstance(dat.background, np.ndarray)]
-

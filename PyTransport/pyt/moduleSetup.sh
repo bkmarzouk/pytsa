@@ -9,4 +9,4 @@ CC=gcc python $CWD/moduleSetup.py install --force
 # -- Need to work this out as to not make a mess
 
 #MODELS_DIR=$CWD/../models
-#CC=gcc python $CWD/moduleSetup.py install --force --prefix $MODELS_DIR
+#CC=gcc python $CWD/moduleSetup.py example_models --force --prefix $MODELS_DIR
