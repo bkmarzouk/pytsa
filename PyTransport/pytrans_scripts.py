@@ -16,15 +16,11 @@
 
 # python code contains some useful scripts to use with the compiled pyt module.
 
-import gc
 import os
 import pickle as pk
-import sys
 import timeit
 
 import numpy as np
-import sympy as sym
-from pytransport.gravtools_pyt import curvatureObject
 from scipy import interpolate
 from scipy.interpolate import UnivariateSpline
 
