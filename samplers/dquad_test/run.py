@@ -3,12 +3,6 @@ import dill as dill
 
 from pytransport.sampler.configs.setup_sampler import HyperParameters
 from pytransport.sampler.methods import main_pool
-from pytransport.sampler.configs.rng_states import RandomStates
-from pytransport.sampler.methods.samplers import APriori, LatinHypercube, Constant
-
-
-def quick_config()
-
 
 if __name__ == "__main__":
     os.environ['SAMPLER_MODE'] = "TRUE"
@@ -50,8 +44,6 @@ if __name__ == "__main__":
     extra_group.add_argument("--beta", nargs="+", help="Additional 3pt tasks: beta definitions", required=False)
 
     args = parser.parse_args()
-
-    args_dict = {k:}
 
     path = os.path.abspath(os.path.join(os.path.dirname(__file__), "sampler"))
 

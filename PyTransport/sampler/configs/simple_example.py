@@ -1,4 +1,4 @@
-from pytransport.sampler.configs.setup_sampler import Setup
+from pytransport.sampler.configs.setup_sampler import HyperParameters
 
 # Import PyTransSetup module to set paths to compiled cpp module files
 from pytransport import pytrans_setup
@@ -10,7 +10,7 @@ import dquad_euclidean as PyT
 # We will make use of scipy's statistical libraries to sample parameter space
 import scipy.stats as stats
 
-sampler_setup = Setup(PyT)
+sampler_setup = HyperParameters(PyT)
 
 sampler_setup.set_field(0, 1, method=stats.uniform(-20, 20))
 sampler_setup.set_dot_field(0, 1, method="sr")

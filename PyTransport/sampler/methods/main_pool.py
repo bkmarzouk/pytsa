@@ -1,5 +1,5 @@
 import numpy as np
-from pytransport.sampler.configs.setup_sampler import build_catalogue, Setup  # Import Setup for dill handling
+from pytransport.sampler.configs.setup_sampler import build_catalogue, HyperParameters  # Import Setup for dill handling
 from pytransport.sampler.methods import pyt_methods
 
 
@@ -60,7 +60,7 @@ class _Data(object):
         self._add_value("Nend", None if background is None else background[-1][0])
 
 
-def main(pool, setup: Setup, args):
+def main(pool, setup: HyperParameters, args):
     n_samples = args.n_samples
 
     build_catalogue(setup, args)

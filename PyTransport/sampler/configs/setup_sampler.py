@@ -3,15 +3,35 @@ import shutil
 import dill
 import pickle as pk
 import numpy as np
+import scipy.stats
+from pytransport.sampler.configs.rng_states import RandomStates
 
-from pytransport.cache_tools import hash_pars
-from pytransport.sampler.methods import samplers
-
-apriori = "apriori"
-latin = "latin"
 default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "samplers"))
 
 assert os.path.exists(default_cache)
+
+
+class Constant(object):
+
+    def __init__(self, val):
+        """
+        Mimics methods from scipy.stats for constructing samples via rvs or ppf. Returns constant in either case
+        for any value
+
+        :param val: constant value to return
+        """
+        self.val = val
+        self.random_state = None
+
+    def rvs(self, n=1):
+        return np.array([self.val]).repeat(n) if n > 1 else self.val
+
+    def ppf(self, *x):
+        return self.val
+
+    @classmethod
+    def slow_roll(cls):
+        return cls("sr")
 
 
 def _dist2pars(d):
@@ -137,7 +157,7 @@ class _SamplingParameters(object):
         return hd
 
 
-class Setup(_SamplingParameters):
+class HyperParameters(_SamplingParameters):
 
     def __init__(self, pyt_model, sampler_name, cache_loc=default_cache):
         """
@@ -145,10 +165,10 @@ class Setup(_SamplingParameters):
 
         :param pyt_model: pytransport module
         """
-        super(Setup, self).__init__(pyt_model)
+        super(HyperParameters, self).__init__(pyt_model)
 
         self.cache_loc = os.path.join(cache_loc, sampler_name)
-        self.sampler_path = os.path.join(self.cache_loc, "sampler")
+        self.sampler_path = os.path.join(self.cache_loc, "sampler.hyperparams")
 
         self.fieldspace_reject = {}
         self.dotfieldspace_reject = {}
@@ -300,67 +320,228 @@ class Setup(_SamplingParameters):
                 exi_val = existing_data[k]  # Existing value
                 assert current_data[k] == existing_data[k], f"KEY ERROR @ {k}:\n{cur_val} != {exi_val}"
 
+    def sr2val(self, idx: int or np.ndarray, fvals: np.ndarray, pvals: np.ndarray):
+        """
+        Get slow roll value for field index/indices
+        :param idx:
+        :param fvals:
+        :param pvals:
+        :return:
+        """
+        V = self.PyT.V(fvals, pvals)
+        dV = self.PyT.dV(fvals, pvals)
+        return -dV[idx] / np.sqrt(3 * V)
 
-def build_catalogue(s: Setup, parsed_args, path_only=False):  # TODO: Remove....
-    pars = [s.N_min, s.N_adiabitc, s.N_sub_evo, s.tols]
-    pars += [parsed_args.seed, parsed_args.grid_seed, parsed_args.n_samples]
 
-    hash = hash_pars(*pars)
+class _SamplerRoutine(object):
 
-    dir_name = "latin_" if parsed_args.latin else "apriori_"
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list, param_methods: list):
+        """
+        Base class for samplers.
 
-    dir_name += hash
+        :param seed: if given, seed is used for prng before 'get_samples' call in derived function.
+                        Note: in LatinHypercube method, this is called earlier, during the distribution
+                                of grid squares.
+        """
+        self.random_states = random_states
 
-    dir_path = s.path
+        self.n_field = len(field_methods)
+        self.field_methods = field_methods
 
-    path = os.path.join(dir_path, dir_name)
+        assert len(dotfield_methods) == self.n_field, [len(dotfield_methods), self.n_field]
+        self.dotfield_methods = dotfield_methods
 
-    if not os.path.exists(path):
-        os.makedirs(path)
+        self.n_params = len(param_methods)
+        self.param_methods = param_methods
 
-    samples_path = os.path.join(path, "catalogue.npy")
+        if isinstance(self, LatinHypercube):
+            print("-- I am latin")
+            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+                assert hasattr(m, "ppf"), m
 
-    if path_only:
-        return samples_path
+        elif isinstance(self, APriori):
+            print("-- I am apriori")
+            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+                assert hasattr(m, "rvs"), m
 
-    if not os.path.exists(samples_path):
-        if parsed_args.apriori:
-            x = samplers.APriori(parsed_args.seed)
         else:
-            x = samplers.LatinHypercube(parsed_args.n_samples, seed=parsed_args.seed,
-                                        cube_seed=parsed_args.grid_seed)
+            raise TypeError(self)
 
-        print("-- Constructing catalogue for ICs & Params")
+    def get_sample(self, *args, **kwargs) -> tuple:
+        pass
 
-        for f in range(s.nF):
-            x.add_param(s.fields[f])
-        for f in range(s.nF):
-            x.add_param(s.dot_fields[f])
-        for p in range(s.nP):
-            x.add_param(s.params[p])
 
-        if parsed_args.apriori:
-            samples = x.get_samples(parsed_args.n_samples).T
+class APriori(_SamplerRoutine):
+
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
+                 param_methods: list):
+        """
+        Draws values apriori from statistical distributions defined with paramters
+
+        :param seed: integer or None, defining a random (or absence of) random seed
+        """
+        super(APriori, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
+
+    def get_sample(self, sample_index: int):
+        """
+        Get samples for parameters as defined by corresponding statistical distributions
+
+        :param n_samples: number of samples
+        :return: array of samples with shape (n_samples, n_params)
+        """
+
+        dotfields_out = np.zeros(self.n_field * 2, dtype=object)
+        params_out = np.zeros(self.n_params, dtype=object)
+
+        state = self.random_states.get_state(sample_index)
+
+        for idx in range(self.n_field):
+            m = self.field_methods[idx]
+            m.random_state = state
+            dotfields_out[idx] = m.rvs()
+
+            m = self.dotfield_methods[idx]
+            m.random_state = state
+            dotfields_out[idx + self.n_field] = m.rvs()
+
+        for idx in range(self.n_params):
+            m = self.param_methods[idx]
+            m.random_state = state
+            params_out[idx] = m.rvs()
+
+        return dotfields_out, params_out
+
+
+class LatinHypercube(_SamplerRoutine):
+
+    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
+                 param_methods: list):
+        """
+        Constructs latin hypercube for inverse sampling the CDF of a given distribution
+
+        :param n_cells: number of cells (along one dimension) to define sample regions
+        :param seed: prng seed for constructing samples
+        :param cube_seed: prng seed for constructing hypercube
+        """
+        super(LatinHypercube, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
+        self.n_samples = random_states.n_states - 1
+        self.grid = self.build_grid()
+        g = np.linspace(0, 1, self.n_samples + 1)
+        self.unif = list(zip(g, np.roll(g, -1)))[:-1]  # const density intervals
+
+    def coords_1d(self, grid_state):
+        """
+        Construct non-repeating list of integers on the interval [0, n_cells-1], that represent
+        sampling intervals for a single parameter of a unique sample
+
+        :return: interval coords
+        """
+
+        n_samples = self.n_samples
+
+        avail = list(range(n_samples))
+        coords = np.zeros(n_samples, dtype=int)
+
+        for ii in range(n_samples):
+            m = scipy.stats.randint(0, len(avail))
+            m.random_state = grid_state
+            coords[ii] = avail.pop(m.rvs())
+
+        return coords, grid_state
+
+    def build_grid(self):
+        """
+        Construct grid of coordinates representing sampling intervals for the n-dimensional parameter space
+
+        :return: nxn coordinate grid
+        """
+
+        n_tot = self.n_params + self.n_field * 2
+
+        coords = np.zeros((n_tot, self.n_samples), dtype=int)
+
+        grid_state = self.random_states.get_state(0)
+
+        for ii in range(n_tot):
+            coords[ii], grid_state = self.coords_1d(grid_state)
+
+        return coords.T
+
+    def get_sample(self, sample_index: int):
+        """
+        Get samples for parameters as defined by corresponding statistical distributions
+
+        :param verbose: print statements if True
+        :return: array of samples with shape (n_cells, n_params)
+        """
+
+        # +1 to state index since we reserve the zeroth for grid building
+        state = self.random_states.get_state(sample_index + 1)
+
+        fdf_out = np.zeros(2 * self.n_field, dtype=object)
+        par_out = np.zeros(self.n_params, dtype=object)
+
+        grid_indices = self.grid[sample_index]
+        unif_regions = self.unif
+
+        for idx in range(self.n_field):
+            lb, ub = unif_regions[grid_indices[idx]]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            fdf_out[idx] = self.field_methods[idx].ppf(unif_rv)  # Get sampled value
+
+            lb, ub = unif_regions[grid_indices[idx + self.n_field]]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            fdf_out[idx + self.n_field] = self.dotfield_methods[idx].ppf(unif_rv)  # Get sampled value
+
+        for idx in range(self.n_params):
+            lb, ub = self.unif[grid_indices[idx + self.n_field * 2]]
+            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
+            m.random_state = state  # update random state to match for current sample
+            unif_rv = m.rvs()  # random point from cdf on [0, 1]
+            par_out[idx] = self.param_methods[idx].ppf(unif_rv)  # Get sampled value
+
+        return fdf_out, par_out
+
+
+class _XSampler:
+
+    def __init__(self, is_apriori: bool, random_states: RandomStates, hyp_pars: HyperParameters):
+        self.random_states = random_states
+        self.hyp_pars = hyp_pars
+
+        fields = [hyp_pars.fields[idx] for idx in range(hyp_pars.nF)]
+        dotfields = [hyp_pars.dot_fields[idx] for idx in range(hyp_pars.nF)]
+        params = [hyp_pars.params[idx] for idx in range(hyp_pars.nP)]
+
+        if is_apriori:
+            self.sampler = APriori(random_states, fields, dotfields, params)
         else:
-            samples = x.get_samples().T
+            self.sampler = LatinHypercube(random_states, fields, dotfields, params)
 
-        for row_idx, row in enumerate(samples):
+    def get_sample(self, idx: int):
+        fdf, pars = self.sampler.get_sample(idx)
 
-            if "sr" in row:
-                f = np.array([*row[:s.nF]], dtype=np.float64)
-                p = np.array([*row[-s.nP:]], dtype=np.float64)
-                V = s.PyT.V(f, p)
-                dV = s.PyT.dV(f, p)
+        if np.any(fdf == "sr"):
+            sr_idx = np.where(fdf == "sr")[0]
+            fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx, fdf[:self.hyp_pars.nF], pars)
 
-                sr_ic = -dV / np.sqrt(3 * V)
+        return fdf, pars
 
-                for idx in range(s.nF):
-                    if samples[row_idx][s.nF + idx] == "sr":
-                        samples[row_idx][s.nF + idx] = sr_ic[idx]
 
-        np.save(samples_path, np.asarray(samples, dtype=np.float64))
+class APrioriSampler(_XSampler):
 
-    print("-- Sample ICs & Params @ {}".format(samples_path))
+    def __init__(self, random_states: RandomStates, hyp_pars: HyperParameters):
+        super(_XSampler, self).__init__(True, random_states, hyp_pars)
+
+
+class LatinSampler(_XSampler):
+
+    def __init__(self, random_states: RandomStates, hyp_pars: HyperParameters):
+        super(_XSampler, self).__init__(False, random_states, hyp_pars)
 
 
 if __name__ == "__main__":
@@ -368,10 +549,10 @@ if __name__ == "__main__":
     from pytransport.sampler.methods.samplers import Constant
     import scipy.stats as stats
 
-    sampler_setup = Setup(model, "dquad_test")
+    sampler_setup = HyperParameters(model, "dquad_test")
 
-    sampler_setup.set_analysis_params(tols=[1e-7, 1e-7])
-    sampler_setup.set_field(0, 1, method=stats.uniform(-20, 20))
+    sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
+    sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
     sampler_setup.set_dot_field(0, method="sr")
     sampler_setup.set_dot_field(1, method=stats.norm(0, 1e-7))
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
