@@ -3,17 +3,20 @@ import sympy as sym
 import os
 import pickle as pk
 
-model_cache = os.environ["model_cache"]
-fmet_cache = os.environ["fmet_cache"]
-pot_cache = os.environ["pot_cache"]
-covd_cache = os.environ["covd_cache"]
+sym_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "sym_cache"))
+model_cache = os.path.join(sym_cache, "model")
+fmet_cache = os.path.join(sym_cache, "fmet")
+pot_cache = os.path.join(sym_cache, "pot")
+covd_cache = os.path.join(sym_cache, "covd")
+
 
 def hash_pars(*pars: object):
-
     s = ""
 
     for par in pars:
         s += str(par)
+
+    # Cheap and nasty way of converting arbitrary parameters into an identifying string
 
     return sha224(bytes(s, encoding='utf-8')).hexdigest()
 

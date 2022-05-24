@@ -13,8 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with _PyTransport.  If not, see <http://www.gnu.org/licenses/>.
 
-
 # This file contains python scripts used to setup the compiled pyt module
+import sys
+
 import sympy as sym
 import subprocess
 import os
@@ -41,6 +42,9 @@ _PyMethodDefs = ",".join([
     '{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve}',
     '{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve}',
 ])
+
+
+MODELS_LOC = os.path.abspath(os.path.join(os.path.dirname(__file__), "models"))
 
 
 def _delta_ctime(a, b):
@@ -107,6 +111,11 @@ def set_template_headers(NC: bool):
 def set_paths():  # Remove dep
     pass
 
+def garbage_removal():
+    t.sleep(1)
+    cwd = os.path.dirname(__file__)
+    location = os.path.join(cwd, 'pyt')
+    shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
 
 def compile_module(name, NC=False):
     """
@@ -168,14 +177,19 @@ def compile_module(name, NC=False):
     #                cwd=location)
     subprocess.run(["bash", "moduleSetup.sh"], cwd=location)
 
+    subprocess.run(["rm", "-r", "build"], cwd=location)
+    subprocess.run(["rm", "-r", "dist"], cwd=location)
+    subprocess.run(["rm", "-r", f"{name}.egg-info"], cwd=location)
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
-
-    try:
-        shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
-    except:
-        pass
+    #
+    # garbage_removal()
+    # try:
+    #     shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
+    # except:
+    #     print("\n\n\nUNABLE TO REMOVE\n\n\n")
+    #     pass
 
 
 def delete_module(name):

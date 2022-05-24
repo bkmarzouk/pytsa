@@ -20,9 +20,9 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/NC/model.h"//model
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/model.h"//model
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 #include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
@@ -1182,10 +1182,10 @@ PyDoc_STRVAR(doc_sigEvolve, "Evolve 2pt correlation functions");
 PyDoc_STRVAR(doc_alphaEvolve, "Evolve 3pt correlation functions";)
 
 static char PyTrans_docs[] =
-"This is PyTransport, a package for solving the moment transport equations of inflationary cosmology\n";
+"This is a custom PyTransport package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef pyt_dquad_2sphere_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, doc_Epsilon},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, doc_Eta},{"V", (PyCFunction)MT_V,   METH_VARARGS, doc_V},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, doc_dV},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, doc_ddV},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, doc_massMatrix},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, doc_findEndOfInflation},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, doc_backEvolve},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve},   {NULL}};//FuncDef
+static PyMethodDef pyt_x_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, doc_Epsilon},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, doc_Eta},{"V", (PyCFunction)MT_V,   METH_VARARGS, doc_V},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, doc_dV},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, doc_ddV},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, doc_massMatrix},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, doc_findEndOfInflation},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, doc_backEvolve},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve},   {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1193,11 +1193,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "pyt_dquad_2sphere", PyTrans_docs, -1, pyt_dquad_2sphere_funcs}; //modDef
+static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "pyt_x", PyTrans_docs, -1, pyt_x_funcs}; //modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_pyt_dquad_2sphere(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+PyMODINIT_FUNC PyInit_pyt_x(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
