@@ -2,13 +2,13 @@
 
 
 # Ensure that the setupBuilds module is imported
-from . setup_sampler import HyperParameters
+from . setup_sampler import SamplerMethods
 
 # Import the _PyTransport module you want to perform sampling with
 import PyTrans2Quad as PyT
 
 # Initialize the model file using the _PyTransport module
-sampler_setup = HyperParameters(PyT)
+sampler_setup = SamplerMethods(PyT)
 
 # Set core params
 sampler_setup.set("nc_exmaple")

@@ -157,7 +157,7 @@ class _SamplingParameters(object):
         return hd
 
 
-class HyperParameters(_SamplingParameters):
+class SamplerMethods(_SamplingParameters):
 
     def __init__(self, pyt_model, sampler_name, cache_loc=default_cache):
         """
@@ -165,10 +165,10 @@ class HyperParameters(_SamplingParameters):
 
         :param pyt_model: pytransport module
         """
-        super(HyperParameters, self).__init__(pyt_model)
+        super(SamplerMethods, self).__init__(pyt_model)
 
         self.cache_loc = os.path.join(cache_loc, sampler_name)
-        self.sampler_path = os.path.join(self.cache_loc, "sampler.hyperparams")
+        self.sampler_path = os.path.join(self.cache_loc, "sampler.methods")
 
         self.fieldspace_reject = {}
         self.dotfieldspace_reject = {}
@@ -509,7 +509,7 @@ class LatinHypercube(_SamplerRoutine):
 
 class _XSampler:
 
-    def __init__(self, is_apriori: bool, random_states: RandomStates, hyp_pars: HyperParameters):
+    def __init__(self, is_apriori: bool, random_states: RandomStates, hyp_pars: SamplerMethods):
         self.random_states = random_states
         self.hyp_pars = hyp_pars
 
@@ -534,22 +534,22 @@ class _XSampler:
 
 class APrioriSampler(_XSampler):
 
-    def __init__(self, random_states: RandomStates, hyp_pars: HyperParameters):
-        super(_XSampler, self).__init__(True, random_states, hyp_pars)
+    def __init__(self, random_states: RandomStates, hyp_pars: SamplerMethods):
+        super(APrioriSampler, self).__init__(True, random_states, hyp_pars)
 
 
 class LatinSampler(_XSampler):
 
-    def __init__(self, random_states: RandomStates, hyp_pars: HyperParameters):
-        super(_XSampler, self).__init__(False, random_states, hyp_pars)
+    def __init__(self, random_states: RandomStates, hyp_pars: SamplerMethods):
+        super(LatinSampler, self).__init__(False, random_states, hyp_pars)
 
 
 if __name__ == "__main__":
+
     import pyt_dquad_euclidean as model
-    from pytransport.sampler.methods.samplers import Constant
     import scipy.stats as stats
 
-    sampler_setup = HyperParameters(model, "dquad_test")
+    sampler_setup = SamplerMethods(model, "dquad_test")
 
     sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
     sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
@@ -557,3 +557,46 @@ if __name__ == "__main__":
     sampler_setup.set_dot_field(1, method=stats.norm(0, 1e-7))
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
     sampler_setup.build_sampler()
+
+    make_demo_fig = False
+
+    if make_demo_fig:
+
+        import matplotlib.pyplot as plt
+
+        N = 2
+
+        n_samples = 1000
+
+        states_lh = RandomStates(n_samples + 1, entropy=438473848392)
+        states_ap = RandomStates(n_samples, entropy=438473848392)
+
+        m1 = scipy.stats.uniform(loc=-20, scale=40)
+        m2 = scipy.stats.norm(1e-3)
+        m3 = scipy.stats.lognorm(1e-6, 1e-3)
+
+        lh = LatinHypercube(states_lh, [m1] * N, [m2] * N, [m3] * N)
+        ap = APriori(states_ap, [m1] * N, [m2] * N, [m3] * N)
+
+        lh_fdfs = np.zeros((n_samples, N * 2), dtype=float)
+        lh_pars = np.zeros((n_samples, N), dtype=float)
+
+        ap_fdfs = lh_fdfs.copy()
+        ap_pars = lh_pars.copy()
+
+        for ii in range(n_samples):
+            lh_fdfs[ii], lh_pars[ii] = lh.get_sample(ii)
+            ap_fdfs[ii], ap_pars[ii] = ap.get_sample(ii)
+
+        fig, axs = plt.subplots(2, 3, figsize=(10, 5))
+
+        for idx, ax in enumerate(axs.flatten()[:4]):
+            ax.hist(lh_fdfs.T[idx], density=True, bins="auto", alpha=0.3)
+            ax.hist(ap_fdfs.T[idx], density=True, bins="auto", alpha=0.3)
+
+        for idx, ax in enumerate(axs.flatten()[4:]):
+            ax.hist(lh_pars.T[idx], density=True, bins="auto", alpha=0.3)
+            ax.hist(ap_pars.T[idx], density=True, bins="auto", alpha=0.3)
+
+        plt.show()
+        plt.tight_layout()

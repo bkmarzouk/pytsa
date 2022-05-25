@@ -7,6 +7,7 @@
 **/*.egg
 
 # Ignore builds dir
+samplers/
 PyTransport/sampler/builds
 !PyTransport/sampler/builds/.gitkeep
 !PyTransport/sampler/builds/__init__.py
