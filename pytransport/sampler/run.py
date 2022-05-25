@@ -55,6 +55,6 @@ if __name__ == "__main__":
 
     job_config(args_dict)
 
-    pool = schwimmbad.choose_pool(mpi=parsed_args.n_procs > 1, processes=parsed_args.n_procs)
+    pool = schwimmbad.choose_pool(mpi=parsed_args.n_procs > 1, processes=parsed_args.n_procs, use_dill=True)
 
     main_pool.main(pool, args_dict)

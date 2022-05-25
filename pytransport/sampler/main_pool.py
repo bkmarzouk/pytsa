@@ -39,7 +39,9 @@ def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
 
     pool_data = build_back_pool(os.path.join(args_dict['cwd'], args_dict['name']), n_samples)
+
     r = pool.map(pyt_methods.compute_background, pool_data)
+
     return 0
     #
     # build_catalogue(setup, args)

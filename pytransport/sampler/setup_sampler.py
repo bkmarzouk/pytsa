@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats
 from pytransport.cache_tools import hash_alpha_beta
 from pytransport.sampler.rng_states import RandomStates
-import pytransport as p
+from pytransport.sampler.mpi_helpers import make_dir, single_proc_task, barrier, rank
 
 default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "", "..", "..", "samplers"))
 
@@ -274,15 +274,18 @@ class SamplerMethods(_SamplingParameters):
 
         cache_loc = self.cache_loc
 
-        if not os.path.exists(cache_loc):
-            os.makedirs(cache_loc)
+        make_dir(cache_loc)
 
         self.hash_check()
 
         self._dump_self()
-        src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "run.py")
+
         dest = os.path.join(cache_loc, "run.py")
-        shutil.copy(src, dest)
+        if rank == 0 and not os.path.exists(dest):
+            src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "run.py")
+            shutil.copy(src, dest)
+
+        barrier()
 
     def _dump_self(self):
         """
@@ -291,9 +294,12 @@ class SamplerMethods(_SamplingParameters):
 
         path = os.path.join(self.sampler_path)
 
-        with open(path, "wb") as f:
-            print("-- sampler configuration data @ {}".format(path))
-            dill.dump(self, f)
+        if not os.path.exists(path) and rank == 0:
+            with open(path, "wb") as f:
+                print("-- sampler configuration data @ {}".format(path))
+                dill.dump(self, f)
+
+        barrier()
 
     def hash_check(self):
         """
@@ -306,21 +312,25 @@ class SamplerMethods(_SamplingParameters):
 
         current_data = self.get_hash_data()
 
-        if not os.path.exists(hash_path):
-            with open(hash_path, "wb") as f:
-                pk.dump(current_data, f)
-        else:
-            with open(hash_path, "rb") as f:
-                existing_data: dict = pk.load(f)
+        if rank == 0:
 
-            # check for key data
-            assert current_data.keys() == existing_data.keys(), [current_data.keys(), existing_data.keys()]
+            if not os.path.exists(hash_path):
+                with open(hash_path, "wb") as f:
+                    pk.dump(current_data, f)
+            else:
+                with open(hash_path, "rb") as f:
+                    existing_data: dict = pk.load(f)
 
-            # check values match
-            for k in current_data.keys():
-                cur_val = current_data[k]  # Current value
-                exi_val = existing_data[k]  # Existing value
-                assert current_data[k] == existing_data[k], f"KEY ERROR @ {k}:\n{cur_val} != {exi_val}"
+                # check for key data
+                assert current_data.keys() == existing_data.keys(), [current_data.keys(), existing_data.keys()]
+
+                # check values match
+                for k in current_data.keys():
+                    cur_val = current_data[k]  # Current value
+                    exi_val = existing_data[k]  # Existing value
+                    assert current_data[k] == existing_data[k], f"KEY ERROR @ {k}:\n{cur_val} != {exi_val}"
+
+        barrier()
 
     def sr2val(self, idx: int or np.ndarray, fvals: np.ndarray, pvals: np.ndarray):
         """
@@ -330,8 +340,10 @@ class SamplerMethods(_SamplingParameters):
         :param pvals:
         :return:
         """
-        V = self.model.V(fvals, pvals)
-        dV = self.model.dV(fvals, pvals)
+
+        V = self.model.V(fvals.astype(np.float64), pvals)
+        dV = self.model.dV(fvals.astype(np.float64), pvals)
+
         return -dV[idx] / np.sqrt(3 * V)
 
 
@@ -393,7 +405,7 @@ class APriori(_SamplerRoutine):
         """
 
         dotfields_out = np.zeros(self.n_field * 2, dtype=object)
-        params_out = np.zeros(self.n_params, dtype=object)
+        params_out = np.zeros(self.n_params, dtype=float)
 
         state = self.random_states.get_state(sample_index)
 
@@ -481,7 +493,7 @@ class LatinHypercube(_SamplerRoutine):
         state = self.random_states.get_state(sample_index + 1)
 
         fdf_out = np.zeros(2 * self.n_field, dtype=object)
-        par_out = np.zeros(self.n_params, dtype=object)
+        par_out = np.zeros(self.n_params, dtype=float)
 
         grid_indices = self.grid[sample_index]
         unif_regions = self.unif
@@ -529,7 +541,7 @@ class _XSampler:
 
         if np.any(fdf == "sr"):
             sr_idx = np.where(fdf == "sr")[0]
-            fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx, fdf[:self.hyp_pars.nF], pars)
+            fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx - self.hyp_pars.nF, fdf[:self.hyp_pars.nF], pars)
 
         return fdf, pars
 
@@ -548,8 +560,10 @@ class LatinSampler(_XSampler):
 
 def build_results_template(cache, n_samples, n_vals):
     path = os.path.join(cache, "data.npy")
-    if not os.path.exists(path):
+    if not os.path.exists(path) and rank == 0:
         np.save(path, np.zeros((n_samples, n_vals), dtype=np.float64))
+
+    barrier()
 
 
 def job_config(task_pars: dict):
@@ -563,69 +577,68 @@ def job_config(task_pars: dict):
 
     root_dir = os.path.abspath(os.path.join(sampler_cwd, name))
 
-    if not os.path.exists(root_dir):
-        os.makedirs(root_dir)
+    make_dir(root_dir)
+    barrier()
 
     tasks_path = os.path.join(root_dir, "sampler.tasks")
 
-    if os.path.exists(tasks_path):
+    if rank == 0:
 
-        with open(tasks_path, "rb") as f:
+        if os.path.exists(tasks_path):
 
-            cached_task_pars: dict = pk.load(f)
+            with open(tasks_path, "rb") as f:
 
-        assert cached_task_pars.keys() == task_pars.keys(), [cached_task_pars.keys(), task_pars.keys()]
+                cached_task_pars: dict = pk.load(f)
 
-        for k in cached_task_pars.keys():
-            parsed_par = task_pars[k]
-            cached_par = cached_task_pars[k]
+            assert cached_task_pars.keys() == task_pars.keys(), [cached_task_pars.keys(), task_pars.keys()]
 
-            assert parsed_par == cached_par, f"Parameter error @ {k}: {parsed_par} != {cached_par}"
+            for k in cached_task_pars.keys():
+                parsed_par = task_pars[k]
+                cached_par = cached_task_pars[k]
 
-    else:
+                assert parsed_par == cached_par or k == "n_procs", f"Parameter error @ {k}: {parsed_par} != {cached_par}"
 
-        with open(tasks_path, "wb") as f:
+        else:
 
-            pk.dump(task_pars, f)
+            with open(tasks_path, "wb") as f:
 
-    random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
+                pk.dump(task_pars, f)
 
-    sampler_path = os.path.join(root_dir, "sampler.run")
+        random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
 
-    if not os.path.exists(sampler_path):
-        methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
+        sampler_path = os.path.join(root_dir, "sampler.run")
 
-        with open(methods_path, "rb") as f:
-            sampler_methods = dill.load(f)  # DILL??
+        if not os.path.exists(sampler_path):
+            methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
 
-        _m = APrioriSampler if apriori else LatinSampler
+            with open(methods_path, "rb") as f:
+                sampler_methods = dill.load(f)  # DILL??
 
-        sampler_run = _m(random_states, sampler_methods)
+            _m = APrioriSampler if apriori else LatinSampler
 
-        with open(sampler_path, "wb") as f:
-            dill.dump(sampler_run, f)
+            sampler_run = _m(random_states, sampler_methods)
 
-    result_dirs = [(x, 2) for x in ['mij', 'epsilon', 'eta']]
+            with open(sampler_path, "wb") as f:
+                dill.dump(sampler_run, f)
 
-    if 'task_2pt' in task_pars:
-        result_dirs.append(('ns_alpha', 2))
+        result_dirs = [(x, 2) for x in ['mij', 'epsilon', 'eta']]
 
-    for ext in ['eq', 'fo', 'sq']:
-        task_name = f'task_3pt_{ext}'
-        if task_name in task_pars:
-            result_dirs.append((f'fnl_{ext}', 1))
+        if 'task_2pt' in task_pars:
+            result_dirs.append(('ns_alpha', 2))
 
-    for a, b in zip(task_pars['alpha'], task_pars['beta']):
-        result_dirs.append((f'fnl_{hash_alpha_beta(a, b)}', 1))
+        for ext in ['eq', 'fo', 'sq']:
+            task_name = f'task_3pt_{ext}'
+            if task_name in task_pars:
+                result_dirs.append((f'fnl_{ext}', 1))
 
-    for rd in result_dirs:
-        cache = os.path.join(root_dir, rd[0])
+        for a, b in zip(task_pars['alpha'], task_pars['beta']):
+            result_dirs.append((f'fnl_{hash_alpha_beta(a, b)}', 1))
 
-        if not os.path.exists(cache):
+        for rd in result_dirs:
+            cache = os.path.join(root_dir, rd[0])
             os.makedirs(cache)
 
-        nvar = rd[1]
-        build_results_template(cache, n_samples, nvar)
+    barrier()
 
 
 if __name__ == "__main__":
@@ -638,7 +651,7 @@ if __name__ == "__main__":
     sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
     sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
     sampler_setup.set_dot_field(0, method="sr")
-    sampler_setup.set_dot_field(1, method=stats.norm(0, 1e-7))
+    sampler_setup.set_dot_field(1, method="sr")
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
     sampler_setup.build_sampler()
 

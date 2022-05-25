@@ -109,19 +109,19 @@ def compute_background(data: ProtoMethods):
     model = data.methods.model
     index = data.index
 
-    tols = data.methods.tols
+    tols = np.asarray(data.methods.tols, dtype=float)
     Nmin = data.methods.N_min
     ics, params = data.sampler.get_sample(index)
     Nend = model.findEndOfInflation(ics, params, tols, True)
 
-    print(Nend)
-
-    if Nend < Nmin:
-        background = ErrorValue.inflation_too_short()
-
-    else:
-        N_evo = np.linspace(0, Nend, int(100 * Nend))
-        background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)
+    print(Nend, ics, params)
+    #
+    # if Nend < Nmin:
+    #     background = ErrorValue.inflation_too_short()
+    #
+    # else:
+    #     N_evo = np.linspace(0, Nend, int(100 * Nend))
+    #     background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)
 
     return 0
 
