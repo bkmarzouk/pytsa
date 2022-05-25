@@ -374,8 +374,8 @@ def write_results(rerun=False):
     possibleKeys  = ["m{}".format(ii) for ii in range(nF)] + ["T_masses"]
     possibleLaTeX = ["m_{}^2/H^2".format(ii) for ii in range(nF)] + ["T_{M^A_B}"]
 
-    possibleKeys  += ["ns", "alpha", "T_2pf"]
-    possibleLaTeX += ["n_s", "\\alpha", "T_{n_s}"]
+    possibleKeys  += ["ns", "As", "alpha", "T_2pf"]
+    possibleLaTeX += ["n_s", "\ln{10^{10}A_s}", "\\alpha", "T_{n_s}"]
     
     fNLFile = open(os.path.join(pathLocalData, "fNL.localdata"), "rb")
     with fNLFile:

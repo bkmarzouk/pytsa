@@ -839,6 +839,11 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
         # Append power spedctrum at end of background
         pZetaVals = np.append(pZetaVals, twoPf.T[1][-1])
 
+        if k == kPivot:
+            # print(kPivot, pZetaVals[-1], pZetaVals[-1]  / kPivot**3)
+
+            scalar_amplitude = pZetaVals[-1] * (kPivot ** 3)
+
     #  Build log arrays in k and Pzeta
     arrLogK = np.log(kVals / kPivot)
     arrLogPz = np.log(pZetaVals)
@@ -859,6 +864,8 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
 
     ns = ns_(kExit)
     alpha = alpha_(kExit)
+
+    # TODO: Lost scalar amplitude in merge??
 
     if returnRunning:
         return np.array([ns, alpha])
