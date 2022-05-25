@@ -38,9 +38,10 @@ def build_back_pool(loc: str, n_samples: int):
 def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
 
+    # NOTE: list(...) call required for serial pools
     pool_data = build_back_pool(os.path.join(args_dict['cwd'], args_dict['name']), n_samples)
 
-    r = pool.map(pyt_methods.compute_background, pool_data)
+    list(pool.map(pyt_methods.compute_background, pool_data))
 
     return 0
     #

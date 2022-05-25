@@ -45,22 +45,24 @@ using namespace std;
 // Look for environment variable that indicates we should be running in sampler mode, i.e. flag returns
 bool _SamplerMode(){
     char const* tmp = getenv( "SAMPLER_MODE" );
+
     bool sampler_mode;
-        if ( tmp == NULL ) {
+
+    if ( tmp == NULL ) {
+        cout << "NOT USING SAMPLER MODE" << endl;
+        sampler_mode = false;
+    }
+    else {
+        std::string s( tmp );
+        if (s == "TRUE") {
+            cout << "USING SAMPLER MODE" << endl;
+            sampler_mode = true;
+        }
+        else {
             cout << "NOT USING SAMPLER MODE" << endl;
             sampler_mode = false;
         }
-        else {
-            std::string s( tmp );
-            if (s == "TRUE") {
-                cout << "USING SAMPLER MODE" << endl;
-                sampler_mode = true;
-            }
-            else {
-                cout << "NOT USING SAMPLER MODE" << endl;
-                sampler_mode = false;
-            }
-        }
+    }
     return sampler_mode;
 }
 

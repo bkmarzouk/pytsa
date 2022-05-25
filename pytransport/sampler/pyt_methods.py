@@ -109,10 +109,11 @@ def compute_background(data: ProtoMethods):
     model = data.methods.model
     index = data.index
 
-    tols = np.asarray(data.methods.tols, dtype=float)
+    tols = np.array([*data.methods.tols], dtype=float)
     Nmin = data.methods.N_min
     ics, params = data.sampler.get_sample(index)
-    Nend = model.findEndOfInflation(ics, params, tols, True)
+
+    Nend = model.findEndOfInflation(ics, params, tols)
 
     print(Nend, ics, params)
     #

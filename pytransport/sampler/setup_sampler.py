@@ -341,8 +341,8 @@ class SamplerMethods(_SamplingParameters):
         :return:
         """
 
-        V = self.model.V(fvals.astype(np.float64), pvals)
-        dV = self.model.dV(fvals.astype(np.float64), pvals)
+        V = self.model.V(fvals.astype(float), pvals)
+        dV = self.model.dV(fvals.astype(float), pvals)
 
         return -dV[idx] / np.sqrt(3 * V)
 
@@ -537,11 +537,18 @@ class _XSampler:
             self.sampler = LatinHypercube(random_states, fields, dotfields, params)
 
     def get_sample(self, idx: int):
-        fdf, pars = self.sampler.get_sample(idx)
+        _fdf, pars = self.sampler.get_sample(idx)
 
-        if np.any(fdf == "sr"):
-            sr_idx = np.where(fdf == "sr")[0]
-            fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx - self.hyp_pars.nF, fdf[:self.hyp_pars.nF], pars)
+        if np.any(_fdf == "sr"):
+            sr_idx = np.where(_fdf == "sr")[0]
+            _fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx - self.hyp_pars.nF, _fdf[:self.hyp_pars.nF], pars)
+
+        # TODO: This is an inefficient way of type-casting the fdf results from object to float
+        #       NOTE: WE have object type to accomodate the 'sr' key; maybe define this as a floating
+        #             point constant such that we don't have to do this?
+        fdf = np.zeros(self.hyp_pars.nF * 2, dtype=float)
+        for idx, val in enumerate(_fdf):
+            fdf[idx] = val
 
         return fdf, pars
 
@@ -636,7 +643,9 @@ def job_config(task_pars: dict):
 
         for rd in result_dirs:
             cache = os.path.join(root_dir, rd[0])
-            os.makedirs(cache)
+
+            if not os.path.exists(cache):
+                os.makedirs(cache)
 
     barrier()
 
