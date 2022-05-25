@@ -628,6 +628,9 @@ def job_config(task_pars: dict):
             with open(sampler_path, "wb") as f:
                 dill.dump(sampler_run, f)
 
+        samples_core_dir = os.path.join(root_dir, "samples_core")
+        make_dir(samples_core_dir)
+
         result_dirs = [(x, 2) for x in ['mij', 'epsilon', 'eta']]
 
         if 'task_2pt' in task_pars:

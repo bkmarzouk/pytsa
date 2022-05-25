@@ -9,10 +9,11 @@ from pytransport.sampler.setup_sampler import SamplerMethods, APrioriSampler, La
 
 class TrackMethods:
 
-    def __init__(self, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index):
+    def __init__(self, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index, cache):
         self.methods = methods
         self.sampler = sampler
         self.index = index
+        self.cache = cache
 
 
 def _dill_load(path):
@@ -29,8 +30,10 @@ def build_back_pool(loc: str, n_samples: int):
 
     pool_data = np.empty(n_samples, dtype=TrackMethods)
 
+    samples_dir = os.path.join(loc, "samples_core")
+
     for idx in range(n_samples):
-        pool_data[idx] = TrackMethods(methods, sampler, idx)
+        pool_data[idx] = TrackMethods(methods, sampler, idx, samples_dir)
 
     return pool_data
 

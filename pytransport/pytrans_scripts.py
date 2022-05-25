@@ -146,19 +146,16 @@ def arr_eval_nearest_N(N, arr):
     Zeroth should contain quantities at the earliest time
     :return: array quantities at the time step N
     """
-    if N in arr.T[0]:
-        return arr[np.where(N == arr.T[0])]
 
-    assert N > 1, N
-    assert N < arr[-1][0] - 1, N
+    Nseries = arr.T[0]
 
-    for ii, step in enumerate(arr):
+    idx_out = None
 
-        if step[0] > N:
-            jj = ii - 1
-            dNii = step[0] - N
-            dNjj = N - arr[jj][0]
-            return arr[jj if dNjj < dNii else ii]
+    for idx, Nstep in enumerate(Nseries):
+        if Nstep > N:
+            idx_out = idx
+
+    return arr[idx_out]
 
 
 def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
@@ -583,9 +580,19 @@ def alpBetSpecMpi(kt, alpha, beta, back, params, NB, nsnaps, tols, MTE):
             return (np.empty, np.empty, np.empty, np.empty, np.empty, snaps)
 
 
-def kexitN(Nexit, back, params, MTE, fit="spl"):
-    assert Nexit > back[0][0], Nexit
-    assert Nexit < back[-1][0], Nexit
+def kexitN(Nexit: float, back: np.ndarray, params: np.ndarray, MTE, fit="nearest"):
+    """
+    Computes horizon exit momenta at efold Nexit
+
+    :param Nexit: Horizon exit time
+    :param back: background evolution
+    :param params: model parameters
+    :param MTE: PyTransport model
+    :param fit: method for fitting / finding k value. 'nearest' finds closest step to Nexit; 'spl' forms spline estimate
+    :return: Horizon exit mode, k_{exit}
+    """
+    assert Nexit >= back[0][0], Nexit
+    assert Nexit <= back[-1][0], Nexit
 
     if fit == "spl":
         back_exit = arr_eval_spl_val(Nexit, back, 0)
@@ -620,6 +627,8 @@ def matchKExitN(back, params, MTE, k=0.002):
     HArr = np.zeros(4, dtype=float)
 
     count = 0
+
+    # TODO: Implement methods from spline_tools.py !
 
     # Iterate over background step
     for ii in range(len(back) - 4):
@@ -683,8 +692,8 @@ def matchKExitN(back, params, MTE, k=0.002):
 
     try:
 
-        print(kExitArr)
-        print(HArr)
+        # print(kExitArr)
+        # print(HArr)
 
         HkSpl = UnivariateSpline(kExitArr, HArr)
 

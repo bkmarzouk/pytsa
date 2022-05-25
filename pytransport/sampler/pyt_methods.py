@@ -48,11 +48,13 @@
 #
 # sys.path.append(pathMethods)
 # from writer import update_sample
+import os
 
 import numpy as np
 
-import pytransport.pytrans_scripts as PyS
+import pytransport.pytrans_scripts as py_scripts
 
+import pickle as pk
 import importlib
 
 from pytransport.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
@@ -60,54 +62,95 @@ from pytransport.sampler.setup_sampler import LatinSampler, APrioriSampler, Samp
 
 class ErrorValue(object):
 
+    # TODO: Should actually error return as PyObject from C source rather than flag output
+
     def __init__(self, field: str, err_number: int):
         self.field = field
         self.err_n = err_number
 
     @classmethod
     def inflation_too_short(cls):
-        return cls("background", 0)
+        return cls("background", -30)
 
     @classmethod
     def field_space_violation(cls):
-        return cls("fieldspace", 1)
+        return cls("fieldspace", -31)
 
     @classmethod
     def int_background(cls):
-        return cls("integration", 0)
+        return cls("integration", -32)
 
     @classmethod
     def int_2pf(cls):
-        return cls("integration", 1)
+        return cls("integration", -33)
 
     @classmethod
     def int_3pf(cls, alpha, beta):
-        return cls("integration_{}_{}".format(alpha, beta), 2)
+        return cls("integration_{}_{}".format(alpha, beta), -34)
 
     @classmethod
     def ics(cls):
-        return cls("ics", 0)
+        return cls("ics", -35)
 
     @classmethod
     def k_exit(cls):
-        return cls("momenta", 0)
+        return cls("momenta", -36)
 
     @classmethod
     def linalg(cls):
-        return cls("linalg", 0)
+        return cls("linalg", -37)
 
 
-class ProtoMethods:
+class SampleCore:
+
+    def __init__(self, idx: int or None, back: np.ndarray or None, back_raw: np.ndarray or None,
+                 Nexit: float or None, Nexit_raw: float or None, kexit: float or None, cache_loc: str,
+                 void: bool = False):
+
+        self.idx = idx
+
+        self.back = back
+        self.back_raw = back_raw
+
+        self.Nexit = Nexit
+        self.Nexit_raw = Nexit_raw
+
+        self.kexit = kexit
+
+        path = os.path.join(cache_loc, "sample.%06d" % idx)
+
+        self.void = void
+
+        if not os.path.exists(path):
+
+            with open(path, "wb") as f:
+                pk.dump(self, f)
+
+        else:
+            pass  # TODO: quick check for pars on loaded path obj against current. Should be same because of rng states!
+
+    @classmethod
+    def void_sample(cls, idx, cache_loc):
+        return cls(idx, None, None, None, None, None, cache_loc, void=True)
+
+    @staticmethod
+    def exists(idx, cache_loc):
+        return os.path.exists(os.path.join(cache_loc, "sample.%06d" % idx))
+
+
+class ProtoAttributes:
     # Prototype for typing
 
     methods: SamplerMethods
     sampler: APrioriSampler or LatinSampler
     index: int
+    cache: str
 
 
-def compute_background(data: ProtoMethods):
+def compute_background(data: ProtoAttributes):
     model = data.methods.model
     index = data.index
+    cache = data.cache
 
     tols = np.array([*data.methods.tols], dtype=float)
     Nmin = data.methods.N_min
@@ -115,16 +158,29 @@ def compute_background(data: ProtoMethods):
 
     Nend = model.findEndOfInflation(ics, params, tols)
 
-    print(Nend, ics, params)
-    #
-    # if Nend < Nmin:
-    #     background = ErrorValue.inflation_too_short()
-    #
-    # else:
-    #     N_evo = np.linspace(0, Nend, int(100 * Nend))
-    #     background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)
+    if Nend < Nmin:
+        SampleCore.void_sample(index, cache)
+        return ErrorValue.inflation_too_short()
 
-    return 0
+    elif isinstance(Nend, tuple):
+        SampleCore.void_sample(index, cache)
+        return ErrorValue.int_background()
+
+    else:
+        N_evo = np.linspace(0, Nend, int(100 * Nend))  # Dense N evo
+        background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)  # Raw background
+        back_adj = py_scripts.adjust_back(background)  # Adjusted background
+
+        # TODO: Integrate fieldpsace constraint check here ! and ErrorValue return as appropriate
+
+        nexit_adj = py_scripts.matchKExitN(back_adj, params, model)
+        nexit = py_scripts.matchKExitN(background, params, model)
+
+        kexit_adj = py_scripts.kexitN(nexit_adj, back_adj, params, model)
+
+        SampleCore(index, back_adj, background, nexit_adj, nexit, kexit_adj, cache)
+
+    return index
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

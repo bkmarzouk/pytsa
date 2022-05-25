@@ -53,6 +53,7 @@ if __name__ == "__main__":
 
     args_dict['cwd'] = os.path.abspath(os.path.dirname(__file__))
 
+
     job_config(args_dict)
 
     pool = schwimmbad.choose_pool(mpi=parsed_args.n_procs > 1, processes=parsed_args.n_procs, use_dill=True)
