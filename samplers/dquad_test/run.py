@@ -2,63 +2,14 @@ import os
 import dill as dill
 import pickle as pk
 
+import numpy as np
+
 from pytransport.sampler.configs.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
 from pytransport.sampler.methods import main_pool
 from pytransport.sampler.configs.rng_states import RandomStates
+from pytransport.cache_tools import hash_alpha_beta
 
-
-def job_config(task_pars: dict):
-    name = task_pars['name']
-    n_samples = task_pars['n_samples']
-    entropy = task_pars['entropy']
-    apriori = task_pars['apriori']
-
-    n_states = n_samples if apriori else n_samples + 1
-
-    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), name))
-
-    if not os.path.exists(root_dir):
-        os.makedirs(root_dir)
-
-    tasks_path = os.path.join(root_dir, "sampler.tasks")
-
-    if os.path.exists(tasks_path):
-
-        with open(tasks_path, "rb") as f:
-
-            cached_task_pars: dict = pk.load(f)
-
-        assert cached_task_pars.keys() == task_pars.keys(), [cached_task_pars.keys(), task_pars.keys()]
-
-        for k in cached_task_pars.keys():
-            parsed_par = task_pars[k]
-            cached_par = cached_task_pars[k]
-
-            assert parsed_par == cached_par, f"Parameter error @ {k}: {parsed_par} != {cached_par}"
-
-    else:
-
-        with open(tasks_path, "wb") as f:
-
-            pk.dump(task_pars, f)
-
-    random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
-
-    sampler_path = os.path.join(root_dir, "sampler.run")
-
-    if not os.path.exists(sampler_path):
-        methods_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "sampler.methods"))
-
-        with open(methods_path, "rb") as f:
-            sampler_methods = dill.load(f)  # DILL??
-
-        _m = APrioriSampler if apriori else LatinSampler
-
-        sampler_run = _m(random_states, sampler_methods)
-
-        with open(sampler_path, "wb") as f:
-            dill.dump(sampler_run, f)
-
+from pytransport.sampler.configs import setup_sampler as s
 
 if __name__ == "__main__":
     os.environ['SAMPLER_MODE'] = "TRUE"
@@ -89,10 +40,10 @@ if __name__ == "__main__":
     observables_group = parser.add_argument_group()
 
     # TODO: docs
-    sampler_group.add_argument("--ns", action="store_true", dest="run_2pt")
-    sampler_group.add_argument("--eq", action="store_true", dest="run_3pt_eq")
-    sampler_group.add_argument("--fo", action="store_true", dest="run_3pt_fo")
-    sampler_group.add_argument("--sq", action="store_true", dest="run_3pt_sq")
+    sampler_group.add_argument("--ns", action="store_true", dest="task_2pt")
+    sampler_group.add_argument("--eq", action="store_true", dest="task_3pt_eq")
+    sampler_group.add_argument("--fo", action="store_true", dest="task_3pt_fo")
+    sampler_group.add_argument("--sq", action="store_true", dest="task_3pt_sq")
 
     extra_group = parser.add_argument_group()
 
@@ -103,7 +54,15 @@ if __name__ == "__main__":
 
     args_dict = vars(parsed_args)
 
-    job_config(args_dict)
+    for k in ['alpha', 'beta']:
+        if args_dict[k] is None:
+            args_dict[k] = []
+
+    assert len(parsed_args.alpha) == len(parsed_args.beta), [parsed_args.alpha, parsed_args.beta]
+
+    args_dict['cwd'] = os.path.abspath(os.path.dirname(__file__))
+
+    s.job_config(args_dict)
 
     assert 0, args_dict
 

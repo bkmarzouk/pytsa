@@ -4,6 +4,7 @@ import dill
 import pickle as pk
 import numpy as np
 import scipy.stats
+from pytransport.cache_tools import hash_alpha_beta
 from pytransport.sampler.configs.rng_states import RandomStates
 
 default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "samplers"))
@@ -300,7 +301,7 @@ class SamplerMethods(_SamplingParameters):
 
         """
 
-        hash_path = os.path.join(self.cache_loc, "pars.pk")
+        hash_path = os.path.join(self.cache_loc, "sampler.pars")
 
         current_data = self.get_hash_data()
 
@@ -544,6 +545,88 @@ class LatinSampler(_XSampler):
         super(LatinSampler, self).__init__(False, random_states, hyp_pars)
 
 
+def build_results_template(cache, n_samples, n_vals):
+    path = os.path.join(cache, "data.npy")
+    if not os.path.exists(path):
+        np.save(path, np.zeros((n_samples, n_vals), dtype=np.float64))
+
+
+def job_config(task_pars: dict):
+    name = task_pars['name']
+    n_samples = task_pars['n_samples']
+    entropy = task_pars['entropy']
+    apriori = task_pars['apriori']
+    sampler_cwd = task_pars['cwd']
+
+    n_states = n_samples if apriori else n_samples + 1
+
+    root_dir = os.path.abspath(os.path.join(sampler_cwd, name))
+
+    if not os.path.exists(root_dir):
+        os.makedirs(root_dir)
+
+    tasks_path = os.path.join(root_dir, "sampler.tasks")
+
+    if os.path.exists(tasks_path):
+
+        with open(tasks_path, "rb") as f:
+
+            cached_task_pars: dict = pk.load(f)
+
+        assert cached_task_pars.keys() == task_pars.keys(), [cached_task_pars.keys(), task_pars.keys()]
+
+        for k in cached_task_pars.keys():
+            parsed_par = task_pars[k]
+            cached_par = cached_task_pars[k]
+
+            assert parsed_par == cached_par, f"Parameter error @ {k}: {parsed_par} != {cached_par}"
+
+    else:
+
+        with open(tasks_path, "wb") as f:
+
+            pk.dump(task_pars, f)
+
+    random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
+
+    sampler_path = os.path.join(root_dir, "sampler.run")
+
+    if not os.path.exists(sampler_path):
+        methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
+
+        with open(methods_path, "rb") as f:
+            sampler_methods = dill.load(f)  # DILL??
+
+        _m = APrioriSampler if apriori else LatinSampler
+
+        sampler_run = _m(random_states, sampler_methods)
+
+        with open(sampler_path, "wb") as f:
+            dill.dump(sampler_run, f)
+
+    result_dirs = [(x, 2) for x in ['mij', 'epsilon', 'eta']]
+
+    if 'task_2pt' in task_pars:
+        result_dirs.append(('ns_alpha', 2))
+
+    for ext in ['eq', 'fo', 'sq']:
+        task_name = f'task_3pt_{ext}'
+        if task_name in task_pars:
+            result_dirs.append((f'fnl_{ext}', 1))
+
+    for a, b in zip(task_pars['alpha'], task_pars['beta']):
+        result_dirs.append((f'fnl_{hash_alpha_beta(a, b)}', 1))
+
+    for rd in result_dirs:
+        cache = os.path.join(root_dir, rd[0])
+
+        if not os.path.exists(cache):
+            os.makedirs(cache)
+
+        nvar = rd[1]
+        build_results_template(cache, n_samples, nvar)
+
+
 if __name__ == "__main__":
 
     import pyt_dquad_euclidean as model
@@ -558,7 +641,7 @@ if __name__ == "__main__":
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
     sampler_setup.build_sampler()
 
-    make_demo_fig = False
+    make_demo_fig = True
 
     if make_demo_fig:
 

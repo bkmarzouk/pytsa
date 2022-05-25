@@ -2,6 +2,21 @@ import numpy as np
 from pytransport.sampler.configs.setup_sampler import SamplerMethods  # Import Setup for dill handling
 from pytransport.sampler.methods import pyt_methods
 
+class Sample:
+
+    def __init__(self, index: int):
+        self.index = index
+
+class Observable:
+
+    def __init__(self):
+        self.value = None
+        self.errror_code = None
+
+    def update(self, value, error_code):
+        self.value = value
+        self.errror_code = error_code
+
 
 class _2pt:
 
@@ -34,7 +49,6 @@ class _3pt:
 
 class _Sample:
     def __int__(self, index, cache_loc):
-
         self.index = index
         self.cache_loc = cache_loc
 

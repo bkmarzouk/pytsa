@@ -1,13 +1,19 @@
-from hashlib import sha224
+from hashlib import sha224, md5
 import sympy as sym
 import os
 import pickle as pk
+import numpy as np
 
 sym_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "sym_cache"))
 model_cache = os.path.join(sym_cache, "model")
 fmet_cache = os.path.join(sym_cache, "fmet")
 pot_cache = os.path.join(sym_cache, "pot")
 covd_cache = os.path.join(sym_cache, "covd")
+
+
+def hash_alpha_beta(alpha: float or int, beta: float or int):
+    arr = np.array([alpha, beta], dtype=np.float64)
+    return md5(np.copy(arr, order='C')).hexdigest()
 
 
 def hash_pars(*pars: object):
