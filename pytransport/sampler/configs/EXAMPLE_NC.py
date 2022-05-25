@@ -2,7 +2,7 @@
 
 
 # Ensure that the setupBuilds module is imported
-from . setup_sampler import SamplerMethods
+from pytransport.sampler.setup_sampler import SamplerMethods
 
 # Import the _PyTransport module you want to perform sampling with
 import PyTrans2Quad as PyT

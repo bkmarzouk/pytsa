@@ -35,7 +35,7 @@ PyTransport/sampler/builds
 !/pytransport/sampler/configs/EXAMPLE.py
 !/pytransport/sampler/configs/EXAMPLE_NC.py
 !/pytransport/sampler/configs/simple_example.py
-!/pytransport/sampler/configs/setup_sampler.py
+!/pytransport/sampler/setup_sampler.py
 
 
 # Ignore cached symbolic files

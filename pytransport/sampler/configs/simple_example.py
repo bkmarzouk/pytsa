@@ -1,7 +1,6 @@
-from pytransport.sampler.configs.setup_sampler import SamplerMethods
+from pytransport.sampler.setup_sampler import SamplerMethods
 
 # Import PyTransSetup module to set paths to compiled cpp module files
-from pytransport import pytrans_setup
 
 
 # Now we can import the compiled module

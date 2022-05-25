@@ -1,5 +1,5 @@
 import numpy as np
-from pytransport.sampler.configs.setup_sampler import SamplerMethods  # Import Setup for dill handling
+from pytransport.sampler.setup_sampler import SamplerMethods  # Import Setup for dill handling
 from pytransport.sampler.methods import pyt_methods
 
 class Sample:
@@ -74,34 +74,36 @@ class _Data(object):
         self._add_value("Nend", None if background is None else background[-1][0])
 
 
-def main(pool, setup: SamplerMethods, args):
-    n_samples = args.n_samples
+def main(pool, args_dict: dict):
+    n_samples = args_dict['n_samples']
 
-    build_catalogue(setup, args)
-
-    # Print configuration to command line
-    print("-- Starting sampling routine: {}".format(setup.PyT))
-
-    pool_data = []
-
-    # Construct initial numpy array of samples (required to support latin sampling)
-    catalogue_path = build_catalogue(setup, args, path_only=True)
-
-    for idx in range(n_samples):
-        pd = _Data()
-        pd.PyT = setup.PyT.__name__
-        pd.model_number = idx
-        pd.path = catalogue_path
-        pd.tols = setup.tols
-        pd.N_min = setup.N_min
-        pd.N_adi = setup.N_adiabitc
-        pd.N_sub = setup.N_sub_evo
-        pool_data.append(pd)
-
-    # get results from background (returns data objs. with updated ics, params and back vals
-    r = pool.map(pyt_methods.compute_background, pool_data)
-
-    # TODO: cache and reload pool data to following list
-
-    # redefine pool data with successful trajectories
-    pool_data = [dat for dat in r if isinstance(dat.background, np.ndarray)]
+    return 0
+    #
+    # build_catalogue(setup, args)
+    #
+    # # Print configuration to command line
+    # print("-- Starting sampling routine: {}".format(setup.PyT))
+    #
+    # pool_data = []
+    #
+    # # Construct initial numpy array of samples (required to support latin sampling)
+    # catalogue_path = build_catalogue(setup, args, path_only=True)
+    #
+    # for idx in range(n_samples):
+    #     pd = _Data()
+    #     pd.PyT = setup.PyT.__name__
+    #     pd.model_number = idx
+    #     pd.path = catalogue_path
+    #     pd.tols = setup.tols
+    #     pd.N_min = setup.N_min
+    #     pd.N_adi = setup.N_adiabitc
+    #     pd.N_sub = setup.N_sub_evo
+    #     pool_data.append(pd)
+    #
+    # # get results from background (returns data objs. with updated ics, params and back vals
+    # r = pool.map(pyt_methods.compute_background, pool_data)
+    #
+    # # TODO: cache and reload pool data to following list
+    #
+    # # redefine pool data with successful trajectories
+    # pool_data = [dat for dat in r if isinstance(dat.background, np.ndarray)]

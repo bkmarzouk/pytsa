@@ -5,9 +5,10 @@ import pickle as pk
 import numpy as np
 import scipy.stats
 from pytransport.cache_tools import hash_alpha_beta
-from pytransport.sampler.configs.rng_states import RandomStates
+from pytransport.sampler.rng_states import RandomStates
+import pytransport as p
 
-default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "samplers"))
+default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "", "..", "..", "samplers"))
 
 assert os.path.exists(default_cache)
 
@@ -279,7 +280,7 @@ class SamplerMethods(_SamplingParameters):
         self.hash_check()
 
         self._dump_self()
-        src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "methods", "run.py")
+        src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "run.py")
         dest = os.path.join(cache_loc, "run.py")
         shutil.copy(src, dest)
 
@@ -641,7 +642,7 @@ if __name__ == "__main__":
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
     sampler_setup.build_sampler()
 
-    make_demo_fig = True
+    make_demo_fig = False
 
     if make_demo_fig:
 

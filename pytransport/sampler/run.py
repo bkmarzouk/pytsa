@@ -1,15 +1,8 @@
 import os
-import dill as dill
-import pickle as pk
 
-import numpy as np
-
-from pytransport.sampler.configs.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
 from pytransport.sampler.methods import main_pool
-from pytransport.sampler.configs.rng_states import RandomStates
-from pytransport.cache_tools import hash_alpha_beta
 
-from pytransport.sampler.configs import setup_sampler as s
+from pytransport.sampler.setup_sampler import job_config, SamplerMethods
 
 if __name__ == "__main__":
     os.environ['SAMPLER_MODE'] = "TRUE"
@@ -62,8 +55,8 @@ if __name__ == "__main__":
 
     args_dict['cwd'] = os.path.abspath(os.path.dirname(__file__))
 
-    s.job_config(args_dict)
+    job_config(args_dict)
 
     pool = schwimmbad.choose_pool(mpi=parsed_args.n_procs > 1, processes=parsed_args.n_procs)
 
-    main_pool.main(pool)
+    main_pool.main(pool, args_dict)
