@@ -1,82 +1,45 @@
+import os.path
+
 import numpy as np
-from pytransport.sampler.setup_sampler import SamplerMethods  # Import Setup for dill handling
-from pytransport.sampler.methods import pyt_methods
+import dill
 
-class Sample:
+from pytransport.sampler import pyt_methods
+from pytransport.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
 
-    def __init__(self, index: int):
+
+class TrackMethods:
+
+    def __init__(self, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index):
+        self.methods = methods
+        self.sampler = sampler
         self.index = index
 
-class Observable:
 
-    def __init__(self):
-        self.value = None
-        self.errror_code = None
-
-    def update(self, value, error_code):
-        self.value = value
-        self.errror_code = error_code
+def _dill_load(path):
+    with open(path, "rb") as f:
+        return dill.load(f)
 
 
-class _2pt:
+def build_back_pool(loc: str, n_samples: int):
+    sampler_path = os.path.join(loc, "sampler.run")
+    sampler: APrioriSampler or LatinSampler = _dill_load(sampler_path)
 
-    def __int__(self):
-        self.ns = None
-        self.running = None
-        self.error_code = None
+    methods_path = os.path.abspath(os.path.join(loc, "..", "sampler.methods"))
+    methods: SamplerMethods = _dill_load(methods_path)
 
-    def add_result(self, ns, running, error_code):
-        assert self.ns is None, self.ns
-        self.ns = ns
-        assert self.running is None, self.running
-        self.running = running
-        self.error_code = error_code
+    pool_data = np.empty(n_samples, dtype=TrackMethods)
 
+    for idx in range(n_samples):
+        pool_data[idx] = TrackMethods(methods, sampler, idx)
 
-class _3pt:
-
-    def __init__(self, alpha: int or float, beta: int or float):
-        self.alpha = alpha
-        self.beta = beta
-        self.result = None
-        self.error_code = None
-
-    def add_result(self, result, error_code):
-        assert self.result is None, self.result
-        self.result = result
-        self.error_code = error_code
-
-
-class _Sample:
-    def __int__(self, index, cache_loc):
-        self.index = index
-        self.cache_loc = cache_loc
-
-
-class _Data(object):
-
-    def __init__(self):
-        self.background = None
-        self.Nend = None
-
-    def _add_value(self, attr_name, value):
-        assert not hasattr(self, attr_name), attr_name
-        setattr(self, attr_name, value)
-
-    def add_fields_dotfields(self, fields_dotfields):
-        self._add_value("fields_dotfields", fields_dotfields)
-
-    def add_params(self, params):
-        self._add_value("params", params)
-
-    def add_background(self, background):
-        self._add_value("background", background)
-        self._add_value("Nend", None if background is None else background[-1][0])
+    return pool_data
 
 
 def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
 
+    pool_data = build_back_pool(os.path.join(args_dict['cwd'], args_dict['name']), n_samples)
+    r = pool.map(pyt_methods.compute_background, pool_data)
     return 0
     #
     # build_catalogue(setup, args)

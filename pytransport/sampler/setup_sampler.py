@@ -75,7 +75,7 @@ class _SamplingParameters(object):
         :param pyt_model: pytransport module
         """
 
-        self.PyT = pyt_model
+        self.model = pyt_model
         self.nF = pyt_model.nF()
         self.nP = pyt_model.nP()
 
@@ -330,8 +330,8 @@ class SamplerMethods(_SamplingParameters):
         :param pvals:
         :return:
         """
-        V = self.PyT.V(fvals, pvals)
-        dV = self.PyT.dV(fvals, pvals)
+        V = self.model.V(fvals, pvals)
+        dV = self.model.dV(fvals, pvals)
         return -dV[idx] / np.sqrt(3 * V)
 
 

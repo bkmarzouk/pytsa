@@ -4,18 +4,13 @@ import os
 import pickle as pk
 import sys
 # Import other useful tools
-import time
-import warnings
 
 # Import numerical tools
-import numpy as np
-from scipy.interpolate import UnivariateSpline
 
 # Navigate to local files
 runDir = os.path.dirname(os.path.abspath(__file__))
 pathLocalData = os.path.join(runDir, ".localdata")
 sys.path.append(pathLocalData)
-import generator
 
 # Get environment data
 envPath = os.path.join(pathLocalData, "env.localdata")
@@ -48,7 +43,7 @@ with transportFile: transportDict = pk.load(transportFile)
 sys.path.append(pathMethods)
 
 # Import _PyTransport and writer tools
-import pyt_methods as pytm
+from pytransport.sampler import pyt_methods as pytm
 import writer as w
 
 # Finally configure internal _PyTransport workings
@@ -59,7 +54,6 @@ PyTransSetup.set_paths()
 
 # Load _PyTransport module installation and scripts
 PyT = importlib.import_module(transportDict['transportModule'])
-import PyTransScripts as PyS
 
 
 def main(pool, n_samples, run_2pf, run_3pf, use_samples):

@@ -55,6 +55,8 @@ import pytransport.pytrans_scripts as PyS
 
 import importlib
 
+from pytransport.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
+
 
 class ErrorValue(object):
 
@@ -68,7 +70,7 @@ class ErrorValue(object):
 
     @classmethod
     def field_space_violation(cls):
-        return cls("background", 1)
+        return cls("fieldspace", 1)
 
     @classmethod
     def int_background(cls):
@@ -95,52 +97,33 @@ class ErrorValue(object):
         return cls("linalg", 0)
 
 
-def compute_background(data):
-    PyT = importlib.import_module(data.PyT)
-    model_number = data.model_number
-    catalogue_path = data.path
-    ics_params = np.zeros((2 * PyT.nF() + PyT.nP()), dtype=np.float64)
-    ics_params[::] = np.load(catalogue_path, mmap_mode="r")[model_number]
+class ProtoMethods:
+    # Prototype for typing
 
-    ics = ics_params[:2 * PyT.nF()]
-    params = ics_params[2 * PyT.nF():]
+    methods: SamplerMethods
+    sampler: APrioriSampler or LatinSampler
+    index: int
 
-    data.add_fields_dotfields(ics.copy())
-    data.add_params(params.copy())
 
-    del ics_params, ics, params
+def compute_background(data: ProtoMethods):
+    model = data.methods.model
+    index = data.index
 
-    tols = data.tols
-    N_min = data.N_min
-    N_eps = PyT.findEndOfInflation(data.fields_dotfields, data.params, tols, True)
+    tols = data.methods.tols
+    Nmin = data.methods.N_min
+    ics, params = data.sampler.get_sample(index)
+    Nend = model.findEndOfInflation(ics, params, tols, True)
 
-    if N_eps < N_min:
-        data.background = ErrorValue.inflation_too_short()
+    print(Nend)
+
+    if Nend < Nmin:
+        background = ErrorValue.inflation_too_short()
 
     else:
-        N_evo = np.linspace(0, N_eps, int(100 * N_eps))
-        bg_eps = PyT.backEvolve(N_evo, data.fields_dotfields, data.params, tols, False, -1, True)
+        N_evo = np.linspace(0, Nend, int(100 * Nend))
+        background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)
 
-        bg_eps = PyS.adjust_back(bg_eps)
-
-        if isinstance(bg_eps, tuple):
-            data.background = ErrorValue.int_background()
-        else:
-            data.background = bg_eps
-
-            print(PyS.kexitN(N_eps - 55, data.background, data.params, PyT))
-            #
-            # ICs_subevo = PyS.ICsBM(data.N_sub, 1e-3, data.background, data.params, PyT, fit="spl")
-            # print(ICs_subevo)
-            #
-            # N_start_perturbations = data.background[-1][0] - PyS.matchKExitN(data.background, data.params, PyT)
-            # print(N_start_perturbations)
-            # k_pivot = PyS.kexitN(N_start_perturbations, data.background, data.params, PyT)
-            # ICs_subevo = PyS.ICsBM(data.N_sub, k_pivot, data.background, data.params, PyT, fit="spl")
-            # print(N_start_perturbations, k_pivot, ICs_subevo)
-            # # data.corr_ics = PyS.
-
-    return data
+    return 0
 
 #
 # def buildICPs(modelnumber, rerun_model=False):
