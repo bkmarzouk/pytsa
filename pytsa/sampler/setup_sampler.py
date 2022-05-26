@@ -609,14 +609,15 @@ def job_config(task_pars: dict):
 
         random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
 
+        methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
+
+        with open(methods_path, "rb") as f:
+            sampler_methods: SamplerMethods = dill.load(f)
+
+        n_fields = sampler_methods.nF
+
         sampler_path = os.path.join(root_dir, "sampler.run")
-
         if not os.path.exists(sampler_path):
-            methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
-
-            with open(methods_path, "rb") as f:
-                sampler_methods = dill.load(f)  # DILL??
-
             _m = APrioriSampler if apriori else LatinSampler
 
             sampler_run = _m(random_states, sampler_methods)
@@ -628,7 +629,7 @@ def job_config(task_pars: dict):
         make_dir(samples_core_dir)
 
         # nF eigs for each mij. Factor of 2 for hexit and nend evaluation
-        result_dirs = [('mij', 2 * model.nF())] + [(x, 2) for x in ['epsilon', 'eta']]
+        result_dirs = [('mij', 2 * n_fields)] + [(x, 2) for x in ['epsilon', 'eta']]
 
         if 'task_2pt' in task_pars:
             result_dirs.append(('ns_alpha', 2))
@@ -646,6 +647,7 @@ def job_config(task_pars: dict):
 
             if not os.path.exists(cache):
                 os.makedirs(cache)
+                build_results_template(cache, n_samples, rd[1])
 
     barrier()
 

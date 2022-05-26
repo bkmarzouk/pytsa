@@ -1,62 +1,9 @@
-# # Import numerical tools
-# import numpy as np
-# from scipy.interpolate import UnivariateSpline
-#
-# # Import system tools
-# import os
-# import sys
-# import importlib
-# import pickle as pk
-# import time
-# import warnings
-#
-# # Retrieve paths from environment variables
-# envKeys = [
-#     'PyTS_pathPyT', 'PyTS_pathRoot', 'PyTS_pathSamples',
-#     'PyTS_pathStats', 'PyTS_pathClasses', 'PyTS_pathMethods', 'PyTS_pathLocalData'
-# ]
-#
-# pathPyT, pathRoot, \
-# pathSamples, pathStats, pathClasses, pathMethods, pathLocalData = [os.environ[eK] for eK in envKeys]
-#
-# # get transport data dictionary
-# transportPath = os.path.join(pathLocalData, "transport.localdata")
-# transportFile = open(transportPath, "rb")
-# with transportFile: transportDict = pk.load(transportFile)
-#
-# # configure internal pytsa paths
-# sys.path.append(pathPyT)
-# import PyTransSetup
-#
-# PyTransSetup.pathSet()
-#
-# # Import module and get other required data for computing observables
-# PyT = importlib.import_module(transportDict['transportModule'])
-# import PyTransScripts as PyS
-#
-# transportKeys = ["exitN", "subN", "intTols", "adiabaticN", "minN"]
-# Nexit, subevo, tols, adiabaticN, minN = [transportDict[tK] for tK in transportKeys]
-#
-# # Get fNL data
-# fNLPath = os.path.join(pathLocalData, "fNL.localdata")
-# fNLFile = open(fNLPath, "rb")
-# with fNLFile: fNLDict = pk.load(fNLFile)
-#
-# # Import sample generator & other useful class structures
-# from generator import genSample
-# from realization import realization as new_sample
-#
-# sys.path.append(pathMethods)
-# from writer import update_sample
 import os
-
 import numpy as np
+import pickle as pk
 
 import pytsa.pytrans_scripts as py_scripts
 from pytsa.cache_tools import hash_alpha_beta
-
-import pickle as pk
-
 from pytsa.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
 
@@ -270,15 +217,16 @@ def compute_background(data: ProtoAttributes):
 
     back_adj = py_scripts.adjust_back(background)  # Adjusted background
 
-    nexit_adj = py_scripts.matchKExitN(back_adj, params, model)
-    nexit = py_scripts.matchKExitN(background, params, model)
+    nexit_adj = py_scripts.compute_Nexit_for_matching(model, back_adj, params)
+    nexit = py_scripts.compute_Nexit_for_matching(model, background, params)
 
     return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit, params).get_last_status()
 
 
 def compute_epsilon(data: ProtoAttributes):
     sample_core = extract_core(data)
-    print("EPS", py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
+    print("EPS",
+          py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
 
 
 def compute_eta(data: ProtoAttributes):
@@ -289,7 +237,7 @@ def compute_eta(data: ProtoAttributes):
 def compute_mij(data: ProtoAttributes):
     sample_core = extract_core(data)
     masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
-                                                 data.methods.model)
+                                                       data.methods.model)
 
     N_adi = data.methods.N_adiabitc
 
@@ -323,20 +271,24 @@ def compute_mij(data: ProtoAttributes):
 
     print(f"MIJ: {masses_exit}, {masses_end}, {adi}")
 
-# def compute_2pf(data: ProtAttributes):
-#     result = py_scripts.spectralIndex(
-#         sample_core.back,
-#         sample_core.params,
-#         sample_core.Nexit,
-#         np.array([*data.methods.tols], dtype=float),
-#         data.methods.N_sub_evo,
-#         data.methods.model,
-#         returnRunning=True,
-#         tmax=600,
-#         errorReturn=True
-#     )
-#
-#     print(result)
+
+def compute_2pf(data: ProtoAttributes):
+    sample_core = extract_core(data)
+
+    result = py_scripts.spectralIndex(
+        sample_core.back,
+        sample_core.params,
+        sample_core.Nexit,
+        np.array([*data.methods.tols], dtype=float),
+        data.methods.N_sub_evo,
+        data.methods.model,
+        returnRunning=True,
+        tmax=600,
+        errorReturn=True,
+        useMatchEq=False  # We have already computed this data
+    )
+
+    print(result)
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

@@ -238,7 +238,16 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
     :return: ICs or (see return_all)
     """
 
+    # Evolve masses for all of background
     masses_array = evolveMasses(back, params, MTE)
+
+    largest_mass_evo = np.zeros((len(back), 2))
+
+    diff_evo = np.zeros((len(back), 2), dtype=float)
+
+    for idx, (mass_step, back_step) in enumerate(zip(masses_array, back)):
+        diff_evo[0] = back_step[0]
+        mass = np.max(mass_step[1:])
 
     m_array = np.zeros((len(back), 3))
 
@@ -620,8 +629,43 @@ def kexitPhi(PhiExit, n, back, params, MTE):
     return k
 
 
-def matchKExitN(back, params, MTE, k=0.002):
-    const = 55.75 - np.log(k / 0.05)
+def compute_Nexit_for_matching(MTE, back: np.ndarray, params: np.ndarray, k=0.002):
+    const = 55.75 - np.log(k / 0.05) + np.log(243.5 * 3 ** 0.25)
+
+    Hend = MTE.H(back[-1][1:], params)
+
+    Hk = None
+
+    for ii in range(1, len(back)):
+
+        jj = ii - 1
+
+        N_ii = back[ii - 1][0]
+        N_jj = back[ii][0]
+
+        H_ii = MTE.H(back[ii][1:], params)
+        H_jj = MTE.H(back[jj][1:], params)
+
+        k_ii = np.exp(N_ii + np.log(H_ii))
+        k_jj = np.exp(N_jj + np.log(H_jj))
+
+        if k_jj > k:
+            Hk = H_ii if abs(k_ii - k) < abs(k_jj - k) else H_jj
+
+            break
+
+    if Hk is None:
+        print("ERROR")  # TODO: Fix
+
+    N_before_end = const + np.log(Hk) - np.log(Hend) / 2
+
+    return back.T[0][-1] - N_before_end
+
+def matchKExitN(back, params, MTE, k=0.002):  # Remove
+    const = 55.75 - np.log(k / 0.05)  # TODO: seems a bit odd!
+
+    # Mpl = 2.435 × 10^18 GeV
+    # Tre = 10^16 Gev
 
     kExitArr = np.zeros(4, dtype=float)
     HArr = np.zeros(4, dtype=float)
@@ -752,6 +796,33 @@ def get_mass_data(back, params, Nexit, MTE):
     return np.array([eigs_exit / Hexit, eigs_end / Hend], dtype=float)
 
 
+def evolve_mass_spectrum(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
+    """
+    Evolves the mass spectrum as a function of efolds, normalizing the result by H
+
+    :param back: background evolution
+    :param params: model params
+    :param MTE: PyTransport model
+    :param scale_eigs: if True, rescales evolution to absolute sqrt
+    :param hess_approx: if True, hess aprox to matrix
+    :param covariant: if True, returns index down down expression
+    :return: eigs(M^i_j) / H^2
+    """
+
+    nF = MTE.nF()
+    out = np.zeros((len(back), 1 + nF), dtype=float)
+
+    for idx, step in enumerate(back):
+        mij = MTE.massMatrix(step[1:], params, hess_approx, covariant)
+        H = MTE.H(step[1:], params)
+        out[idx][1:] = np.sort(np.linalg.eigvals(mij)) / H ** 2
+
+    if scale_eigs:
+        out[::, 1:] = np.sqrt(np.abs(out[::, 1:]))
+
+    return out
+
+
 def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
     """ Computes the mass matrix along a given background evolution, M^{I}_{J} """
 
@@ -777,6 +848,17 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
         eigs[idx] = np.concatenate((np.array([N]), masses))
 
     return eigs
+
+
+def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub_evo: int or float,
+                           Nexit=None, return_running=True, tmax=None):
+    if Nexit is None:
+        Nexit = matchKExitN(back, params, MTE)
+
+    if Nexit is None:
+
+        if "SAMPLER_MODE" in os.environ.keys():
+            return
 
 
 def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
@@ -876,6 +958,9 @@ def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
             tmax = -1
 
         twoPf = MTE.sigEvolve(np.array([Nstart, Nend]), k, ICs, pvals, tols, False, tmax, True)
+
+        print('k', k)
+        print('ics', ICs)
 
         # Handle failed calculation
         if type(twoPf) is tuple:
@@ -1047,3 +1132,20 @@ def GetCurvatureObject(MTE):
         curv_obj = pk.load(curv_file)
 
     return curv_obj
+
+if __name__ == "__main__":
+
+    import pyt_dquad_euclidean as d
+
+    f = np.array([12., 12., 0., 0.])
+    p = np.array([1e-5, 1e-5])
+    t = p.copy() / 10
+
+    N = np.linspace(0, 100, 1000)
+
+    b = d.backEvolve(N, f, p, t, False)
+
+    R1 = matchKExitN(b, p, d)
+    R2 = compute_Nexit_for_matching(d, b, p)
+
+    print(R1, R2)
