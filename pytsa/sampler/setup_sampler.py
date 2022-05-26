@@ -627,7 +627,8 @@ def job_config(task_pars: dict):
         samples_core_dir = os.path.join(root_dir, "samples_core")
         make_dir(samples_core_dir)
 
-        result_dirs = [(x, 2) for x in ['mij', 'epsilon', 'eta']]
+        # nF eigs for each mij. Factor of 2 for hexit and nend evaluation
+        result_dirs = [('mij', 2 * model.nF())] + [(x, 2) for x in ['epsilon', 'eta']]
 
         if 'task_2pt' in task_pars:
             result_dirs.append(('ns_alpha', 2))
