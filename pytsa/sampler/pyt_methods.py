@@ -53,61 +53,46 @@ import os
 import numpy as np
 
 import pytsa.pytrans_scripts as py_scripts
+from pytsa.cache_tools import hash_alpha_beta
 
 import pickle as pk
-import importlib
 
 from pytsa.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
-
-class ErrorValue(object):
-
-    # TODO: Should actually error return as PyObject from C source rather than flag output
-
-    def __init__(self, field: str, err_number: int):
-        self.field = field
-        self.err_n = err_number
-
-    @classmethod
-    def inflation_too_short(cls):
-        return cls("background", -30)
-
-    @classmethod
-    def field_space_violation(cls):
-        return cls("fieldspace", -31)
-
-    @classmethod
-    def int_background(cls):
-        return cls("integration", -32)
-
-    @classmethod
-    def int_2pf(cls):
-        return cls("integration", -33)
-
-    @classmethod
-    def int_3pf(cls, alpha, beta):
-        return cls("integration_{}_{}".format(alpha, beta), -34)
-
-    @classmethod
-    def ics(cls):
-        return cls("ics", -35)
-
-    @classmethod
-    def k_exit(cls):
-        return cls("momenta", -36)
-
-    @classmethod
-    def linalg(cls):
-        return cls("linalg", -37)
+error_dict = {
+    0: "",
+    -30: "short",
+    -31: "fpace",
+    -32: "int_back",
+    -33: "timeout_back",
+    -40: "eps",
+    -41: "eta",
+    -42: "mij",
+    -50: "ics_2pf",
+    -51: "kexit_2pf",
+    -52: "int_2pf",
+    -53: "timeout_2pf",
+    -60: "ics_3pf_{alpha_beta}",
+    -61: "kexit_3pf_{alpha_beta}",
+    -62: "int_3pf_{alpha_beta}",
+    -63: "timeout_3pf_{alpha_beta}"
+}
 
 
-class SampleCore:
+class SampleCore(object):
 
-    def __init__(self, idx: int or None, back: np.ndarray or None, back_raw: np.ndarray or None,
-                 Nexit: float or None, Nexit_raw: float or None, kexit: float or None, cache_loc: str,
-                 void: bool = False):
+    # TODO: Should actually error return as PyObject from C source rather than flag output, this is OK for now, though
 
-        self.idx = idx
+    def __init__(self, index: int, err_number: int, cache_loc, back: np.ndarray or None = None,
+                 back_raw: np.ndarray or None = None,
+                 Nexit: float or None = None, Nexit_raw: float or None = None):
+
+        self.index = index
+        self.cache_loc = cache_loc
+        self.path = os.path.join(self.cache_loc, "sample.%06d" % self.index)
+
+        self.err_n = [err_number]
+        self.err_s = [error_dict[err_number]]
 
         self.back = back
         self.back_raw = back_raw
@@ -115,27 +100,81 @@ class SampleCore:
         self.Nexit = Nexit
         self.Nexit_raw = Nexit_raw
 
-        self.kexit = kexit
+        self.cache()
 
-        path = os.path.join(cache_loc, "sample.%06d" % idx)
+    def get_last_status(self):
+        return self.index, self.err_n[-1]
 
-        self.void = void
+    @classmethod
+    def accepted(cls, index, cache_loc):
+        return cls(index, 0, cache_loc)
 
-        if not os.path.exists(path):
+    @classmethod
+    def inflation_too_short(cls, index, cache_loc):
+        return cls(index, -30, cache_loc)
 
-            with open(path, "wb") as f:
+    @classmethod
+    def field_space_violation(cls, index, cache_loc):
+        return cls(index, -31, cache_loc)
+
+    @classmethod
+    def int_background(cls, index, cache_loc):
+        return cls(index, -32, cache_loc)
+
+    def task_eps(self, index: int, failed: bool):
+        if failed:
+            self._update_errors(index, -40)
+        else:
+            self._update_errors(index, 0)
+
+    def task_eta(self, index: int, failed: bool):
+        if failed:
+            self._update_errors(index, -41)
+        else:
+            self._update_errors(index, 0)
+
+    def task_mij(self, index: int, failed: bool):
+        if failed:
+            self._update_errors(index, -42)
+        else:
+            self._update_errors(index, 0)
+
+    def task_2pf(self, index: int, code):
+        if -60 < code < -50:
+            self._update_errors(index, code)
+        else:
+            assert code == 0, code
+            self._update_errors(index, 0)
+
+    def task_3pf(self, index: int, code: bool, alpha: float, beta: float):
+        if -70 < code < -60:
+            self._update_errors(index, code, hash_alpha_beta(alpha, beta))
+        else:
+            self._update_errors(index, 0)
+
+    def _update_errors(self, index: int, error_code: int, alpha_beta=None):
+
+        assert self.index == index, [self.index, index]
+
+        self.err_n.append(error_code)
+
+        es = error_dict[error_code]
+
+        self.err_s.append(es if alpha_beta is None else es.format(alpha_beta=alpha_beta))
+
+        self.cache()
+
+    def cache(self):
+
+        p = self.path
+
+        if not os.path.exists(p):
+            with open(p, "wb") as f:
                 pk.dump(self, f)
 
         else:
-            pass  # TODO: quick check for pars on loaded path obj against current. Should be same because of rng states!
-
-    @classmethod
-    def void_sample(cls, idx, cache_loc):
-        return cls(idx, None, None, None, None, None, cache_loc, void=True)
-
-    @staticmethod
-    def exists(idx, cache_loc):
-        return os.path.exists(os.path.join(cache_loc, "sample.%06d" % idx))
+            os.remove(p)
+            self.cache()
 
 
 class ProtoAttributes:
@@ -158,29 +197,56 @@ def compute_background(data: ProtoAttributes):
 
     Nend = model.findEndOfInflation(ics, params, tols)
 
+    N_evo = np.linspace(0, Nend, int(100 * Nend))  # Dense N evo
+    background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)  # Raw background
+
+    # Dictionary with keys for field indices, and arrays for end inflation
+    terminate_with_fields = data.methods.fieldspace_terminate
+
+    if len(terminate_with_fields) > 0:
+
+        _idx = np.inf
+
+        for idx, step in enumerate(background):
+
+            for fidx, bounds in terminate_with_fields.items():
+
+                if bounds[0] <= step[1 + fidx] <= bounds[1]:
+                    _idx = np.min([_idx, idx])
+
+        if np.isinf(_idx):
+            return SampleCore.field_space_violation(index, cache)
+
+        background = background[:_idx + 1]
+        N_evo = background.T[0]
+        Nend = N_evo[-1]
+
+    reject_with_fields = data.methods.fieldspace_reject
+
+    if len(reject_with_fields) > 0:
+
+        for idx, step in enumerate(background):
+
+            for fidx, bounds in reject_with_fields.items():
+
+                if bounds[0] <= step[1 + fidx] <= bounds[1]:
+                    SampleCore.field_space_violation(index, cache)
+
     if Nend < Nmin:
-        SampleCore.void_sample(index, cache)
-        return ErrorValue.inflation_too_short()
+        return SampleCore.inflation_too_short(index, cache).get_last_status()
 
-    elif isinstance(Nend, tuple):
-        SampleCore.void_sample(index, cache)
-        return ErrorValue.int_background()
+    if isinstance(Nend, tuple):
+        return SampleCore.int_background(index, cache).get_last_status()
 
-    else:
-        N_evo = np.linspace(0, Nend, int(100 * Nend))  # Dense N evo
-        background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)  # Raw background
-        back_adj = py_scripts.adjust_back(background)  # Adjusted background
+    if isinstance(background, tuple):
+        return SampleCore.int_background(index, cache).get_last_status()
 
-        # TODO: Integrate fieldpsace constraint check here ! and ErrorValue return as appropriate
+    back_adj = py_scripts.adjust_back(background)  # Adjusted background
 
-        nexit_adj = py_scripts.matchKExitN(back_adj, params, model)
-        nexit = py_scripts.matchKExitN(background, params, model)
+    nexit_adj = py_scripts.matchKExitN(back_adj, params, model)
+    nexit = py_scripts.matchKExitN(background, params, model)
 
-        kexit_adj = py_scripts.kexitN(nexit_adj, back_adj, params, model)
-
-        SampleCore(index, back_adj, background, nexit_adj, nexit, kexit_adj, cache)
-
-    return index
+    return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit).get_last_status()
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

@@ -37,6 +37,12 @@ def build_back_pool(loc: str, n_samples: int):
 
     return pool_data
 
+def build_obs_pool(loc: str, n_samples: int):
+
+    samples_dir = os.path.join(loc, "samples_core")
+
+
+
 
 def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
@@ -44,7 +50,9 @@ def main(pool, args_dict: dict):
     # NOTE: list(...) call required for serial pools
     pool_data = build_back_pool(os.path.join(args_dict['cwd'], args_dict['name']), n_samples)
 
-    list(pool.map(pyt_methods.compute_background, pool_data))
+    back_status = list(pool.map(pyt_methods.compute_background, pool_data))
+
+
 
     return 0
     #

@@ -183,34 +183,26 @@ class SamplerMethods(_SamplingParameters):
         self.sampler_path = os.path.join(self.cache_loc, "sampler.methods")
 
         self.fieldspace_reject = {}
-        self.dotfieldspace_reject = {}
-
-        self.fieldspace_end_inflation = {}
-        self.dotfieldspace_end_inflation = {}
+        self.fieldspace_terminate = {}
 
         self._analysis_pars_set = False
 
     def add_fieldspace_constraint(self, fidx, fmin=-np.inf, fmax=np.inf, dot_field=False):
         """
-        Define region of fieldspace where inflation is permitted. If deviation occurs, the sample is rejected.
+        Define region of fieldspace where inflation is permitted.
+        If deviation occurs, the sample is rejected.
 
         :param fidx: Field index
         :param fmin: minimum allowed field value. By default, -inf, i.e. no lower bound
         :param fmax: maximum allowed field value. By default, +inf, i.e. no upper bound
-        :param dot_field: if True, constraint applies to field velocities. Else field value
         """
 
-        if dot_field:
-            if fidx in self.dotfieldspace_reject:
-                raise AttributeError("Attribute already defined for field number {}".format(fidx))
-            self.dotfieldspace_reject[fidx] = np.array([fmin, fmax])
+        if fidx in self.fieldspace_reject:
+            raise AttributeError("Attribute already defined for field number {}".format(fidx))
 
-        else:
-            if fidx in self.fieldspace_reject:
-                raise AttributeError("Attribute already defined for field number {}".format(fidx))
-            self.fieldspace_reject[fidx] = np.array([fmin, fmax])
+        self.fieldspace_reject[fidx] = [fmin, fmax]
 
-    def add_end_inflation_constraint(self, fidx, fmin, fmax, dot_field=False):
+    def add_end_inflation_constraint(self, fidx, fmin, fmax):
         """
         Define region of fieldspace where inflation instantaneously ends. E.g. in d-brane inflation.
         The first efold N when f \in [fmin, fmax] will terminate inflation. Sample(s) will be accepted
@@ -219,18 +211,12 @@ class SamplerMethods(_SamplingParameters):
         :param fidx: Field index
         :param fmin: minimum allowed field value. By default,
         :param fmax: maximum allowed field value. By default, +inf, i.e. no upper bound
-        :param dot_field: if True, constraint applies to field velocities. Else field value
         """
 
-        if dot_field:
-            if fidx in self.dotfieldspace_end_inflation:
-                raise AttributeError("Attribute already defined for field number {}".format(fidx))
-            self.dotfieldspace_end_inflation[fidx] = np.array([fmin, fmax])
+        if fidx in self.fieldspace_terminate:
+            raise AttributeError("Attribute already defined for field number {}".format(fidx))
 
-        else:
-            if fidx in self.fieldspace_end_inflation:
-                raise AttributeError("Attribute already defined for field number {}".format(fidx))
-            self.fieldspace_end_inflation[fidx] = np.array([fmin, fmax])
+        self.fieldspace_terminate[fidx] = [fmin, fmax]
 
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
         assert 0, "currently unsupported"
@@ -258,10 +244,10 @@ class SamplerMethods(_SamplingParameters):
 
         base = self._get_hash_data()
 
-        prefixes = ['fields_rej', 'dotfields_rej', 'fields_end', 'dotfields_end']
+        prefixes = ['fields_rej_', 'fields_end_']
 
-        for conditions, p in zip([self.fieldspace_reject, self.dotfieldspace_reject,
-                                  self.fieldspace_end_inflation, self.dotfieldspace_end_inflation], prefixes):
+        for conditions, p in zip([self.fieldspace_reject, self.fieldspace_terminate], prefixes):
+
             for key in conditions:
                 base[p + f"_{key}"] = conditions[key]
 
