@@ -67,7 +67,7 @@ def _delta_ctime(a, b):
 
 def set_template_headers(NC: bool):
     """
-    Configures directory structure for pytransport
+    Configures directory structure for pytsa
 
     :param NC: if True methods use non-canonical field metric
     :return: None, configure pyt.cpp file

@@ -8,12 +8,12 @@
 
 # Ignore builds dir
 samplers/
-PyTransport/sampler/builds
-!PyTransport/sampler/builds/.gitkeep
-!PyTransport/sampler/builds/__init__.py
+pytsa/sampler/builds
+!pytsa/sampler/builds/.gitkeep
+!pytsa/sampler/builds/__init__.py
 
 # Ignore compile modules
-/pytransport/pyt/lib/python3.8/site-packages/*
+/pytsa/pyt/lib/python3.8/site-packages/*
 **/*.egg-info
 **/*.so
 **/build
@@ -27,23 +27,23 @@ PyTransport/sampler/builds
 !/example_models/path_root.py
 
 # Ignore sampler builds, but keep directory
-/pytransport/sampler/builds/*
-!/pytransport/sampler/builds/.gitkeep
+/pytsa/sampler/builds/*
+!/pytsa/sampler/builds/.gitkeep
 
 # Ignore sampler configs (except for examples)
-/pytransport/sampler/configs/*
-!/pytransport/sampler/configs/EXAMPLE.py
-!/pytransport/sampler/configs/EXAMPLE_NC.py
-!/pytransport/sampler/configs/simple_example.py
-!/pytransport/sampler/setup_sampler.py
+/pytsa/sampler/configs/*
+!/pytsa/sampler/configs/EXAMPLE.py
+!/pytsa/sampler/configs/EXAMPLE_NC.py
+!/pytsa/sampler/configs/simple_example.py
+!/pytsa/sampler/setup_sampler.py
 
 
 # Ignore cached symbolic files
-/pytransport/sym_cache/*
+/pytsa/sym_cache/*
 
 # Ignore .h header files that are generated from proto
-/pytransport/cppt/fieldmetric.h
-/pytransport/cppt/potential.h
+/pytsa/cppt/fieldmetric.h
+/pytsa/cppt/potential.h
 
 # Ignore correlation files
 **.pdf

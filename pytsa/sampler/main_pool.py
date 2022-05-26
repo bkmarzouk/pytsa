@@ -3,8 +3,8 @@ import os.path
 import numpy as np
 import dill
 
-from pytransport.sampler import pyt_methods
-from pytransport.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
+from pytsa.sampler import pyt_methods
+from pytsa.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
 
 
 class TrackMethods:

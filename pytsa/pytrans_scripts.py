@@ -233,7 +233,7 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
     :param k: Horizon exit scale (k = aH)
     :param back: Background evolution
     :param params: Model parameters
-    :param MTE: pytransport module
+    :param MTE: pytsa module
     :param return_all: if True, returns the ICs, efold at which the massless condition is attained, mass evolution
     :return: ICs or (see return_all)
     """

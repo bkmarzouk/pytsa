@@ -24,7 +24,7 @@
 # transportFile = open(transportPath, "rb")
 # with transportFile: transportDict = pk.load(transportFile)
 #
-# # configure internal pytransport paths
+# # configure internal pytsa paths
 # sys.path.append(pathPyT)
 # import PyTransSetup
 #
@@ -52,12 +52,12 @@ import os
 
 import numpy as np
 
-import pytransport.pytrans_scripts as py_scripts
+import pytsa.pytrans_scripts as py_scripts
 
 import pickle as pk
 import importlib
 
-from pytransport.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
+from pytsa.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
 
 class ErrorValue(object):

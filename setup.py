@@ -7,10 +7,10 @@ def configuration(parent_package='', top_path=''):
 
 
 setup(
-    name='PyTransport Sampler',
+    name='pytsa',
     version='0.0.1',
-    packages=['pytransport', 'pytransport.pyt', 'pytransport.cppt', 'pytransport.cppt.NC', 'pytransport.cppt.stepper',
-              'pytransport.models', 'pytransport.sampler'],
+    packages=['pytsa', 'pytsa.pyt', 'pytsa.cppt', 'pytsa.cppt.NC', 'pytsa.cppt.stepper',
+              'pytsa.models', 'pytsa.sampler'],
     data_files=[],
     url='<todo>',
     author='Kareem Marzouk',
@@ -18,5 +18,6 @@ setup(
     description='<todo>',
     install_requires=[],
     requires=['numpy', 'sympy', 'scipy', 'mpi4py'],
-    long_description="<todo>",
+    long_description="This is PyTransport Sampler (pytsa) - A package that builds upon existing the existing "
+                     "PyTransport technology to sample inflationary model spaces.",
     configuration=configuration)

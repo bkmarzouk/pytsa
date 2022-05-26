@@ -290,7 +290,7 @@ class _FieldSpaceSym(object):
 
         assert identity == kronecker, "Failed matrix inversion: g g^-1 != I"
 
-        # Pack matrix into format to be read into pytransport
+        # Pack matrix into format to be read into pytsa
 
         self.metric_ud = sym.Matrix.zeros(self.nf)  # Up down indices
         self.metric_du = sym.Matrix.zeros(self.nf)  # down Up indices

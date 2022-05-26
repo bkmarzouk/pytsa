@@ -4,9 +4,9 @@ import dill
 import pickle as pk
 import numpy as np
 import scipy.stats
-from pytransport.cache_tools import hash_alpha_beta
-from pytransport.sampler.rng_states import RandomStates
-from pytransport.sampler.mpi_helpers import make_dir, single_proc_task, barrier, rank
+from pytsa.cache_tools import hash_alpha_beta
+from pytsa.sampler.rng_states import RandomStates
+from pytsa.sampler.mpi_helpers import make_dir, single_proc_task, barrier, rank
 
 default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "", "..", "..", "samplers"))
 
@@ -72,7 +72,7 @@ class _SamplingParameters(object):
         """
         Container for sampling parameters
 
-        :param pyt_model: pytransport module
+        :param pyt_model: pytsa module
         """
 
         self.model = pyt_model
@@ -165,7 +165,7 @@ class SamplerMethods(_SamplingParameters):
         """
         Setup routine for sampler
 
-        :param pyt_model: pytransport module
+        :param pyt_model: pytsa module
         """
         super(SamplerMethods, self).__init__(pyt_model)
 

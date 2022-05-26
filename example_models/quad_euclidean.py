@@ -1,6 +1,6 @@
-from path_root import *  # Sets path to import pytransport files
+from path_root import *  # Sets path to import pytsa files
 import sympy as sym
-from pytransport import pytrans_setup
+from pytsa import pytrans_setup
 
 # Example installation file for single field quadratic inflation
 

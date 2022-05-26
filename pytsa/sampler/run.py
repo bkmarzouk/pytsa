@@ -1,6 +1,6 @@
 import os
-from pytransport.sampler import main_pool
-from pytransport.sampler.setup_sampler import job_config, SamplerMethods, APrioriSampler, LatinSampler
+from pytsa.sampler import main_pool
+from pytsa.sampler.setup_sampler import job_config, SamplerMethods, APrioriSampler, LatinSampler
 
 if __name__ == "__main__":
     os.environ['SAMPLER_MODE'] = "TRUE"

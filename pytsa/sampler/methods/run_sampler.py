@@ -43,7 +43,7 @@ with transportFile: transportDict = pk.load(transportFile)
 sys.path.append(pathMethods)
 
 # Import _PyTransport and writer tools
-from pytransport.sampler import pyt_methods as pytm
+from pytsa.sampler import pyt_methods as pytm
 import writer as w
 
 # Finally configure internal _PyTransport workings
