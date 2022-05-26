@@ -20,11 +20,11 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/model.h"//model
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
-#include"/home/kareem/cosmo-share/repos/pytsample/pytransport/cppt/stepper/rkf45.hpp"//stepper
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/model.h"//model
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/stepper/rkf45.hpp"//stepper
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
 #include <math.h>

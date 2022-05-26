@@ -106,6 +106,9 @@ class _SamplingParameters(object):
         if method == "sr" or method == "SR":
             method = Constant.slow_roll()
 
+        if isinstance(method, float or int):
+            method = Constant(method)
+
         _check_method(method)
 
         for idx in indices:
@@ -124,6 +127,9 @@ class _SamplingParameters(object):
         if method == "sr" or method == "SR":
             method = Constant.slow_roll()
 
+        if isinstance(method, float or int):
+            method = Constant(method)
+
         _check_method(method)
 
         for idx in indices:
@@ -139,6 +145,10 @@ class _SamplingParameters(object):
         :param latex: latex definition
         :param record: if True, records IC in results
         """
+
+        if isinstance(method, float or int):
+            method = Constant(method)
+
         _check_method(method)
 
         for idx in indices:
@@ -659,11 +669,9 @@ if __name__ == "__main__":
     import scipy.stats as stats
 
     sampler_setup = SamplerMethods(model, "dquad_test")
-
     sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
     sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
-    sampler_setup.set_dot_field(0, method="sr")
-    sampler_setup.set_dot_field(1, method="sr")
+    sampler_setup.set_dot_field(0, 1, method="sr")
     sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
     sampler_setup.build_sampler()
 
