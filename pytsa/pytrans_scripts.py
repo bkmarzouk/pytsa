@@ -20,6 +20,7 @@ import os
 import pickle as pk
 import timeit
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 from scipy.interpolate import UnivariateSpline
@@ -225,6 +226,33 @@ def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
     return out
 
 
+def find_massless_condition(MTE, N_before_massless, k, back, params):
+    kexit_evolution = np.ones(len(back), dtype=float) * k ** 2
+    _mass_evolution = evolve_mass_spectrum(back, params, MTE)
+
+    mass_evolution = np.zeros(kexit_evolution.shape, dtype=float)
+
+    for idx, step in enumerate(_mass_evolution):
+        mass_evolution[idx] = step[1:].max()
+
+    for idx, step in enumerate(back):
+        N, fdf = step[0], step[1:]
+        kexit_evolution[idx] /= MTE.H(fdf, params) ** 2 * np.exp(2 * N)
+
+    diff_evolution = np.abs(mass_evolution - kexit_evolution)
+
+    idx_massless = np.where(diff_evolution == diff_evolution.min())[0][0]
+
+    Nstart = back.T[0][idx_massless] - N_before_massless
+
+    if Nstart < 0:
+        assert 0, "fix"
+
+    new_ics = splt.approx_row_closest(Nstart, back, 0)
+
+    return new_ics[0], new_ics[1:]
+
+
 def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
     """
     Compute the initial conditions for correlation functions NBMassless efolds before the massless condition is realized
@@ -240,8 +268,6 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
 
     # Evolve masses for all of background
     masses_array = evolveMasses(back, params, MTE)
-
-    largest_mass_evo = np.zeros((len(back), 2))
 
     diff_evo = np.zeros((len(back), 2), dtype=float)
 
@@ -661,6 +687,7 @@ def compute_Nexit_for_matching(MTE, back: np.ndarray, params: np.ndarray, k=0.00
 
     return back.T[0][-1] - N_before_end
 
+
 def matchKExitN(back, params, MTE, k=0.002):  # Remove
     const = 55.75 - np.log(k / 0.05)  # TODO: seems a bit odd!
 
@@ -851,14 +878,80 @@ def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covaria
 
 
 def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub_evo: int or float,
-                           Nexit=None, return_running=True, tmax=None):
+                           Nexit=None, tmax=None):
+    """
+    Compute ns, running and As
+
+    :param MTE:
+    :param back:
+    :param params:
+    :param tols:
+    :param sub_evo:
+    :param Nexit:
+    :param tmax:
+    :return:
+    """
     if Nexit is None:
-        Nexit = matchKExitN(back, params, MTE)
+        Nexit = compute_Nexit_for_matching(MTE, back, params)
 
     if Nexit is None:
+        assert 0, "FIX"
 
-        if "SAMPLER_MODE" in os.environ.keys():
-            return
+    kexit_arr = np.zeros(5, dtype=float)
+
+    for idx in range(5):
+        _k = kexitN(Nexit - 1.2 + 0.6 * idx, back, params, MTE)
+
+        if np.isnan(_k) or np.isinf(_k):
+            assert 0, "FIX"
+
+        kexit_arr[idx] = _k
+
+    kexit = kexit_arr[2]
+
+    # Build power spectra values
+    p_zeta_arr = np.zeros(5, dtype=float)
+
+    Nend = back.T[0][-1]
+
+    scalar_amplitude = None
+
+    # Iterate over k-scales
+    for idx, k in enumerate(kexit_arr):
+
+        # Build initial conditions for mode based on massless condition
+        Nstart, ICs = find_massless_condition(MTE, sub_evo, k, back, params)
+
+        _2pf = MTE.sigEvolve(np.array([Nstart, Nend]), k, ICs, params, tols, False, tmax, True)
+
+        # TODO: handle 2pf error
+
+        p_zeta_arr[idx] = _2pf.T[1][-1]
+
+        if idx == 2:
+            scalar_amplitude = p_zeta_arr[2] * (k ** 3)
+
+    assert scalar_amplitude is not None, scalar_amplitude
+
+    #  Build log arrays in k and Pzeta
+    arrLogK = np.log(kexit_arr / kexit)
+    arrLogPz = np.log(p_zeta_arr)
+
+    # Build cubic spline from log values
+    twoPtSpline = UnivariateSpline(arrLogK, arrLogPz, k=3)
+
+    # Differentiate for ns & running
+    nsSpline = twoPtSpline.derivative()
+    alphaSpline = nsSpline.derivative()
+
+    # Define functions to map exit scale to observables subject to kPicot
+    def ns(k):
+        return nsSpline(np.log(k / kexit)) + 4.
+
+    def alpha(k):
+        return alphaSpline(np.log(k / kexit))
+
+    return ns(kexit), alpha(kexit), scalar_amplitude
 
 
 def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
@@ -1133,8 +1226,8 @@ def GetCurvatureObject(MTE):
 
     return curv_obj
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     import pyt_dquad_euclidean as d
 
     f = np.array([12., 12., 0., 0.])

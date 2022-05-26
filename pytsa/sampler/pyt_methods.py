@@ -275,17 +275,14 @@ def compute_mij(data: ProtoAttributes):
 def compute_2pf(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    result = py_scripts.spectralIndex(
+    result = py_scripts.compute_spectral_index(
+        data.methods.model,
         sample_core.back,
         sample_core.params,
-        sample_core.Nexit,
         np.array([*data.methods.tols], dtype=float),
         data.methods.N_sub_evo,
-        data.methods.model,
-        returnRunning=True,
-        tmax=600,
-        errorReturn=True,
-        useMatchEq=False  # We have already computed this data
+        Nexit=sample_core.Nexit,
+        tmax=600  # 10 minute maximum, this should be plenty
     )
 
     print(result)
