@@ -287,6 +287,23 @@ def compute_2pf(data: ProtoAttributes):
 
     print(result)
 
+
+def compute_3pf(data: ProtoAttributes):
+    sample_core = extract_core(data)
+
+    result = py_scripts.compute_fnl(
+        data.methods.model,
+        sample_core.back,
+        sample_core.params,
+        np.array([*data.methods.tols], dtype=float),
+        data.methods.N_sub_evo,
+        Nexit=sample_core.Nexit,
+        tmax=600,  # 10 minute maximum, this should be plenty
+        eq=True
+    )
+
+    print(result)
+
 #
 # def buildICPs(modelnumber, rerun_model=False):
 #     """ Builds initial conditions & parameters, or retrieves them if in rerun mode"""

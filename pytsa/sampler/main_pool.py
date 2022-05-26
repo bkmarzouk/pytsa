@@ -73,6 +73,7 @@ def main(pool, args_dict: dict):
     list(pool.map(pyt_methods.compute_eta, obs_pool))
     list(pool.map(pyt_methods.compute_mij, obs_pool))
     list(pool.map(pyt_methods.compute_2pf, obs_pool))
+    list(pool.map(pyt_methods.compute_3pf, obs_pool))
 
     return 0
     #

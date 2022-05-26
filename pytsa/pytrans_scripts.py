@@ -954,6 +954,80 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
     return ns(kexit), alpha(kexit), scalar_amplitude
 
 
+def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub_evo: int or float,
+                Nexit=None, tmax=None, alpha=None, beta=None, eq=False, fo=False, sq=False):
+    assert sum([eq, fo, sq]) > 0 or (alpha is not None and beta is not None), [alpha, beta, eq, fo, sq]
+
+    Nend = back.T[0][-1]
+
+    if Nexit is None:
+        Nexit = compute_Nexit_for_matching(MTE, back, params)
+
+    if Nexit is None:
+        assert 0, "FIX"
+
+    kexit = kexitN(Nexit, back, params, MTE)
+
+    # Build Fourier triangle via Fergusson Shellard convention;
+    def _k1(alpha, beta, k):
+        return k * (1. - beta) / 2.
+
+    def _k2(alpha, beta, k):
+        return k * (1. + alpha + beta) / 4.
+
+    def _k3(alpha, beta, k):
+        return k * (1. - alpha + beta) / 4.
+
+    kt = 3 * kexit
+
+    # standard template options
+    if eq:
+        alpha, beta = 0, 1. / 3.
+    elif fo:
+        alpha, beta = -0.5, 0.5
+    elif sq:
+        alpha, beta = 0.9, 0.01
+    else:
+        pass
+
+    # Compute momentum triangle
+    k1 = _k1(alpha, beta, kt)
+    k2 = _k2(alpha, beta, kt)
+    k3 = _k3(alpha, beta, kt)
+
+    # Check momenta TODO: return error for bad k here
+    for k in [k1, k2, k3]:
+
+        # if momenta has become infinite, or subject to numerical error
+        if np.isinf(k) or np.isnan(k):
+            assert 0, "fix"
+
+    del k
+
+    # Find larges scale and compute ICs
+    kmin = np.min([k1, k2, k3])
+
+    Nstart, ICs = find_massless_condition(MTE, sub_evo, kmin, back, params)
+
+    print(Nstart, k1, k2, k3)
+
+    if type(ICs) != np.ndarray and np.isnan(ICs):
+        assert 0, "fix"
+
+    # Compute three-point function up until end of background
+    _3pf = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, params, tols, True, tmax, True)
+
+    # If flag has been returned when computing 3pf, return flag data
+    if type(_3pf) is tuple:
+        assert 0, "fix"
+
+    # Compute amplitude of fNL at end of inflation
+    pzeta_1, pzeta_2, pzeta_3, bzeta = [_3pf.T[i][-1] for i in range(1, 5)]
+    fnl = (5. / 6.) * bzeta / (pzeta_1 * pzeta_2 + pzeta_2 * pzeta_3 + pzeta_1 * pzeta_3)
+
+    return fnl
+
+
 def spectralIndex(back, pvals, Nexit, tols, subevo, MTE, returnRunning=True,
                   errorReturn=False, tmax=None, useMatchEq=True, return_logarr=False):
     """
