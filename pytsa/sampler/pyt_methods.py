@@ -59,6 +59,16 @@ import pickle as pk
 
 from pytsa.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
+
+class ProtoAttributes:
+    # Prototype for typing
+
+    methods: SamplerMethods
+    sampler: APrioriSampler or LatinSampler
+    index: int
+    cache: str
+
+
 error_dict = {
     0: "",
     -30: "short",
@@ -85,11 +95,15 @@ class SampleCore(object):
 
     def __init__(self, index: int, err_number: int, cache_loc, back: np.ndarray or None = None,
                  back_raw: np.ndarray or None = None,
-                 Nexit: float or None = None, Nexit_raw: float or None = None):
+                 Nexit: float or None = None,
+                 Nexit_raw: float or None = None,
+                 params: np.ndarray or None = None):
 
         self.index = index
         self.cache_loc = cache_loc
         self.path = os.path.join(self.cache_loc, "sample.%06d" % self.index)
+
+        self.params = params
 
         self.err_n = [err_number]
         self.err_s = [error_dict[err_number]]
@@ -177,16 +191,29 @@ class SampleCore(object):
             self.cache()
 
 
-class ProtoAttributes:
-    # Prototype for typing
+def extract_core(data: ProtoAttributes):
+    cache = data.cache
 
-    methods: SamplerMethods
-    sampler: APrioriSampler or LatinSampler
-    index: int
-    cache: str
+    sample_path = os.path.join(cache, "sample.%06d" % data.index)
+
+    try:
+
+        with open(sample_path, "rb") as f:
+            sample_core: SampleCore = pk.load(f)
+
+        return sample_core
+
+    except FileNotFoundError:
+
+        return None
 
 
 def compute_background(data: ProtoAttributes):
+    loaded = extract_core(data)
+
+    if isinstance(loaded, SampleCore):
+        return loaded.index, loaded.err_n[0]
+
     model = data.methods.model
     index = data.index
     cache = data.cache
@@ -215,7 +242,7 @@ def compute_background(data: ProtoAttributes):
                     _idx = np.min([_idx, idx])
 
         if np.isinf(_idx):
-            return SampleCore.field_space_violation(index, cache)
+            return SampleCore.field_space_violation(index, cache).get_last_status()
 
         background = background[:_idx + 1]
         N_evo = background.T[0]
@@ -230,7 +257,7 @@ def compute_background(data: ProtoAttributes):
             for fidx, bounds in reject_with_fields.items():
 
                 if bounds[0] <= step[1 + fidx] <= bounds[1]:
-                    SampleCore.field_space_violation(index, cache)
+                    SampleCore.field_space_violation(index, cache).get_last_status()
 
     if Nend < Nmin:
         return SampleCore.inflation_too_short(index, cache).get_last_status()
@@ -246,7 +273,70 @@ def compute_background(data: ProtoAttributes):
     nexit_adj = py_scripts.matchKExitN(back_adj, params, model)
     nexit = py_scripts.matchKExitN(background, params, model)
 
-    return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit).get_last_status()
+    return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit, params).get_last_status()
+
+
+def compute_epsilon(data: ProtoAttributes):
+    sample_core = extract_core(data)
+    print("EPS", py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
+
+
+def compute_eta(data: ProtoAttributes):
+    sample_core = extract_core(data)
+    print("ETA", py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
+
+
+def compute_mij(data: ProtoAttributes):
+    sample_core = extract_core(data)
+    masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
+                                                 data.methods.model)
+
+    N_adi = data.methods.N_adiabitc
+
+    back = sample_core.back
+
+    NEND = back.T[0][-1]
+
+    N_adi_check = np.array([N for N in back.T[0] if N > NEND - N_adi])
+
+    # Check for adiabatic limit: Criteria here requires that m^2 >= 2 H^2 over the last efolds of inflation
+    # for all but one tachyonic mode.
+    # precise nember defined as N_adiabatic in setup
+
+    adi = True
+    for _ in N_adi_check:
+        masses = py_scripts.get_mass_data(sample_core.back, sample_core.params, _, data.methods.model)
+
+        n_tachyon = (masses < 0).sum()
+
+        if n_tachyon != 1:
+            adi = False
+            break
+
+        rest_heavy = np.all(np.sort(masses)[1:] > 2)
+
+        if not rest_heavy:
+            adi = False
+            break
+
+    sample_core.adiabitic = adi
+
+    print(f"MIJ: {masses_exit}, {masses_end}, {adi}")
+
+# def compute_2pf(data: ProtAttributes):
+#     result = py_scripts.spectralIndex(
+#         sample_core.back,
+#         sample_core.params,
+#         sample_core.Nexit,
+#         np.array([*data.methods.tols], dtype=float),
+#         data.methods.N_sub_evo,
+#         data.methods.model,
+#         returnRunning=True,
+#         tmax=600,
+#         errorReturn=True
+#     )
+#
+#     print(result)
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

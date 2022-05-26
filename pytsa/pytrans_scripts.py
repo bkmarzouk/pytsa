@@ -278,7 +278,7 @@ def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
     if return_all:
         return ics_start, N_massless, m_array
 
-    return ics_start
+    return N_start, ics_start
 
 
 def ICsBE(NBExit, k, back, params, MTE):
@@ -692,9 +692,6 @@ def matchKExitN(back, params, MTE, k=0.002):
 
     try:
 
-        # print(kExitArr)
-        # print(HArr)
-
         HkSpl = UnivariateSpline(kExitArr, HArr)
 
         Hk = HkSpl(k)
@@ -710,6 +707,49 @@ def matchKExitN(back, params, MTE, k=0.002):
         return np.nan
 
     return Nk
+
+
+def _eps_eta_mij_hub(back, params, Nexit, MTE, func):
+    if func == "eps":
+        METHOD = MTE.Epsilon
+    elif func == "eta":
+        METHOD = MTE.Eta
+    elif func == "mij":
+        METHOD = MTE.massMatrix
+    elif func == "hub":
+        METHOD = MTE.H
+    else:
+        raise KeyError(func)
+
+    def _eval(step, params):
+        return METHOD(step[1:2 * MTE.nF() + 1], params)
+
+    back_exit = splt.approx_row_closest(Nexit, back, 0)
+    back_end = back[-1]
+
+    return np.array([_eval(back_exit, params), _eval(back_end, params)], dtype=float)
+
+
+def get_epsilon_data(back, params, Nexit, MTE):
+    return _eps_eta_mij_hub(back, params, Nexit, MTE, "eps")
+
+
+def get_eta_data(back, params, Nexit, MTE):
+    return _eps_eta_mij_hub(back, params, Nexit, MTE, "eta")
+
+
+def get_mass_data(back, params, Nexit, MTE):
+    def get_mij_data(back, params, Nexit, MTE):
+        return _eps_eta_mij_hub(back, params, Nexit, MTE, "mij")
+
+    mij = get_mij_data(back, params, Nexit, MTE)
+
+    eigs_exit = np.sort(np.linalg.eigvals(mij[0]))
+    eigs_end = np.sort(np.linalg.eigvals(mij[1]))
+
+    Hexit, Hend = _eps_eta_mij_hub(back, params, Nexit, MTE, "hub") ** 2
+
+    return np.array([eigs_exit / Hexit, eigs_end / Hend], dtype=float)
 
 
 def evolveMasses(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):

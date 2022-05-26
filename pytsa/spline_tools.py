@@ -70,8 +70,6 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
             val_l = v
             break
 
-    print(val_l, val_h)
-
     if abs(val_l - pivot_value) < abs(val_h - pivot_value):
         approx_idx = idx_l
     else:
