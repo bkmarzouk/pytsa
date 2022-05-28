@@ -9,7 +9,9 @@ from pytsa.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSam
 
 class TrackMethods:
 
-    def __init__(self, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index, cache, task_dict=None):
+    def __init__(self, n_samples: int, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index, cache,
+                 task_dict=None):
+        self.n_samples = n_samples
         self.methods = methods
         self.sampler = sampler
         self.index = index
@@ -34,7 +36,7 @@ def build_back_pool(loc: str, n_samples: int):
     samples_dir = os.path.join(loc, "samples_core")
 
     for idx in range(n_samples):
-        pool_data[idx] = TrackMethods(methods, sampler, idx, samples_dir)
+        pool_data[idx] = TrackMethods(n_samples, methods, sampler, idx, samples_dir)
 
     return pool_data
 
@@ -48,6 +50,8 @@ def build_obs_pool(loc: str, status_dict: list, task_dict: dict):
 
     indices = {sd[0] for sd in status_dict if sd[1] == 0}
 
+    n_total = task_dict['n_samples']
+
     n_samples = len(indices)
 
     pool_data = np.empty(n_samples, dtype=TrackMethods)
@@ -55,7 +59,7 @@ def build_obs_pool(loc: str, status_dict: list, task_dict: dict):
     samples_dir = os.path.join(loc, "samples_core")
 
     for _, idx in enumerate(indices):
-        pool_data[_] = TrackMethods(methods, sampler, idx, samples_dir, task_dict=task_dict)
+        pool_data[_] = TrackMethods(n_total, methods, sampler, idx, samples_dir, task_dict=task_dict)
 
     return pool_data
 

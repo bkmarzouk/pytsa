@@ -950,7 +950,7 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
         return ns_spline(np.log(k / kexit)) + 4.
 
     def alpha(k):
-        return alpha_spline(np.log(k / kexit))
+        return float(alpha_spline(np.log(k / kexit)))
 
     return ns(kexit), alpha(kexit), scalar_amplitude
 
