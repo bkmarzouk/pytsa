@@ -14,6 +14,7 @@ class ProtoAttributes:
     sampler: APrioriSampler or LatinSampler
     index: int
     cache: str
+    task_dict: dict
 
 
 error_dict = {
@@ -38,7 +39,7 @@ error_dict = {
 
 class SampleCore(object):
 
-    # TODO: Should actually error return as PyObject from C source rather than flag output, this is OK for now, though
+    # Track background quantities for observables, and log errors
 
     def __init__(self, index: int, err_number: int, cache_loc, back: np.ndarray or None = None,
                  back_raw: np.ndarray or None = None,
@@ -61,6 +62,10 @@ class SampleCore(object):
         self.Nexit = Nexit
         self.Nexit_raw = Nexit_raw
 
+        self.adiabatic = None
+
+        self.completed = set()
+
         self.cache()
 
     def get_last_status(self):
@@ -82,40 +87,55 @@ class SampleCore(object):
     def int_background(cls, index, cache_loc):
         return cls(index, -32, cache_loc)
 
-    def task_eps(self, index: int, failed: bool):
-        if failed:
-            self._update_errors(index, -40)
-        else:
-            self._update_errors(index, 0)
+    def task_eps(self, failed: bool):
 
-    def task_eta(self, index: int, failed: bool):
-        if failed:
-            self._update_errors(index, -41)
-        else:
-            self._update_errors(index, 0)
+        self.completed.add("eps")
 
-    def task_mij(self, index: int, failed: bool):
         if failed:
-            self._update_errors(index, -42)
+            self._update_errors(-40)
         else:
-            self._update_errors(index, 0)
+            self._update_errors(0)
 
-    def task_2pf(self, index: int, code):
+    def task_eta(self, failed: bool):
+
+        self.completed.add("eta")
+
+        if failed:
+            self._update_errors(-41)
+        else:
+            self._update_errors(0)
+
+    def task_mij(self, failed: bool, adiabatic: bool):
+
+        self.completed.add("mij")
+
+        self.adiabatic = adiabatic
+
+        if failed:
+            self._update_errors(-42)
+        else:
+            self._update_errors(0)
+
+    def task_2pf(self, code: int):
+
+        self.completed.add("2pf")
+
         if -60 < code < -50:
-            self._update_errors(index, code)
+            self._update_errors(code)
         else:
             assert code == 0, code
-            self._update_errors(index, 0)
+            self._update_errors(0)
 
-    def task_3pf(self, index: int, code: bool, alpha: float, beta: float):
+    def task_3pf(self, code: int, alpha_beta):
+
+        self.completed.add(alpha_beta)
+
         if -70 < code < -60:
-            self._update_errors(index, code, hash_alpha_beta(alpha, beta))
+            self._update_errors(code, alpha_beta)
         else:
-            self._update_errors(index, 0)
+            self._update_errors(0)
 
-    def _update_errors(self, index: int, error_code: int, alpha_beta=None):
-
-        assert self.index == index, [self.index, index]
+    def _update_errors(self, error_code: int, alpha_beta=None):
 
         self.err_n.append(error_code)
 
@@ -138,28 +158,23 @@ class SampleCore(object):
             self.cache()
 
 
-def extract_core(data: ProtoAttributes):
+def extract_core(data: ProtoAttributes) -> SampleCore:
     cache = data.cache
 
     sample_path = os.path.join(cache, "sample.%06d" % data.index)
 
-    try:
+    with open(sample_path, "rb") as f:
+        sample_core: SampleCore = pk.load(f)
 
-        with open(sample_path, "rb") as f:
-            sample_core: SampleCore = pk.load(f)
-
-        return sample_core
-
-    except FileNotFoundError:
-
-        return None
+    return sample_core
 
 
 def compute_background(data: ProtoAttributes):
-    loaded = extract_core(data)
-
-    if isinstance(loaded, SampleCore):
+    try:
+        loaded = extract_core(data)
         return loaded.index, loaded.err_n[0]
+    except FileNotFoundError:
+        pass
 
     model = data.methods.model
     index = data.index
@@ -225,84 +240,130 @@ def compute_background(data: ProtoAttributes):
 
 def compute_epsilon(data: ProtoAttributes):
     sample_core = extract_core(data)
-    print("EPS",
-          py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
+
+    if "eps" not in sample_core.completed:
+        eps = py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
+        sample_core.task_eps(False)  # TODO: error
 
 
 def compute_eta(data: ProtoAttributes):
     sample_core = extract_core(data)
-    print("ETA", py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model))
+
+    if "eta" not in sample_core.completed:
+        eta = py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
+        sample_core.task_eta(False)  # TODO: error
 
 
 def compute_mij(data: ProtoAttributes):
     sample_core = extract_core(data)
-    masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
-                                                       data.methods.model)
 
-    N_adi = data.methods.N_adiabitc
+    if "mij" not in sample_core.completed:
 
-    back = sample_core.back
+        masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
+                                                           data.methods.model)
+        N_adi = data.methods.N_adiabitc
 
-    NEND = back.T[0][-1]
+        back = sample_core.back
 
-    N_adi_check = np.array([N for N in back.T[0] if N > NEND - N_adi])
+        NEND = back.T[0][-1]
 
-    # Check for adiabatic limit: Criteria here requires that m^2 >= 2 H^2 over the last efolds of inflation
-    # for all but one tachyonic mode.
-    # precise nember defined as N_adiabatic in setup
+        N_adi_check = np.array([N for N in back.T[0] if N > NEND - N_adi])
 
-    adi = True
-    for _ in N_adi_check:
-        masses = py_scripts.get_mass_data(sample_core.back, sample_core.params, _, data.methods.model)
+        # Check for adiabatic limit: Criteria here requires that m^2 >= 2 H^2 over the last efolds of inflation
+        # for all but one tachyonic mode.
+        # precise nember defined as N_adiabatic in setup
 
-        n_tachyon = (masses < 0).sum()
+        adi = True
+        for _ in N_adi_check:
+            masses = py_scripts.get_mass_data(sample_core.back, sample_core.params, _, data.methods.model)
 
-        if n_tachyon != 1:
-            adi = False
-            break
+            n_tachyon = (masses < 0).sum()
 
-        rest_heavy = np.all(np.sort(masses)[1:] > 2)
+            if n_tachyon != 1:
+                adi = False
+                break
 
-        if not rest_heavy:
-            adi = False
-            break
+            rest_heavy = np.all(np.sort(masses)[1:] > 2)
 
-    sample_core.adiabitic = adi
+            if not rest_heavy:
+                adi = False
+                break
 
-    print(f"MIJ: {masses_exit}, {masses_end}, {adi}")
+        sample_core.task_mij(False, adi)  # TODO: error
+
+
+def compute_obs(data: ProtoAttributes):
+    task_dict = data.task_dict
+
+    if task_dict['task_2pt'] is True:
+        compute_2pf(data)
+
+    if task_dict['task_3pt_eq'] is True:
+        compute_3pf(data, eq=True)
+
+    if task_dict['task_3pt_fo'] is True:
+        compute_3pf(data, fo=True)
+
+    if task_dict['task_3pt_sq'] is True:
+        compute_3pf(data, sq=True)
+
+    if len(task_dict['alpha']) > 0:
+        for alpha, beta in zip(task_dict['alpha'], ['beta']):
+            compute_3pf(data, alpha=alpha, beta=beta)
+
+    return 0
 
 
 def compute_2pf(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    result = py_scripts.compute_spectral_index(
-        data.methods.model,
-        sample_core.back,
-        sample_core.params,
-        np.array([*data.methods.tols], dtype=float),
-        data.methods.N_sub_evo,
-        Nexit=sample_core.Nexit,
-        tmax=600  # 10 minute maximum, this should be plenty
-    )
+    if "2pf" not in sample_core.completed:
 
-    print(result)
+        result = py_scripts.compute_spectral_index(
+            data.methods.model,
+            sample_core.back,
+            sample_core.params,
+            np.array([*data.methods.tols], dtype=float),
+            data.methods.N_sub_evo,
+            Nexit=sample_core.Nexit,
+            tmax=600  # 10 minute maximum, this should be plenty
+        )
+
+        sample_core.task_2pf(0)  # TODO, error
+
+        print(result)
 
 
-def compute_3pf(data: ProtoAttributes):
+def compute_3pf(data: ProtoAttributes, **task_kwargs):
     sample_core = extract_core(data)
 
-    result = py_scripts.compute_fnl(
-        data.methods.model,
-        sample_core.back,
-        sample_core.params,
-        np.array([*data.methods.tols], dtype=float),
-        data.methods.N_sub_evo,
-        Nexit=sample_core.Nexit,
-        tmax=600,  # 10 minute maximum, this should be plenty
-        eq=True
-    )
+    if task_kwargs["eq"]:
+        alpha_beta = "eq"
+    elif task_kwargs["sq"]:
+        alpha_beta = "sq"
+    elif task_kwargs["fo"]:
+        alpha_beta = "fo"
+    else:
+        alpha = task_kwargs['alpha']
+        beta = task_kwargs['beta']
+        alpha_beta = hash_alpha_beta(alpha, beta)
 
-    print(result)
+    if alpha_beta not in sample_core.completed:
+
+        result = py_scripts.compute_fnl(
+            data.methods.model,
+            sample_core.back,
+            sample_core.params,
+            np.array([*data.methods.tols], dtype=float),
+            data.methods.N_sub_evo,
+            Nexit=sample_core.Nexit,
+            tmax=600,  # 10 minute maximum, this should be plenty
+            **task_kwargs
+        )
+
+        sample_core.task_3pf(0, alpha_beta)
+
+        print(result)
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

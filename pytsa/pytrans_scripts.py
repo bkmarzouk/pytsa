@@ -935,28 +935,29 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
     assert scalar_amplitude is not None, scalar_amplitude
 
     #  Build log arrays in k and Pzeta
-    arrLogK = np.log(kexit_arr / kexit)
-    arrLogPz = np.log(p_zeta_arr)
+    log_k_arr = np.log(kexit_arr / kexit)
+    log_pzeta_arr = np.log(p_zeta_arr)
 
     # Build cubic spline from log values
-    twoPtSpline = UnivariateSpline(arrLogK, arrLogPz, k=3)
+    pzeta_spl = UnivariateSpline(log_k_arr, log_pzeta_arr, k=3)
 
     # Differentiate for ns & running
-    nsSpline = twoPtSpline.derivative()
-    alphaSpline = nsSpline.derivative()
+    ns_spline = pzeta_spl.derivative()
+    alpha_spline = ns_spline.derivative()
 
     # Define functions to map exit scale to observables subject to kPicot
     def ns(k):
-        return nsSpline(np.log(k / kexit)) + 4.
+        return ns_spline(np.log(k / kexit)) + 4.
 
     def alpha(k):
-        return alphaSpline(np.log(k / kexit))
+        return alpha_spline(np.log(k / kexit))
 
     return ns(kexit), alpha(kexit), scalar_amplitude
 
 
 def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub_evo: int or float,
                 Nexit=None, tmax=None, alpha=None, beta=None, eq=False, fo=False, sq=False):
+
     assert sum([eq, fo, sq]) > 0 or (alpha is not None and beta is not None), [alpha, beta, eq, fo, sq]
 
     Nend = back.T[0][-1]
