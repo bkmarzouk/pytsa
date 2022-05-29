@@ -1,13 +1,16 @@
 import os.path
 
 import numpy as np
+import pandas as pd
 import dill
 
 from pytsa.sampler import pyt_methods
 from pytsa.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
-
+from pytsa.cache_tools import hash_alpha_beta
 
 LINE_SIZE = None
+
+_BAD = -1.23e-45
 
 
 class TrackMethods:
@@ -71,8 +74,126 @@ def print_out(s: str):
     print(f"\n-- {s}\n")
 
 
-def results_writer(args_dict: dict, obs_pool: np.ndarray):
+def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
+    nF = sample_pool[0].methods.nF
+    nP = sample_pool[0].methods.nP
+    latexs = []
 
+    for ii in range(nF):
+        latexs.append(sample_pool[0].methods.latex_f[ii])
+    for ii in range(nF):
+        latexs.append(sample_pool[0].methods.latex_df[ii])
+    for ii in range(nP):
+        latexs.append(sample_pool[0].methods.latex_p[ii])
+
+    latexs.append(r"\epsilon_*")
+    latexs.append(r"\epsilon")
+
+    latexs.append(r"\eta_*")
+    latexs.append(r"\eta")
+
+    for ii in range(nF):
+        latexs.append(r"M_{*," + str(ii) + "}^2/H_*^2")
+    for ii in range(nF):
+        latexs.append(r"M_{ii}^2/H^2".format(ii=ii))
+
+    # headers for field ics, dot field ics and params
+    headers = [f'f_{idx}' for idx in range(nF)]
+    headers += [f'v_{idx}' for idx in range(nF)]
+    headers += [f'p_{idx}' for idx in range(nP)]
+
+    # headers for sr pars
+    headers += ['eps_exit', 'eps_end', 'eta_exit', 'eta_end']
+
+    # headers for mass eigenvalues
+    headers += [f'm_exit_{n}' for n in range(nF)]
+    headers += [f'm_end_{n}' for n in range(nF)]
+
+    # get relevant keys for calling results in order
+    obs_keys = []
+
+    # headers for 2pf
+    if args_dict['task_2pt']:
+        obs_keys.append("2pf")
+
+        headers.append("ns")
+        headers.append("running")
+        headers.append("As")
+
+        latexs.append("n_s")
+        latexs.append("d n_s / dk")
+        latexs.append("A_s")
+
+    # headers for template 3pf
+    for ext in ['eq', 'fo', 'sq']:
+        full = f"task_3pt_{ext}"
+        if args_dict[full]:
+            obs_keys.append(ext)
+            headers.append(f"fnl_{ext}")
+
+            latexs.append(r"F_\mathrm{NL}^{" + ext + "}")
+
+    # headers for custom 3pf
+    for alpha, beta in zip(args_dict['alpha'], args_dict['beta']):
+        key = hash_alpha_beta(alpha, beta)
+        obs_keys.append(key)
+        headers.append(f"fnl_{key}")
+        latexs.append(r"F_\mathrm{NL}(" + f"{alpha}, {beta}" + ")")
+
+    # initialize as zeros array
+    raw = np.zeros((args_dict['n_samples'], len(headers)), dtype=np.float64)
+
+    for item in sample_pool:
+        sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
+
+        with open(sample_path, "rb") as f:
+            sample = dill.load(f)
+
+        row_data = sample.get_row_data(*obs_keys)
+
+        if isinstance(row_data, float) and row_data == _BAD:
+            raw[sample.index][:] = _BAD
+
+        else:
+            ics, pars = item.sampler.get_sample(item.index)
+            raw[sample.index] = np.concatenate((ics, pars, row_data))
+
+    df = pd.DataFrame(raw, columns=headers)
+
+    sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
+    results_path = os.path.join(sampler_run_dir, "pandas.df")
+
+    if os.path.exists(results_path):
+        os.remove(results_path)
+
+    df.to_pickle(results_path)
+
+    res_getdist = np.ones((raw.shape[0], raw.shape[1] + 2), dtype=np.float64)
+
+    res_getdist[:, 2:] = raw
+
+    Nrows = len(res_getdist)
+
+    for _idx in range(len(res_getdist)):
+        idx = Nrows - 1 - _idx
+        r = res_getdist[idx]
+        if np.any(np.isinf(r)) or np.any(np.isnan(r)) or np.any(r == _BAD):
+            res_getdist = np.delete(res_getdist, idx, 0)
+
+    name = args_dict['name']
+
+    getdist_r_path = os.path.join(sampler_run_dir, f"getdist_{name}.txt")
+
+    with open(getdist_r_path, "w") as f:
+        for row_data in res_getdist:
+            f.write(" ".join(map(str, row_data)) + "\n")
+
+    getdist_p_path = os.path.join(sampler_run_dir, f"getdist_{name}.paramnames")
+    with open(getdist_p_path, "w") as f:
+        for h, l in zip(headers, latexs):
+            f.write(f"{h} {l}\n")
+
+def results_writer(args_dict: dict, obs_pool: np.ndarray):
     sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
 
     samples_dir = os.path.join(sampler_run_dir, "samples_core")
@@ -80,12 +201,35 @@ def results_writer(args_dict: dict, obs_pool: np.ndarray):
     results_path = os.path.join(sampler_run_dir, "results.txt")
     params_path = os.path.join(sampler_run_dir, "results.params")
 
-    for item in obs_pool:
-        sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
+    obs_keys = []
 
+    if args_dict['task_2pt']:
+        obs_keys.append("2pf")
 
+    for ext in ['eq', 'fo', 'sq']:
+        full = f"task_3pt_{ext}"
+        if args_dict[full]:
+            obs_keys.append(ext)
 
+    for alpha, beta in zip(args_dict['alpha'], args_dict['beta']):
+        key = hash_alpha_beta(alpha, beta)
+        obs_keys.append(key)
 
+    with open(results_path, "w") as file:
+        for item in obs_pool:
+            sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
+
+            with open(sample_path, "rb") as f:
+                sample = dill.load(f)
+
+            row_data = sample.get_row_data(*obs_keys)
+
+            if row_data is not None:
+                ics, pars = item.sampler.get_sample(item.index)
+
+                row_data = np.concatenate((np.ones(2, dtype=np.float64), ics, pars, row_data))
+
+                file.write(" ".join(map(str, row_data)) + "\n")
 
 
 def main(pool, args_dict: dict):
@@ -119,3 +263,7 @@ def main(pool, args_dict: dict):
     print_out("Computing observables")
     list(pool.map(pyt_methods.compute_obs, obs_pool))
     print_out("Observables complete.")
+
+    print("Writing results")
+    build_pandas_df(args_dict, back_pool)
+    print("All done.")

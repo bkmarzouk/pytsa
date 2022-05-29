@@ -113,7 +113,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.fields[idx] = method
-            self.latex_f[idx] = f"$f_{idx}$" if latex is None else latex
+            self.latex_f[idx] = f"f_{idx}" if latex is None else latex
 
     def set_dot_field(self, *indices, method, latex: str or None = None, record=True):
         """
@@ -134,7 +134,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.dot_fields[idx] = method
-            self.latex_df[idx] = f"$v_{idx}$" if latex is None else latex
+            self.latex_df[idx] = f"v_{idx}" if latex is None else latex
 
     def set_param(self, *indices, method, latex: str or None = None, record=True):
         """
@@ -153,7 +153,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.params[idx] = method
-            self.latex_df[idx] = f"$p_{idx}$" if latex is None else latex
+            self.latex_p[idx] = f"p_{idx}" if latex is None else latex
 
     def _get_hash_data(self):
 
@@ -625,29 +625,8 @@ def job_config(task_pars: dict):
             with open(sampler_path, "wb") as f:
                 dill.dump(sampler_run, f)
 
-        samples_core_dir = os.path.join(root_dir, "samples_core")
-        make_dir(samples_core_dir)
-
-        # nF eigs for each mij. Factor of 2 for hexit and nend evaluation
-        result_dirs = [('mij', 2 * n_fields)] + [(x, 2) for x in ['epsilon', 'eta']]
-
-        if 'task_2pt' in task_pars:
-            result_dirs.append(('ns_alpha', 2))
-
-        for ext in ['eq', 'fo', 'sq']:
-            task_name = f'task_3pt_{ext}'
-            if task_name in task_pars:
-                result_dirs.append((f'fnl_{ext}', 1))
-
-        for a, b in zip(task_pars['alpha'], task_pars['beta']):
-            result_dirs.append((f'fnl_{hash_alpha_beta(a, b)}', 1))
-
-        for rd in result_dirs:
-            cache = os.path.join(root_dir, rd[0])
-
-            if not os.path.exists(cache):
-                os.makedirs(cache)
-                build_results_template(cache, n_samples, rd[1])
+    samples_core_dir = os.path.join(root_dir, "samples_core")
+    make_dir(samples_core_dir)
 
     barrier()
 
@@ -655,14 +634,23 @@ def job_config(task_pars: dict):
 if __name__ == "__main__":
 
     import pyt_dquad_euclidean as model
+    import pyt_dquad_2sphere as model_nc
     import scipy.stats as stats
 
     sampler_setup = SamplerMethods(model, "dquad_test")
     sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
     sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
     sampler_setup.set_dot_field(0, 1, method="sr")
-    sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-3))
+    sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-2))
     sampler_setup.build_sampler()
+
+    sampler_nc_setup = SamplerMethods(model_nc, "nc_test")
+    sampler_nc_setup.set_analysis_params(tols=[1e-5, 1e-5])
+    sampler_nc_setup.set_field(0, 1, method=stats.uniform(-20, 40))
+    sampler_nc_setup.set_dot_field(0, 1, method="sr")
+    sampler_nc_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-2))
+    sampler_nc_setup.set_param(2, method=stats.norm(loc=1, scale=1e-2))
+    sampler_nc_setup.build_sampler()
 
     make_demo_fig = False
 

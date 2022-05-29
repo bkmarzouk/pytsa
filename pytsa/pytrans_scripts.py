@@ -905,10 +905,14 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
 
     kexit_arr = np.zeros(5, dtype=float)
 
-    print(Nexit)
-
     for idx in range(5):
-        _k = kexitN(Nexit - 1.2 + 0.6 * idx, back, params, MTE)
+
+        _NEXIT = Nexit - 0.5 + 0.25 * idx
+
+        if _NEXIT < 0:
+            return -51
+
+        _k = kexitN(_NEXIT, back, params, MTE)
 
         if np.isnan(_k) or np.isinf(_k):
             return -51
@@ -1023,8 +1027,6 @@ def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub
 
     if not isinstance(ICs, np.ndarray) and np.isnan(ICs):
         return -60
-    #
-    # print(Nstart, k1, k2, k3)
 
     # Compute three-point function up until end of background
     _3pf = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, params, tols, True, tmax, True)

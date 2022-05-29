@@ -176,9 +176,15 @@ def compile_module(name, NC=False):
     os.system("export CFLAGS='-I {}'".format(np.get_include()))
     subprocess.run(["bash", "moduleSetup.sh"], cwd=location)
 
-    subprocess.run(["rm", "-r", "build"], cwd=location)
-    subprocess.run(["rm", "-r", "dist"], cwd=location)
-    subprocess.run(["rm", "-r", f"{name}.egg-info"], cwd=location)
+    if os.path.exists(os.path.join(location, "build")):
+        subprocess.run(["rm", "-r", "build"], cwd=location)
+
+    if os.path.exists(os.path.join(location, "dist")):
+        subprocess.run(["rm", "-r", "dist"], cwd=location)
+
+    if os.path.exists(os.path.join(location,f"{name}.egg-info")):
+        subprocess.run(["rm", "-r", f"{name}.egg-info"], cwd=location)
+
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))

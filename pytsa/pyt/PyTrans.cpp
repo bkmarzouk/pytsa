@@ -349,8 +349,8 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
     double tmax_feoi = -1;      // max integration time, tmax_feoi < 0 => no limit
 
     // Setup integration flags
-    int timeoutFlag     = -10;        // Integration timeout flag
-    int integrationFlag = -20;        // Integration failure flag
+    int timeoutFlag     = -33;        // Integration timeout flag
+    int integrationFlag = -32;        // Integration failure flag
     int eternalFlag     = -35;        // Unable to find end of inflation flag
 
     // Indicate whether to return flag tuple, or eFold at failure
@@ -443,7 +443,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
                 delete[] dy;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", timeoutFlag, N);
+                    return Py_BuildValue("i", timeoutFlag);
 
                 }
 
@@ -462,7 +462,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
             delete[] dy;
 
             if(flagReturn == true){
-                return Py_BuildValue("id", integrationFlag, N);
+                return Py_BuildValue("i", integrationFlag);
             }
 
             else{
@@ -496,7 +496,7 @@ static PyObject* MT_findEndOfInflation(PyObject* self, PyObject* args)
 
     // No end to inflation
     if(flagReturn == true){
-        return Py_BuildValue("id", eternalFlag, N);
+        return Py_BuildValue("i", eternalFlag);
     }
     else{
         return Py_BuildValue("d", N);
@@ -517,8 +517,8 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
     bool exit;
 
     // setup flags
-    int timeoutFlag     = -11;  // timeout flag
-    int integrationFlag = -21;  // integration flag
+    int timeoutFlag     = -33;  // timeout flag
+    int integrationFlag = -32;  // integration flag
 
     // Maximum integration time: Default -1 implies no max
     double tmax_back = -1;
@@ -703,7 +703,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                 delete[] yp;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", timeoutFlag, N);
+                    return Py_BuildValue("i", timeoutFlag);
                 }
 
                 else{
@@ -723,7 +723,7 @@ static PyObject* MT_backEvolve(PyObject* self,  PyObject *args)
                 delete[] yp;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", integrationFlag, N);
+                    return Py_BuildValue("i", integrationFlag);
                 }
 
                 else{

@@ -25,6 +25,7 @@ error_dict = {
     -32: "int_back",
     -33: "timeout_back",
     -34: "nexit",
+    -35: "eternal",
     -40: "eps",
     -41: "eta",
     -42: "mij",
@@ -39,6 +40,7 @@ error_dict = {
 }
 
 _BAD = -1.23e-45
+
 
 class SampleCore(object):
 
@@ -161,8 +163,23 @@ class SampleCore(object):
             os.remove(p)
             self.cache()
 
+    def get_row_data(self, *obs_keys):
 
+        if self.err_n[0] != 0:  # Did not find background
+            return _BAD
 
+        results = np.array([], dtype=np.float64)
+
+        for k in ['eps', 'eta']:
+            results = np.concatenate((results, self.results[k]))
+
+        for masses in self.results['mij']:
+            results = np.concatenate((results, masses))
+
+        for obs in obs_keys:
+            results = np.concatenate((results, self.results[obs]))
+
+        return results
 
 def extract_core(data: ProtoAttributes) -> SampleCore:
     cache = data.cache
@@ -190,10 +207,24 @@ def compute_background(data: ProtoAttributes):
     Nmin = data.methods.N_min
     ics, params = data.sampler.get_sample(index)
 
-    Nend = model.findEndOfInflation(ics, params, tols)
+    Nend = model.findEndOfInflation(
+        ics,
+        params,
+        tols,
+        0.,  # Ninit
+        3000., # Nmax
+        30  # tmax (seconds)
+    )
 
     N_evo = np.linspace(0, Nend, int(100 * Nend))  # Dense N evo
-    background = model.backEvolve(N_evo, ics, params, tols, False, -1, True)  # Raw background
+    background = model.backEvolve(
+        N_evo,
+        ics,
+        params,
+        tols,
+        False,
+        30,  # tmax (seconds)
+    )  # Raw background
 
     # Dictionary with keys for field indices, and arrays for end inflation
     terminate_with_fields = data.methods.fieldspace_terminate
@@ -246,11 +277,12 @@ def compute_background(data: ProtoAttributes):
 
     return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit, params).get_last_status()
 
-def any_nan_inf(*vals):
 
+def any_nan_inf(*vals):
     arr = np.array([*vals])
 
     return np.any(np.isnan(arr)) or np.any(np.isinf(arr))
+
 
 def compute_epsilon(data: ProtoAttributes):
     sample_core = extract_core(data)
@@ -270,6 +302,9 @@ def compute_eta(data: ProtoAttributes):
         eta = py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
 
         failed = any_nan_inf(eta)
+
+        # eta = np.zeros(2, dtype=np.float64)  # TODO: fix
+        # failed = False
 
         sample_core.task_eta(failed, value=eta)
 

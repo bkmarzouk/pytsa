@@ -113,12 +113,12 @@ public:
 
 
     // function returns H dot
-    double Hdot(vector<double> f, vector<double> p)
+    double Hdot(vector<double> fdf, vector<double> p)
 	{
         // Hdot is simply minus the kinetic energy of the fields
-        double dotsigmasq = ke(f, p);
+        double dotsigmasq = ke(fdf, p);
 
-		return -dotsigmasq;
+		return -1. * dotsigmasq;
 	}
 
 	// function returns H dot dot
@@ -216,12 +216,14 @@ public:
             v[ii] = fdf[ii + nF];
         }
 
-        double eps = Ep(f, p);
         double hub = H(f, p);
-        double dothub = Hdot(f, p);
+        double dothub = Hdot(fdf, p);
         double ddothub = Hddot(fdf, p);
 
-        return (ddothub * hub - 2 * dothub * dothub) / (2 * eps * hub * hub * hub * hub);
+        double t1 = ddothub / (dothub * hub);
+        double t2 = 2 * dothub / (hub * hub);
+
+        return t1 - t2;
 	}
 
     // function returns mass-squared-matrix
