@@ -50,6 +50,28 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
     :param col_idx: column containing pivot value
     :return: row from array approximately matching the pivot value
     """
+
+    lower = None
+    upper = None
+    ii = None
+
+    compare_to = array.T[col_idx]
+
+    for ii in range(1, len(array)):
+
+        if compare_to[ii] > pivot_value:
+            lower = compare_to[ii - 1]
+            upper = compare_to[ii]
+            break
+
+    if lower is None:
+        print("COULD NOT FIND SUFFICIENT VALUE")
+
+    if abs(lower - pivot_value) < abs(upper - pivot_value):
+        return array[ii - 1]
+    else:
+        return array[ii]
+
     idx_h = None
     val_h = None
 

@@ -7,6 +7,9 @@ from pytsa.sampler import pyt_methods
 from pytsa.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
 
 
+LINE_SIZE = None
+
+
 class TrackMethods:
 
     def __init__(self, n_samples: int, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index, cache,
@@ -66,6 +69,23 @@ def build_obs_pool(loc: str, status_dict: list, task_dict: dict):
 
 def print_out(s: str):
     print(f"\n-- {s}\n")
+
+
+def results_writer(args_dict: dict, obs_pool: np.ndarray):
+
+    sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
+
+    samples_dir = os.path.join(sampler_run_dir, "samples_core")
+
+    results_path = os.path.join(sampler_run_dir, "results.txt")
+    params_path = os.path.join(sampler_run_dir, "results.params")
+
+    for item in obs_pool:
+        sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
+
+
+
+
 
 
 def main(pool, args_dict: dict):

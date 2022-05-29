@@ -246,7 +246,7 @@ def find_massless_condition(MTE, N_before_massless, k, back, params):
     Nstart = back.T[0][idx_massless] - N_before_massless
 
     if Nstart < 0:
-        assert 0, "fix"
+        return np.nan, np.nan
 
     new_ics = splt.approx_row_closest(Nstart, back, 0)
 
@@ -681,11 +681,16 @@ def compute_Nexit_for_matching(MTE, back: np.ndarray, params: np.ndarray, k=0.00
             break
 
     if Hk is None:
-        print("ERROR")  # TODO: Fix
+        return np.nan
 
     N_before_end = const + np.log(Hk) - np.log(Hend) / 2
 
-    return back.T[0][-1] - N_before_end
+    out = back.T[0][-1] - N_before_end
+
+    if out < 0:
+        return np.nan
+
+    return out
 
 
 def matchKExitN(back, params, MTE, k=0.002):  # Remove
@@ -900,11 +905,13 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
 
     kexit_arr = np.zeros(5, dtype=float)
 
+    print(Nexit)
+
     for idx in range(5):
         _k = kexitN(Nexit - 1.2 + 0.6 * idx, back, params, MTE)
 
         if np.isnan(_k) or np.isinf(_k):
-            assert 0, "FIX"
+            return -51
 
         kexit_arr[idx] = _k
 
@@ -923,9 +930,13 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
         # Build initial conditions for mode based on massless condition
         Nstart, ICs = find_massless_condition(MTE, sub_evo, k, back, params)
 
+        if not isinstance(ICs, np.ndarray) and np.isnan(ICs):
+            return -50
+
         _2pf = MTE.sigEvolve(np.array([Nstart, Nend]), k, ICs, params, tols, False, tmax, True)
 
-        # TODO: handle 2pf error
+        if isinstance(_2pf, int):
+            return _2pf
 
         p_zeta_arr[idx] = _2pf.T[1][-1]
 
@@ -952,12 +963,11 @@ def compute_spectral_index(MTE, back: np.ndarray, params: np.ndarray, tols: np.n
     def alpha(k):
         return float(alpha_spline(np.log(k / kexit)))
 
-    return ns(kexit), alpha(kexit), scalar_amplitude
+    return np.array([ns(kexit), alpha(kexit), scalar_amplitude], dtype=np.float64)
 
 
 def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub_evo: int or float,
                 Nexit=None, tmax=None, alpha=None, beta=None, eq=False, fo=False, sq=False):
-
     assert sum([eq, fo, sq]) > 0 or (alpha is not None and beta is not None), [alpha, beta, eq, fo, sq]
 
     Nend = back.T[0][-1]
@@ -1002,7 +1012,7 @@ def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub
 
         # if momenta has become infinite, or subject to numerical error
         if np.isinf(k) or np.isnan(k):
-            assert 0, "fix"
+            return -61
 
     del k
 
@@ -1011,23 +1021,23 @@ def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub
 
     Nstart, ICs = find_massless_condition(MTE, sub_evo, kmin, back, params)
 
-    print(Nstart, k1, k2, k3)
-
-    if type(ICs) != np.ndarray and np.isnan(ICs):
-        assert 0, "fix"
+    if not isinstance(ICs, np.ndarray) and np.isnan(ICs):
+        return -60
+    #
+    # print(Nstart, k1, k2, k3)
 
     # Compute three-point function up until end of background
     _3pf = MTE.alphaEvolve(np.array([Nstart, Nend]), k1, k2, k3, ICs, params, tols, True, tmax, True)
 
     # If flag has been returned when computing 3pf, return flag data
-    if type(_3pf) is tuple:
-        assert 0, "fix"
+    if isinstance(_3pf, int):
+        return _3pf
 
     # Compute amplitude of fNL at end of inflation
     pzeta_1, pzeta_2, pzeta_3, bzeta = [_3pf.T[i][-1] for i in range(1, 5)]
     fnl = (5. / 6.) * bzeta / (pzeta_1 * pzeta_2 + pzeta_2 * pzeta_3 + pzeta_1 * pzeta_3)
 
-    return fnl
+    return np.array([fnl], dtype=np.float64)
 
 
 if __name__ == "__main__":

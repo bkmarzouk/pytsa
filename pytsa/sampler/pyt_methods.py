@@ -19,11 +19,12 @@ class ProtoAttributes:
 
 
 error_dict = {
-    0: "",
+    -00: "",
     -30: "short",
     -31: "fpace",
     -32: "int_back",
     -33: "timeout_back",
+    -34: "nexit",
     -40: "eps",
     -41: "eta",
     -42: "mij",
@@ -37,6 +38,7 @@ error_dict = {
     -63: "timeout_3pf_{alpha_beta}"
 }
 
+_BAD = -1.23e-45
 
 class SampleCore(object):
 
@@ -61,13 +63,13 @@ class SampleCore(object):
 
         self.back = back
         self.back_raw = back_raw
+        #
+        # self.n_fields = len(back[0][1:]) // 2
 
         self.Nexit = Nexit
         self.Nexit_raw = Nexit_raw
 
         self.adiabatic = None
-
-        self.completed = set()  # TODO: we can actually just look at the results dict instead of tracking twice !
 
         self.cache()
 
@@ -90,27 +92,25 @@ class SampleCore(object):
     def int_background(cls, index, cache_loc):
         return cls(index, -32, cache_loc)
 
-    def task_eps(self, failed: bool, value):
+    @classmethod
+    def nexit_background(cls, index, cache_loc):
+        return cls(index, -34, cache_loc)
 
-        self.completed.add("eps")
+    def task_eps(self, failed: bool, value):
 
         if failed:
             self._update_sample(-40, result_key="eps", result_value=value)
         else:
             self._update_sample(0, "eps", result_key="eps", result_value=value)
 
-    def task_eta(self, failed: bool, value=None):
-
-        self.completed.add("eta")
+    def task_eta(self, failed: bool, value):
 
         if failed:
             self._update_sample(-41, result_key="eta", result_value=value)
         else:
             self._update_sample(0, result_key="eta", result_value=value)
 
-    def task_mij(self, failed: bool, adiabatic: bool, value=None):
-
-        self.completed.add("mij")
+    def task_mij(self, failed: bool, adiabatic: bool, value):
 
         self.adiabatic = adiabatic
 
@@ -119,23 +119,20 @@ class SampleCore(object):
         else:
             self._update_sample(0, result_key="mij", result_value=value)
 
-    def task_2pf(self, code: int, value=None):
+    def task_2pf(self, code: int, value):
 
-        self.completed.add("2pf")
-
-        if -60 < code < -50:
+        if -60 <= code <= -50:
             self._update_sample(code, result_key="2pf", result_value=value)
         else:
-            assert code == 0, code
+            assert code == 0, [code, value]
             self._update_sample(0, result_key="2pf", result_value=value)
 
-    def task_3pf(self, code: int, alpha_beta, value=None):
+    def task_3pf(self, code: int, alpha_beta, value):
 
-        self.completed.add(alpha_beta)
-
-        if -70 < code < -60:
+        if -70 <= code <= -60:
             self._update_sample(code, alpha_beta, result_key=alpha_beta, result_value=value)
         else:
+            assert code == 0, [code, value]
             self._update_sample(0, result_key=alpha_beta, result_value=value)
 
     def _update_sample(self, error_code: int, alpha_beta=None, result_value=None, result_key=None):
@@ -163,6 +160,8 @@ class SampleCore(object):
         else:
             os.remove(p)
             self.cache()
+
+
 
 
 def extract_core(data: ProtoAttributes) -> SampleCore:
@@ -242,36 +241,47 @@ def compute_background(data: ProtoAttributes):
     nexit_adj = py_scripts.compute_Nexit_for_matching(model, back_adj, params)
     nexit = py_scripts.compute_Nexit_for_matching(model, background, params)
 
+    if np.isnan(nexit_adj):
+        return SampleCore.nexit_background(index, cache).get_last_status()
+
     return SampleCore(index, 0, cache, back_adj, background, nexit_adj, nexit, params).get_last_status()
 
+def any_nan_inf(*vals):
 
-from numpy.lib import format as npf
+    arr = np.array([*vals])
 
+    return np.any(np.isnan(arr)) or np.any(np.isinf(arr))
 
 def compute_epsilon(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    if "eps" not in sample_core.completed:
+    if "eps" not in sample_core.results:
         eps = py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
-        sample_core.task_eps(False, eps)  # TODO: error
+
+        failed = any_nan_inf(eps)
+
+        sample_core.task_eps(failed, eps)
 
 
 def compute_eta(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    if "eta" not in sample_core.completed:
+    if "eta" not in sample_core.results:
         eta = py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
-        sample_core.task_eta(False, value=eta)  # TODO: error
+
+        failed = any_nan_inf(eta)
+
+        sample_core.task_eta(failed, value=eta)
 
 
 def compute_mij(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    if "mij" not in sample_core.completed:
+    if "mij" not in sample_core.results:
 
         masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
                                                            data.methods.model)
-        N_adi = data.methods.N_adiabitc
+        N_adi = data.methods.N_adiabatic
 
         back = sample_core.back
 
@@ -295,11 +305,13 @@ def compute_mij(data: ProtoAttributes):
 
             rest_heavy = np.all(np.sort(masses)[1:] > 2)
 
-            if not rest_heavy:
+            if not rest_heavy or any_nan_inf(rest_heavy):
                 adi = False
                 break
 
-        sample_core.task_mij(False, adi, value=[masses_exit, masses_end])  # TODO: error
+        failed = any_nan_inf(masses_exit, masses_end)
+
+        sample_core.task_mij(failed, adi, value=[masses_exit, masses_end])
 
 
 def compute_obs(data: ProtoAttributes):
@@ -327,7 +339,7 @@ def compute_obs(data: ProtoAttributes):
 def compute_2pf(data: ProtoAttributes):
     sample_core = extract_core(data)
 
-    if "2pf" not in sample_core.completed:
+    if "2pf" not in sample_core.results:
         result = py_scripts.compute_spectral_index(
             data.methods.model,
             sample_core.back,
@@ -338,7 +350,13 @@ def compute_2pf(data: ProtoAttributes):
             tmax=600  # 10 minute maximum, this should be plenty
         )
 
-        sample_core.task_2pf(0, value=result)  # TODO, error
+        if isinstance(result, int):
+            status = result
+            result = np.array([_BAD, _BAD, _BAD], dtype=np.float64)
+        else:
+            status = 0
+
+        sample_core.task_2pf(status, value=result)  # TODO, error
 
 
 def compute_3pf(data: ProtoAttributes, **task_kwargs):
@@ -355,7 +373,7 @@ def compute_3pf(data: ProtoAttributes, **task_kwargs):
         beta = task_kwargs['beta']
         alpha_beta = hash_alpha_beta(alpha, beta)
 
-    if alpha_beta not in sample_core.completed:
+    if alpha_beta not in sample_core.results:
         result = py_scripts.compute_fnl(
             data.methods.model,
             sample_core.back,
@@ -367,7 +385,13 @@ def compute_3pf(data: ProtoAttributes, **task_kwargs):
             **task_kwargs
         )
 
-        sample_core.task_3pf(0, alpha_beta, value=result)
+        if isinstance(result, int):
+            status = result
+            result = np.array([_BAD], dtype=np.float64)
+        else:
+            status = 0
+
+        sample_core.task_3pf(status, alpha_beta, value=result)
 
 #
 # def buildICPs(modelnumber, rerun_model=False):

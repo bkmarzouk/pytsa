@@ -49,17 +49,17 @@ bool _SamplerMode(){
     bool sampler_mode;
 
     if ( tmp == NULL ) {
-        cout << "NOT USING SAMPLER MODE" << endl;
+//        cout << "NOT USING SAMPLER MODE" << endl;
         sampler_mode = false;
     }
     else {
         std::string s( tmp );
         if (s == "TRUE") {
-            cout << "USING SAMPLER MODE" << endl;
+//            cout << "USING SAMPLER MODE" << endl;
             sampler_mode = true;
         }
         else {
-            cout << "NOT USING SAMPLER MODE" << endl;
+//            cout << "NOT USING SAMPLER MODE" << endl;
             sampler_mode = false;
         }
     }
@@ -787,8 +787,8 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
     bool full;
 
     // Setup flags
-    int timeoutFlag = -12;
-    int integrationFlag = -22;
+    int integrationFlag = -52;
+    int timeoutFlag = -53;
 
     // Report tuple flag or N at fail
     bool flagReturn = _SamplerMode();
@@ -895,7 +895,7 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
                 delete [] paramsIn;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", timeoutFlag, N);
+                    return Py_BuildValue("i", timeoutFlag);
                 }
 
                 else{
@@ -914,7 +914,7 @@ static PyObject* MT_sigEvolve(PyObject* self,  PyObject *args)
                 delete [] paramsIn;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", integrationFlag, N);
+                    return Py_BuildValue("i", integrationFlag);
                 }
 
                 else{
@@ -970,8 +970,8 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     bool full;
 
     // Setup flags
-    int timeoutFlag = -13;
-    int integrationFlag = -23;
+    int integrationFlag = -62;
+    int timeoutFlag = -63;
     bool flagReturn = _SamplerMode();
 
     // Maximum integration time, if < 0 then no max
@@ -1085,7 +1085,7 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
                 delete [] paramsIn2;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", timeoutFlag, N);
+                    return Py_BuildValue("i", timeoutFlag);
                 }
 
                 else{
@@ -1107,7 +1107,7 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
                 delete [] paramsIn2;
 
                 if(flagReturn == true){
-                    return Py_BuildValue("id", integrationFlag, N);
+                    return Py_BuildValue("i", integrationFlag);
                 }
 
                 else{

@@ -113,7 +113,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.fields[idx] = method
-            self.latex_f[idx] = (latex, record)
+            self.latex_f[idx] = f"$f_{idx}$" if latex is None else latex
 
     def set_dot_field(self, *indices, method, latex: str or None = None, record=True):
         """
@@ -134,7 +134,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.dot_fields[idx] = method
-            self.latex_df[idx] = (latex, record)
+            self.latex_df[idx] = f"$v_{idx}$" if latex is None else latex
 
     def set_param(self, *indices, method, latex: str or None = None, record=True):
         """
@@ -153,7 +153,7 @@ class _SamplingParameters(object):
 
         for idx in indices:
             self.params[idx] = method
-            self.latex_p[idx] = (latex, record)
+            self.latex_df[idx] = f"$p_{idx}$" if latex is None else latex
 
     def _get_hash_data(self):
 
@@ -234,7 +234,7 @@ class SamplerMethods(_SamplingParameters):
             tols = [1e-8, 1e-8]
         self.N_sub_evo = N_sub_evo
         self.tols = tols
-        self.N_adiabitc = N_adiabatic
+        self.N_adiabatic = N_adiabatic
         self.N_min = N_min
         self._analysis_pars_set = True
 
@@ -253,7 +253,7 @@ class SamplerMethods(_SamplingParameters):
 
         keys = ['Nsub', 'tols', 'Nadi', 'Nmin']
 
-        for value, key in zip([self.N_sub_evo, self.tols, self.N_adiabitc, self.N_min], keys):
+        for value, key in zip([self.N_sub_evo, self.tols, self.N_adiabatic, self.N_min], keys):
             base[key] = value
 
         return base
