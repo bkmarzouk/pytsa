@@ -59,7 +59,7 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
 
     for ii in range(1, len(array)):
 
-        if compare_to[ii] > pivot_value:
+        if compare_to[ii] >= pivot_value > compare_to[ii - 1]:
             lower = compare_to[ii - 1]
             upper = compare_to[ii]
             break
