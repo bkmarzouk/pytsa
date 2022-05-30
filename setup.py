@@ -28,3 +28,8 @@ for sub_dir in ['model', 'fmet', 'pot', 'covd']:
 
     if not os.path.exists(sub_dir):
         os.makedirs(sub_dir)
+
+default_samplers_cache = os.path.join(os.path.dirname(__file__), "samplers")
+
+if not os.path.exists(default_samplers_cache):
+    os.makedirs(default_samplers_cache)
