@@ -356,17 +356,17 @@ def compute_obs(data: ProtoAttributes):
         compute_2pf(data)
 
     if task_dict['task_3pt_eq'] is True:
-        compute_3pf(data, eq=True)
+        compute_3pf(data, eq=True, fo=False, sq=False)
 
     if task_dict['task_3pt_fo'] is True:
-        compute_3pf(data, fo=True)
+        compute_3pf(data, eq=False, fo=True, sq=False)
 
     if task_dict['task_3pt_sq'] is True:
-        compute_3pf(data, sq=True)
+        compute_3pf(data, eq=False, fo=False, sq=True)
 
     if len(task_dict['alpha']) > 0:
         for alpha, beta in zip(task_dict['alpha'], ['beta']):
-            compute_3pf(data, alpha=alpha, beta=beta)
+            compute_3pf(data, alpha=alpha, beta=beta, eq=False, fo=False, sq=False)
 
     return 0
 
