@@ -14,5 +14,6 @@ setup(
         "dill>=0.3.3",
         "mpi4py>=3.0.3",
         "schwimmbad>=0.3.2"
-    ]
+    ],
+    python_requires=">=3.8, <4"
 )

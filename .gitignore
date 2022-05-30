@@ -26,6 +26,9 @@ pytsa/sampler/builds
 !/example_models/quad_euclidean.py
 !/example_models/path_root.py
 
+/pytsa/models/*
+!/pytsa/models/__init__.py
+
 # Ignore sampler builds, but keep directory
 /pytsa/sampler/builds/*
 !/pytsa/sampler/builds/.gitkeep
