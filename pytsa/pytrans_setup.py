@@ -223,12 +223,12 @@ def potential(V, nF, nP, simplify_fmet=False, simplify_pot=False, simplify_covd=
     :return:
     """
 
+    fieldmetric(nF, nP, G, V, recache=recache, simple_fmet=simplify_fmet, simple_potential=simplify_pot,
+                simple_covd=simplify_covd, silent=silent)
+
     # Get symbolic expressions for covariant derivatives
     covd_sym = sym_tools.CovDSym(nF, nP, G, V, simplify_fmet=simplify_fmet, simplify_pot=simplify_pot,
                                  simplify=simplify_covd, recache=recache)
-
-    fieldmetric(nF, nP, G, V, recache=recache, simple_fmet=simplify_fmet, simple_potential=simplify_pot,
-                simple_covd=simplify_covd, silent=silent)
 
     v, vd, vdd, vddd = covd_sym.get_potential_sym_arrays()
 

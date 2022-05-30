@@ -1187,7 +1187,7 @@ static char PyTrans_docs[] =
 "This is a custom PyTransport package for solving the moment transport equations of inflationary cosmology\n";
 
 // **************************************************************************************
-static PyMethodDef quad_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, doc_Epsilon},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, doc_Eta},{"V", (PyCFunction)MT_V,   METH_VARARGS, doc_V},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, doc_dV},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, doc_ddV},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, doc_massMatrix},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, doc_findEndOfInflation},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, doc_backEvolve},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve},   {NULL}};//FuncDef
+static PyMethodDef dquad_euclidean_funcs[] = {{"H", (PyCFunction)MT_H,   METH_VARARGS, doc_H},{"nF", (PyCFunction)MT_fieldNumber,   METH_NOARGS, doc_nF},{"nP", (PyCFunction)MT_paramNumber,   METH_NOARGS, doc_nP},{"Epsilon", (PyCFunction)MT_Ep,   METH_VARARGS, doc_Epsilon},{"Eta", (PyCFunction)MT_Eta,   METH_VARARGS, doc_Eta},{"V", (PyCFunction)MT_V,   METH_VARARGS, doc_V},{"dV", (PyCFunction)MT_dV,   METH_VARARGS, doc_dV},{"ddV", (PyCFunction)MT_ddV,   METH_VARARGS, doc_ddV},{"massMatrix", (PyCFunction)MT_massMatrix,   METH_VARARGS, doc_massMatrix},{"findEndOfInflation", (PyCFunction)MT_findEndOfInflation,   METH_VARARGS, doc_findEndOfInflation},{"backEvolve", (PyCFunction)MT_backEvolve,   METH_VARARGS, doc_backEvolve},{"sigEvolve", (PyCFunction)MT_sigEvolve,   METH_VARARGS, doc_sigEvolve},{"alphaEvolve", (PyCFunction)MT_alphaEvolve,   METH_VARARGS, doc_alphaEvolve},   {NULL}};//FuncDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
@@ -1195,11 +1195,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "quad", PyTrans_docs, -1, quad_funcs}; //modDef
+static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "dquad_euclidean", PyTrans_docs, -1, dquad_euclidean_funcs}; //modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_quad(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+PyMODINIT_FUNC PyInit_dquad_euclidean(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus

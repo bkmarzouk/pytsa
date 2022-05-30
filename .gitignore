@@ -1,30 +1,24 @@
 # Ignore compiled python files everywhere
 **/*.pyc
-
-# Ignore .idea
 **/__pycache__
-.idea
 **/*.egg
-
-# Ignore builds dir
-samplers/
-pytsa/sampler/builds
-!pytsa/sampler/builds/.gitkeep
-!pytsa/sampler/builds/__init__.py
-
-# Ignore compile modules
-/pytsa/pyt/lib/python3.8/site-packages/*
 **/*.egg-info
 **/*.so
 **/build
 **/dist
+/pytsa/pyt/lib/python3.8/site-packages/*
+
+# Ignore .idea
+.idea
+
+# Ignore builds dir
+samplers/
 
 # Ignore Installation Directory (except for examples)
 /example_models/*
 !/example_models/dquad_euclidean.py
 !/example_models/dquad_2sphere.py
 !/example_models/quad_euclidean.py
-!/example_models/path_root.py
 
 /pytsa/models/*
 !/pytsa/models/__init__.py
@@ -40,18 +34,12 @@ pytsa/sampler/builds
 !/pytsa/sampler/configs/simple_example.py
 !/pytsa/sampler/setup_sampler.py
 
-
 # Ignore cached symbolic files
 /pytsa/sym_cache/*
 
 # Ignore .h header files that are generated from proto
 /pytsa/cppt/fieldmetric.h
 /pytsa/cppt/potential.h
-
-# Ignore correlation files
-**.pdf
-**.cfs
-correlation_functions.py
 
 # Keep .gitignore
 !.gitignore

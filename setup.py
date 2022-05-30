@@ -1,4 +1,5 @@
-from setuptools import setup, find_packages
+import os
+from setuptools import setup
 
 setup(
     name='pytsa',
@@ -17,3 +18,13 @@ setup(
     ],
     python_requires=">=3.8, <4"
 )
+
+sym_cache = os.path.join(os.path.dirname(__file__), "pytsa", "sym_cache")
+if not os.path.exists(sym_cache):
+    os.makedirs(sym_cache)
+
+for sub_dir in ['model', 'fmet', 'pot', 'covd']:
+    sub_dir = os.path.join(sym_cache, sub_dir)
+
+    if not os.path.exists(sub_dir):
+        os.makedirs(sub_dir)
