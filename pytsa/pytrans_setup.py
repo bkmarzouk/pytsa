@@ -111,14 +111,6 @@ def set_template_headers(NC: bool):
 def set_paths():  # Remove dep
     pass
 
-
-def garbage_removal():
-    t.sleep(1)
-    cwd = os.path.dirname(__file__)
-    location = os.path.join(cwd, 'pyt')
-    shutil.rmtree(os.path.join(location, 'build'), ignore_errors=False)
-
-
 def compile_module(name, NC=False):
     """
     Compiles template module
@@ -127,8 +119,8 @@ def compile_module(name, NC=False):
     :param NC: Non-canonical field metric if True, else Euclidean
     """
 
-    if not name.startswith("pyt_"):
-        name = "pyt_{}".format(name)
+    # if not name.startswith("pyt_"):
+    #     name = "pyt_{}".format(name)
 
     t_start = t.ctime()
     print('   [{time}] start'.format(time=t_start))
