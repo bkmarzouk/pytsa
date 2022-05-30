@@ -207,6 +207,7 @@ def compute_background(data: ProtoAttributes):
     Nmin = data.methods.N_min
     ics, params = data.sampler.get_sample(index)
 
+    # TODO: Do we actually need to do this? Duplicates later calculation if terminate with eps > 1
     Nend = model.findEndOfInflation(
         ics,
         params,
@@ -216,6 +217,7 @@ def compute_background(data: ProtoAttributes):
         30  # tmax (seconds)
     )
 
+    # TODO: This is overkill ... relax a bit to compute background faster
     N_evo = np.linspace(0, Nend, int(100 * Nend))  # Dense N evo
     background = model.backEvolve(
         N_evo,
