@@ -111,6 +111,7 @@ def set_template_headers(NC: bool):
 def set_paths():  # Remove dep
     pass
 
+
 def compile_module(name, NC=False):
     """
     Compiles template module
@@ -200,16 +201,6 @@ def compile_module(name, NC=False):
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),
                                                                              _delta_ctime(t_start, t_end)))
-
-
-def delete_module(name):
-    """
-    Deletes module based on compile name
-
-    :param name: module name
-    """
-    location = os.path.join(os.path.dirname(__file__), 'pyt')
-    [os.remove(os.path.join(location, f)) for f in os.listdir(location) if f.startswith("pyt" + name)]
 
 
 # TODO: Tidy translators; wrap into single call?
