@@ -182,8 +182,28 @@ def compile_module(name, NC=False):
     if os.path.exists(os.path.join(location, "dist")):
         subprocess.run(["rm", "-r", "dist"], cwd=location)
 
-    if os.path.exists(os.path.join(location,f"{name}.egg-info")):
+    if os.path.exists(os.path.join(location, f"{name}.egg-info")):
         subprocess.run(["rm", "-r", f"{name}.egg-info"], cwd=location)
+
+    models_root = os.path.abspath(os.path.join(cwd, "models"))
+
+    models_tree = [x[0] for x in os.walk(models_root)]
+
+    models_eggs = [x for x in models_tree if x.endswith(".egg") and name in x]
+
+    for egg_path in models_eggs:
+
+        fnames = [f for f in os.listdir(egg_path) if f.endswith(".so") or f.endswith(".py")]
+
+        for fn in fnames:
+
+            src = os.path.join(egg_path, fn)
+            dst = os.path.join(models_root, fn)
+
+            if os.path.exists(dst):
+                os.remove(dst)
+
+            shutil.copyfile(src, dst)
 
     t_end = t.ctime()
     print("\n-- Compiled source in {} seconds, total time {} seconds".format(_delta_ctime(t_start_compile, t_end),

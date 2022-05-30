@@ -1,4 +1,3 @@
-# from path_root import *  # Sets path to import pytsa files
 import sympy as sym
 from pytsa import pytrans_setup
 

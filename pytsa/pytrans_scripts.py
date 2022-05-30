@@ -25,7 +25,7 @@ import numpy as np
 from scipy import interpolate
 from scipy.interpolate import UnivariateSpline
 
-import spline_tools as splt
+from . import spline_tools as splt
 
 
 # this script finds initial conditions at least NBMassless e-folds before the massless point

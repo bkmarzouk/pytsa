@@ -222,7 +222,7 @@ def compute_background(data: ProtoAttributes):
         ics,
         params,
         tols,
-        False,
+        True,
         30,  # tmax (seconds)
     )  # Raw background
 
