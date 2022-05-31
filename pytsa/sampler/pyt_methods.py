@@ -244,10 +244,10 @@ def compute_background(index: int):
     if isinstance(background, int):
 
         if background == -32:
-            return SampleCore.int_background(index)
+            return SampleCore.int_background(index).get_last_status()
 
         elif background == -33:
-            return SampleCore.timeout_background(index)
+            return SampleCore.timeout_background(index).get_last_status()
 
         else:
             raise ValueError(background)
