@@ -3,6 +3,8 @@ from pytsa.sampler import main_pool
 from pytsa.sampler.setup_sampler import job_config
 
 if __name__ == "__main__":
+
+    # Exports env variable so c++ returns flags upon error
     os.environ['SAMPLER_MODE'] = "TRUE"
 
     # Import schwimmbad for MPI pool processes

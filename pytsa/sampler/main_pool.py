@@ -4,11 +4,9 @@ import numpy as np
 import pandas as pd
 import dill
 
-from pytsa.sampler import pyt_methods
-from pytsa.sampler.setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
-from pytsa.cache_tools import hash_alpha_beta
-
-LINE_SIZE = None
+from . import pyt_methods
+from .setup_sampler import SamplerMethods, APrioriSampler, LatinSampler
+from ..cache_tools import hash_alpha_beta
 
 _BAD = np.nan
 
