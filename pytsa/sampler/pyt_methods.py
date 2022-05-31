@@ -46,7 +46,7 @@ class SampleCore(object):
 
     # Track background quantities for observables, and log errors
 
-    def __init__(self, index: int, err_number: int, cache_loc, back: np.ndarray or None = None,
+    def __init__(self, index: int, back_status: int, cache_loc, back: np.ndarray or None = None,
                  back_raw: np.ndarray or None = None,
                  Nexit: float or None = None,
                  Nexit_raw: float or None = None,
@@ -58,15 +58,13 @@ class SampleCore(object):
 
         self.params = params
 
-        self.err_n = [err_number]
-        self.err_s = [error_dict[err_number]]
+        self.err_n = [back_status]
+        self.err_s = [error_dict[back_status]]
 
         self.results = {}
 
         self.back = back
         self.back_raw = back_raw
-        #
-        # self.n_fields = len(back[0][1:]) // 2
 
         self.Nexit = Nexit
         self.Nexit_raw = Nexit_raw

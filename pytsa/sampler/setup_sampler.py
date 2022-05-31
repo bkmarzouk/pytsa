@@ -596,6 +596,9 @@ def job_config(task_pars: dict):
 
     tasks_path = os.path.join(root_dir, "sampler.tasks")
 
+    assert_keys = ['entropy', 'apriori', 'cwd', 'name', 'n_samples']
+    assert_pars = {k: task_pars[k] for k in assert_keys}
+
     if rank == 0:
 
         if os.path.exists(tasks_path):
@@ -604,19 +607,19 @@ def job_config(task_pars: dict):
 
                 cached_task_pars: dict = pk.load(f)
 
-            assert cached_task_pars.keys() == task_pars.keys(), [cached_task_pars.keys(), task_pars.keys()]
+            assert assert_pars.keys() == assert_pars.keys(), [cached_task_pars.keys(), assert_pars.keys()]
 
-            for k in cached_task_pars.keys():
+            for k in assert_keys:
                 parsed_par = task_pars[k]
                 cached_par = cached_task_pars[k]
 
-                assert parsed_par == cached_par or k == "n_procs", f"Parameter error @ {k}: {parsed_par} != {cached_par}"
+                assert parsed_par == cached_par, f"Parameter error @ {k}: {parsed_par} != {cached_par}"
 
         else:
 
             with open(tasks_path, "wb") as f:
 
-                pk.dump(task_pars, f)
+                pk.dump(assert_pars, f)
 
         random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
 

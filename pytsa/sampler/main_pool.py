@@ -141,6 +141,8 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
     # initialize as zeros array
     raw = np.zeros((args_dict['n_samples'], len(headers)), dtype=np.float64)
 
+    errors_data = {}
+
     for item in sample_pool:
         sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
 
@@ -148,6 +150,8 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
             sample = dill.load(f)
 
         row_data = sample.get_row_data(*obs_keys)
+
+
 
         if isinstance(row_data, float) and np.isnan(row_data):
             raw[sample.index][:] = _BAD
