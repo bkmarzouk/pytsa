@@ -16,31 +16,38 @@ if __name__ == "__main__":
 
     parser.add_argument("name", metavar="name", type=str,
                         help="Name for sampling routine: defines subdir")
-    #
-    # parser.add_argument("--nproc", dest="n_procs", default=1, type=int,
-    #                     help="Number of processes, intializes mpi pool")
 
     sampler_group = parser.add_argument_group()
 
-    sampler_group.add_argument("--n_samples", type=int, dest="n_samples", required=True)
-    sampler_group.add_argument("--entropy", type=int, dest="entropy", required=False, default=None)
+    sampler_group.add_argument("--n_samples", type=int, dest="n_samples", required=True,
+                               help="Number of samples to compute")
+    sampler_group.add_argument("--entropy", type=int, dest="entropy", required=False, default=None,
+                               help="System entropy value: Enables reproducible results")
 
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--apriori", action="store_true", dest="apriori")
-    mode.add_argument("--latin", action="store_true", dest="latin")
+    mode.add_argument("--apriori", action="store_true", dest="apriori",
+                      help="If flagged, then run sampler in apriori mode")
+    mode.add_argument("--latin", action="store_true", dest="latin",
+                      help="If flagged, then run sampler in latin hypercube mode")
 
     observables_group = parser.add_argument_group()
 
-    # TODO: docs
-    sampler_group.add_argument("--ns", action="store_true", dest="task_2pt")
-    sampler_group.add_argument("--eq", action="store_true", dest="task_3pt_eq")
-    sampler_group.add_argument("--fo", action="store_true", dest="task_3pt_fo")
-    sampler_group.add_argument("--sq", action="store_true", dest="task_3pt_sq")
+    sampler_group.add_argument("--ns", action="store_true", dest="task_2pt", help="If flagged, computes 2-point data")
+    sampler_group.add_argument("--eq", action="store_true", dest="task_3pt_eq",
+                               help="If flagged, computes 3-point data in equilateral mode configuration")
+    sampler_group.add_argument("--fo", action="store_true", dest="task_3pt_fo",
+                               help="If flagged, computes 3-point data in folded mode configuration")
+    sampler_group.add_argument("--sq", action="store_true", dest="task_3pt_sq",
+                               help="If flagged, computes 3-point data in squeezed mode configutarion")
 
     extra_group = parser.add_argument_group()
 
-    extra_group.add_argument("--alpha", nargs="+", help="Additional 3pt tasks: alpha definitions", required=False)
-    extra_group.add_argument("--beta", nargs="+", help="Additional 3pt tasks: beta definitions", required=False)
+    extra_group.add_argument("--alpha", nargs="+", required=False,
+                             help="Pass values of alpha (Fergusson Shellard convention) to compute custom fnls. "
+                                  "NOTE: Requires equal number of beta definitions.")
+    extra_group.add_argument("--beta", nargs="+", required=False,
+                             help="Pass values of beta (Fergusson Shellard convention) to compute custom fnls. "
+                                  "NOTE: Requires equal number of alpha definitions.")
 
     parsed_args = parser.parse_args()
 
