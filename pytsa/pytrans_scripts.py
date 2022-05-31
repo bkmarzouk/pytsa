@@ -694,7 +694,7 @@ def compute_Nexit_for_matching(MTE, back: np.ndarray, params: np.ndarray, k=0.00
 
 
 def matchKExitN(back, params, MTE, k=0.002):  # Remove
-    const = 55.75 - np.log(k / 0.05)  # TODO: seems a bit odd!
+    const = 55.75 - np.log(k / 0.05)
 
     # Mpl = 2.435 × 10^18 GeV
     # Tre = 10^16 Gev
@@ -703,8 +703,6 @@ def matchKExitN(back, params, MTE, k=0.002):  # Remove
     HArr = np.zeros(4, dtype=float)
 
     count = 0
-
-    # TODO: Implement methods from spline_tools.py !
 
     # Iterate over background step
     for ii in range(len(back) - 4):
@@ -1011,7 +1009,6 @@ def compute_fnl(MTE, back: np.ndarray, params: np.ndarray, tols: np.ndarray, sub
     k2 = _k2(alpha, beta, kt)
     k3 = _k3(alpha, beta, kt)
 
-    # Check momenta TODO: return error for bad k here
     for k in [k1, k2, k3]:
 
         # if momenta has become infinite, or subject to numerical error

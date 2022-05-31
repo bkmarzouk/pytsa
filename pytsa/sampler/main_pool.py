@@ -10,7 +10,7 @@ from pytsa.cache_tools import hash_alpha_beta
 
 LINE_SIZE = None
 
-_BAD = -1.23e-45
+_BAD = np.nan
 
 
 class TrackMethods:
@@ -74,7 +74,7 @@ def print_out(s: str):
     print(f"\n-- {s}\n")
 
 
-def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
+def write_results(args_dict: dict, sample_pool: np.ndarray):
     nF = sample_pool[0].methods.nF
     nP = sample_pool[0].methods.nP
     latexs = []
@@ -151,7 +151,7 @@ def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
 
         row_data = sample.get_row_data(*obs_keys)
 
-        if isinstance(row_data, float) and row_data == _BAD:
+        if isinstance(row_data, float) and np.isnan(row_data):
             raw[sample.index][:] = _BAD
 
         else:
@@ -161,7 +161,7 @@ def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
     df = pd.DataFrame(raw, columns=headers)
 
     sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
-    results_path = os.path.join(sampler_run_dir, "pandas.df")
+    results_path = os.path.join(sampler_run_dir, "pandas_{}.df".format(args_dict['name']))
 
     if os.path.exists(results_path):
         os.remove(results_path)
@@ -174,6 +174,7 @@ def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
 
     Nrows = len(res_getdist)
 
+    # Filter any rows that contain bad data values that would corrupt getdist analysis
     for _idx in range(len(res_getdist)):
         idx = Nrows - 1 - _idx
         r = res_getdist[idx]
@@ -192,44 +193,6 @@ def build_pandas_df(args_dict: dict, sample_pool: np.ndarray):
     with open(getdist_p_path, "w") as f:
         for h, l in zip(headers, latexs):
             f.write(f"{h} {l}\n")
-
-def results_writer(args_dict: dict, obs_pool: np.ndarray):
-    sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
-
-    samples_dir = os.path.join(sampler_run_dir, "samples_core")
-
-    results_path = os.path.join(sampler_run_dir, "results.txt")
-    params_path = os.path.join(sampler_run_dir, "results.params")
-
-    obs_keys = []
-
-    if args_dict['task_2pt']:
-        obs_keys.append("2pf")
-
-    for ext in ['eq', 'fo', 'sq']:
-        full = f"task_3pt_{ext}"
-        if args_dict[full]:
-            obs_keys.append(ext)
-
-    for alpha, beta in zip(args_dict['alpha'], args_dict['beta']):
-        key = hash_alpha_beta(alpha, beta)
-        obs_keys.append(key)
-
-    with open(results_path, "w") as file:
-        for item in obs_pool:
-            sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
-
-            with open(sample_path, "rb") as f:
-                sample = dill.load(f)
-
-            row_data = sample.get_row_data(*obs_keys)
-
-            if row_data is not None:
-                ics, pars = item.sampler.get_sample(item.index)
-
-                row_data = np.concatenate((np.ones(2, dtype=np.float64), ics, pars, row_data))
-
-                file.write(" ".join(map(str, row_data)) + "\n")
 
 
 def main(pool, args_dict: dict):
@@ -265,5 +228,5 @@ def main(pool, args_dict: dict):
     print_out("Observables complete.")
 
     print("Writing results")
-    build_pandas_df(args_dict, back_pool)
+    write_results(args_dict, back_pool)
     print("All done.")

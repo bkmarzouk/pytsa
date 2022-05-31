@@ -11,10 +11,12 @@ setup(
     url="https://github.com/bkmarzouk/pytsa",
     install_requires=[
         "scipy>=1.6.1",
+        "sympy>=1.6.1",
         "numpy>=1.20.1",
         "dill>=0.3.3",
         "mpi4py>=3.0.3",
-        "schwimmbad>=0.3.2"
+        "schwimmbad>=0.3.2",
+        "pandas>=1.1.1"
     ],
     python_requires=">=3.8, <4"
 )

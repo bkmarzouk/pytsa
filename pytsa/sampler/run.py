@@ -1,12 +1,13 @@
 import os
 from pytsa.sampler import main_pool
-from pytsa.sampler.setup_sampler import job_config, SamplerMethods, APrioriSampler, LatinSampler
+from pytsa.sampler.setup_sampler import job_config
 
 if __name__ == "__main__":
     os.environ['SAMPLER_MODE'] = "TRUE"
 
     # Import schwimmbad for MPI pool processes
     import schwimmbad
+    from pytsa.sampler.mpi_helpers import size as n_proc
 
     # Import argument parser for cmd args
     from argparse import ArgumentParser
@@ -15,9 +16,9 @@ if __name__ == "__main__":
 
     parser.add_argument("name", metavar="name", type=str,
                         help="Name for sampling routine: defines subdir")
-
-    parser.add_argument("--nproc", dest="n_procs", default=1, type=int,
-                        help="Number of processes, intializes mpi pool")
+    #
+    # parser.add_argument("--nproc", dest="n_procs", default=1, type=int,
+    #                     help="Number of processes, intializes mpi pool")
 
     sampler_group = parser.add_argument_group()
 
@@ -55,6 +56,6 @@ if __name__ == "__main__":
 
     job_config(args_dict)
 
-    pool = schwimmbad.choose_pool(mpi=parsed_args.n_procs > 1, processes=parsed_args.n_procs, use_dill=True)
+    pool = schwimmbad.choose_pool(mpi=n_proc > 1, processes=n_proc, use_dill=True)
 
     main_pool.main(pool, args_dict)

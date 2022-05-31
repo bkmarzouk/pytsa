@@ -221,7 +221,8 @@ class SamplerMethods(_SamplingParameters):
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
         assert 0, "currently unsupported"
 
-    def set_analysis_params(self, N_sub_evo=6., tols=None, N_adiabatic=1., N_min=60.):
+    def set_analysis_params(self, N_sub_evo=6., tols=None, N_adiabatic=1., N_min=60., tmax_bg=120,
+                            tmax_2pf=300, tmax_3pf=600, step_density=20):
         """
         Set integration parameters and efoldings for ICs, adiabicity and minimal inflation
 
@@ -229,6 +230,9 @@ class SamplerMethods(_SamplingParameters):
         :param tols: integration tols (abs, rel)
         :param N_adiabatic: Number of efoldings to probe the adiabaitic limit
         :param N_min: min efolds of inflation
+        :param tmax_bg: Maximum time in seconds that is spent computing background
+        :param tmax_2pf: Maximum time in seconds that is spent computing 2point function
+        :param tmax_3pf: Maximum time in seconds that is spent computing 3point function
         """
         if tols is None:
             tols = [1e-8, 1e-8]
@@ -236,6 +240,10 @@ class SamplerMethods(_SamplingParameters):
         self.tols = tols
         self.N_adiabatic = N_adiabatic
         self.N_min = N_min
+        self.tmax_bg = tmax_bg
+        self.tmax_2pf = tmax_2pf
+        self.tmax_3pf = tmax_3pf
+        self.step_density = step_density
         self._analysis_pars_set = True
 
     def get_hash_data(self) -> dict:
@@ -251,9 +259,12 @@ class SamplerMethods(_SamplingParameters):
             for key in conditions:
                 base[p + f"_{key}"] = conditions[key]
 
-        keys = ['Nsub', 'tols', 'Nadi', 'Nmin']
+        keys = ['Nsub', 'tols', 'Nadi', 'Nmin', 'tmax_bg', 'tmax_2pf', 'tmax_3pf', 'step_density']
 
-        for value, key in zip([self.N_sub_evo, self.tols, self.N_adiabatic, self.N_min], keys):
+        for value, key in zip(
+                [self.N_sub_evo, self.tols, self.N_adiabatic, self.N_min, self.tmax_bg, self.tmax_2pf, self.tmax_3pf,
+                 self.step_density],
+                keys):
             base[key] = value
 
         return base
@@ -614,8 +625,6 @@ def job_config(task_pars: dict):
         with open(methods_path, "rb") as f:
             sampler_methods: SamplerMethods = dill.load(f)
 
-        n_fields = sampler_methods.nF
-
         sampler_path = os.path.join(root_dir, "sampler.run")
         if not os.path.exists(sampler_path):
             _m = APrioriSampler if apriori else LatinSampler
@@ -632,25 +641,6 @@ def job_config(task_pars: dict):
 
 
 if __name__ == "__main__":
-
-    import pyt_dquad_euclidean as model
-    import pyt_dquad_2sphere as model_nc
-    import scipy.stats as stats
-
-    sampler_setup = SamplerMethods(model, "dquad_test")
-    sampler_setup.set_analysis_params(tols=[1e-5, 1e-5])
-    sampler_setup.set_field(0, 1, method=stats.uniform(-20, 40))
-    sampler_setup.set_dot_field(0, 1, method="sr")
-    sampler_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-2))
-    sampler_setup.build_sampler()
-
-    sampler_nc_setup = SamplerMethods(model_nc, "nc_test")
-    sampler_nc_setup.set_analysis_params(tols=[1e-5, 1e-5])
-    sampler_nc_setup.set_field(0, 1, method=stats.uniform(-20, 40))
-    sampler_nc_setup.set_dot_field(0, 1, method="sr")
-    sampler_nc_setup.set_param(0, 1, method=stats.loguniform(1e-6, 1e-2))
-    sampler_nc_setup.set_param(2, method=stats.norm(loc=1, scale=1e-2))
-    sampler_nc_setup.build_sampler()
 
     make_demo_fig = False
 
