@@ -118,6 +118,10 @@ class SampleCore(object):
         return cls(index, -32)
 
     @classmethod
+    def timeout_background(cls, index):
+        return cls(index, -33)
+
+    @classmethod
     def nexit_background(cls, index):
         return cls(index, -34)
 
@@ -207,8 +211,6 @@ class SampleCore(object):
 
 def extract_core(index: int) -> SampleCore:
 
-    print(index)
-
     sample_path = os.path.join(samples_dir, "sample.%06d" % index)
 
     with open(sample_path, "rb") as f:
@@ -238,6 +240,17 @@ def compute_background(index: int):
         True,
         tmag_bg,
     )  # Raw background
+
+    if isinstance(background, int):
+
+        if background == -32:
+            return SampleCore.int_background(index)
+
+        elif background == -33:
+            return SampleCore.timeout_background(index)
+
+        else:
+            raise ValueError(background)
 
     # Update evolution to correspond to epsilon > 1 end
     N_evo = background.T[0]

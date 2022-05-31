@@ -44,15 +44,6 @@ def _dill_load(path):
         return dill.load(f)
 
 
-def build_back_pool(n_samples: int):
-    pool_data = np.empty(n_samples, dtype=SampleData)
-
-    for idx in range(n_samples):
-        pool_data[idx] = SampleData(n_samples, idx, None)
-
-    return pool_data
-
-
 def build_obs_pool(indices: list, task_dict: dict):
     pool_data = np.empty(len(indices), dtype=SampleData)
 
