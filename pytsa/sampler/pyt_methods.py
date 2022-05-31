@@ -6,6 +6,13 @@ from pytsa import pytrans_scripts as py_scripts
 from ..cache_tools import hash_alpha_beta
 from .setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
+try:
+    env_verbose = os.environ['pytsa_VERBOSE']
+    verbose = bool(int(env_verbose))
+except KeyError:
+    env_verbose = None
+    verbose = False
+
 
 class ProtoAttributes:
     # Prototype for typing
@@ -191,6 +198,9 @@ def extract_core(data: ProtoAttributes) -> SampleCore:
     return sample_core
 
 
+from pytsa.sampler.mpi_helpers import rank
+
+
 def compute_background(data: ProtoAttributes):
     try:
         loaded = extract_core(data)
@@ -201,6 +211,9 @@ def compute_background(data: ProtoAttributes):
     model = data.methods.model
     index = data.index
     cache = data.cache
+
+    if verbose:
+        print(f"-- computing background {index} @ {rank}")
 
     tols = np.array([*data.methods.tols], dtype=float)
     Nmin = data.methods.N_min
@@ -284,6 +297,8 @@ def compute_epsilon(data: ProtoAttributes):
     sample_core = extract_core(data)
 
     if "eps" not in sample_core.results:
+        if verbose:
+            print(f"-- computing epsilon {sample_core.index} @ {rank}")
         eps = py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
 
         failed = any_nan_inf(eps)
@@ -295,6 +310,8 @@ def compute_eta(data: ProtoAttributes):
     sample_core = extract_core(data)
 
     if "eta" not in sample_core.results:
+        if verbose:
+            print(f"-- computing eta {sample_core.index} @ {rank}")
         eta = py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, data.methods.model)
 
         failed = any_nan_inf(eta)
@@ -306,6 +323,9 @@ def compute_mij(data: ProtoAttributes):
     sample_core = extract_core(data)
 
     if "mij" not in sample_core.results:
+
+        if verbose:
+            print(f"-- computing masses {sample_core.index} @ {rank}")
 
         masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
                                                            data.methods.model)
@@ -370,6 +390,10 @@ def compute_2pf(data: ProtoAttributes):
     tols = np.array([*data.methods.tols], dtype=float)
     tmax = data.methods.tmax_2pf
     if "2pf" not in sample_core.results:
+
+        if verbose:
+            print(f"-- computing 2pf {sample_core.index} @ {rank}")
+
         result = py_scripts.compute_spectral_index(
             data.methods.model,
             sample_core.back,
@@ -407,6 +431,10 @@ def compute_3pf(data: ProtoAttributes, **task_kwargs):
     tmax = data.methods.tmax_2pf
 
     if alpha_beta not in sample_core.results:
+
+        if verbose:
+            print(f"-- computing fnl {alpha_beta} {sample_core.index} @ {rank}")
+
         result = py_scripts.compute_fnl(
             data.methods.model,
             sample_core.back,

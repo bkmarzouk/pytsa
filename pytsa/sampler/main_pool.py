@@ -263,8 +263,6 @@ def main(pool, args_dict: dict):
     # Gather successful trajectories
     obs_pool = build_obs_pool(sampler_run_dir, back_status, args_dict)
 
-    # Compute further background data for successful trajectories
-
     print_out("Computing epsilon data")
     list(pool.map(pyt_methods.compute_epsilon, obs_pool))
     print_out("Epsilon complete.")

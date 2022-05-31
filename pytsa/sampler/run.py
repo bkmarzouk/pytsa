@@ -1,5 +1,4 @@
 import os
-from pytsa.sampler import main_pool
 from pytsa.sampler.setup_sampler import job_config
 
 if __name__ == "__main__":
@@ -18,6 +17,8 @@ if __name__ == "__main__":
 
     parser.add_argument("name", metavar="name", type=str,
                         help="Name for sampling routine: defines subdir")
+
+    parser.add_argument("--verbose", action="store_true", dest="verbose", help="Run sampler in verbose mode")
 
     sampler_group = parser.add_argument_group()
 
@@ -65,6 +66,10 @@ if __name__ == "__main__":
 
     job_config(args_dict)
 
+    os.environ['pytsa_VERBOSE'] = "1" if args_dict['verbose'] else "0"
+
     pool = schwimmbad.choose_pool(mpi=n_proc > 1, processes=n_proc, use_dill=True)
+
+    from pytsa.sampler import main_pool
 
     main_pool.main(pool, args_dict)
