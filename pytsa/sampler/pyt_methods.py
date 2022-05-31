@@ -2,9 +2,9 @@ import os
 import numpy as np
 import pickle as pk
 
-import pytsa.pytrans_scripts as py_scripts
-from pytsa.cache_tools import hash_alpha_beta
-from pytsa.sampler.setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
+from pytsa import pytrans_scripts as py_scripts
+from ..cache_tools import hash_alpha_beta
+from .setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
 
 
 class ProtoAttributes:
