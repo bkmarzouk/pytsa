@@ -31,15 +31,11 @@ reps = [
 ]
 
 
-class TrackMethods:
+class SampleData:
 
-    def __init__(self, n_samples: int, methods: SamplerMethods, sampler: APrioriSampler or LatinSampler, index, cache,
-                 task_dict=None):
+    def __init__(self, n_samples: int, index: int, task_dict: dict or None = None):
         self.n_samples = n_samples
-        self.methods = methods
-        self.sampler = sampler
         self.index = index
-        self.cache = cache
         self.task_dict = task_dict
 
 
@@ -48,42 +44,22 @@ def _dill_load(path):
         return dill.load(f)
 
 
-def build_back_pool(loc: str, n_samples: int):
-    sampler_path = os.path.join(loc, "sampler.run")
-    sampler: APrioriSampler or LatinSampler = _dill_load(sampler_path)
-
-    methods_path = os.path.abspath(os.path.join(loc, "..", "sampler.methods"))
-    methods: SamplerMethods = _dill_load(methods_path)
-
-    pool_data = np.empty(n_samples, dtype=TrackMethods)
-
-    samples_dir = os.path.join(loc, "samples_core")
+def build_back_pool(n_samples: int):
+    pool_data = np.empty(n_samples, dtype=SampleData)
 
     for idx in range(n_samples):
-        pool_data[idx] = TrackMethods(n_samples, methods, sampler, idx, samples_dir)
+        pool_data[idx] = SampleData(n_samples, idx, None)
 
     return pool_data
 
 
-def build_obs_pool(loc: str, status_dict: list, task_dict: dict):
-    sampler_path = os.path.join(loc, "sampler.run")
-    sampler: APrioriSampler or LatinSampler = _dill_load(sampler_path)
-
-    methods_path = os.path.abspath(os.path.join(loc, "..", "sampler.methods"))
-    methods: SamplerMethods = _dill_load(methods_path)
-
-    indices = {sd[0] for sd in status_dict if sd[1] == 0}
+def build_obs_pool(indices: list, task_dict: dict):
+    pool_data = np.empty(len(indices), dtype=SampleData)
 
     n_total = task_dict['n_samples']
 
-    n_samples = len(indices)
-
-    pool_data = np.empty(n_samples, dtype=TrackMethods)
-
-    samples_dir = os.path.join(loc, "samples_core")
-
     for _, idx in enumerate(indices):
-        pool_data[_] = TrackMethods(n_total, methods, sampler, idx, samples_dir, task_dict=task_dict)
+        pool_data[_] = SampleData(n_total, idx, task_dict=task_dict)
 
     return pool_data
 
@@ -92,17 +68,24 @@ def print_out(s: str):
     print(f"\n-- {s}\n")
 
 
-def write_results(args_dict: dict, sample_pool: np.ndarray):
-    nF = sample_pool[0].methods.nF
-    nP = sample_pool[0].methods.nP
+def write_results(args_dict: dict, indices: np.ndarray):
+
+    path = os.path.join(args_dict['cwd'], args_dict['name'], 'sampler.run')
+    samples_dir = os.path.join(args_dict['cwd'], args_dict['name'], 'samples_core')
+
+    with open(path, "rb") as f:
+        sampler: APrioriSampler or LatinSampler = dill.load(f)
+
+    nF = sampler.hyp_pars.nF
+    nP = sampler.hyp_pars.nP
     latexs = []
 
     for ii in range(nF):
-        latexs.append(sample_pool[0].methods.latex_f[ii])
+        latexs.append(sampler.hyp_pars.latex_f[ii])
     for ii in range(nF):
-        latexs.append(sample_pool[0].methods.latex_df[ii])
+        latexs.append(sampler.hyp_pars.latex_df[ii])
     for ii in range(nP):
-        latexs.append(sample_pool[0].methods.latex_p[ii])
+        latexs.append(sampler.hyp_pars.latex_p[ii])
 
     latexs.append(r"\epsilon_*")
     latexs.append(r"\epsilon")
@@ -163,8 +146,8 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
 
     errors_data = {}
 
-    for item in sample_pool:
-        sample_path = os.path.join(item.cache, "sample.%06d" % item.index)
+    for idx in indices:
+        sample_path = os.path.join(samples_dir, "sample.%06d" % idx)
 
         with open(sample_path, "rb") as f:
             sample = dill.load(f)
@@ -184,8 +167,8 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
             raw[sample.index][:] = _BAD
 
         else:
-            ics, pars = item.sampler.get_sample(item.index)
-            raw[sample.index] = np.concatenate((ics, pars, row_data))
+            ics, pars = sampler.get_sample(idx)
+            raw[idx] = np.concatenate((ics, pars, row_data))
 
     df = pd.DataFrame(raw, columns=headers)
 
@@ -237,48 +220,52 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
         for pattern, rep in reps[::-1]:
 
             if k3.startswith(pattern):
-
                 txt = k3.replace(pattern, rep)
 
                 error_lines.append("{:55s} {}\n".format(txt, errors_data[k3]))
 
     efficiency = round(100 * len(res_getdist) / len(raw), 2)
 
-    error_lines.append("\n->{:55s} {}%\n".format("Sampling efficiency", efficiency))
+    error_lines.append("\n-> {:55s} {}%\n".format("Sampling efficiency", efficiency))
 
     with open(errors_path, "w") as f:
         f.writelines(error_lines)
 
+
 def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
 
-    sampler_run_dir = os.path.join(args_dict['cwd'], args_dict['name'])
-
-    back_pool = build_back_pool(sampler_run_dir, n_samples)
+    indices = np.arange(n_samples)
 
     print_out("Computing background trajectories")
-    back_status = list(pool.map(pyt_methods.compute_background, back_pool))
+    back_status = list(pool.map(pyt_methods.compute_background, indices))
     print_out("Background complete.")
 
-    # Gather successful trajectories
-    obs_pool = build_obs_pool(sampler_run_dir, back_status, args_dict)
+    # exit code ok
+    status_0s = list(filter(lambda x: x[1] == 0, back_status))
+    status_0s = [item[0] for item in status_0s]
 
     print_out("Computing epsilon data")
-    list(pool.map(pyt_methods.compute_epsilon, obs_pool))
+    list(pool.map(pyt_methods.compute_epsilon, status_0s))
     print_out("Epsilon complete.")
 
     print_out("Computing eta data")
-    list(pool.map(pyt_methods.compute_eta, obs_pool))
+    list(pool.map(pyt_methods.compute_eta, status_0s))
     print_out("Eta complete.")
 
     print_out("Computing mass data")
-    list(pool.map(pyt_methods.compute_mij, obs_pool))
+    list(pool.map(pyt_methods.compute_mij, status_0s))
     print_out("Masses complete.")
+
+    # Gather successful trajectories
+    obs_pool = build_obs_pool(status_0s, args_dict)
 
     print_out("Computing observables")
     list(pool.map(pyt_methods.compute_obs, obs_pool))
     print_out("Observables complete.")
 
+    pool.close()
+
     print("Writing results")
-    write_results(args_dict, back_pool)
+    write_results(args_dict, indices)
     print("All done.")

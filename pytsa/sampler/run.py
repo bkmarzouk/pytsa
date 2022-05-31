@@ -67,8 +67,9 @@ if __name__ == "__main__":
     job_config(args_dict)
 
     os.environ['pytsa_VERBOSE'] = "1" if args_dict['verbose'] else "0"
+    os.environ['pytsa_SAMPLER'] = os.path.join(args_dict['cwd'], args_dict['name'], 'sampler.run')
 
-    pool = schwimmbad.choose_pool(mpi=n_proc > 1, processes=n_proc, use_dill=True)
+    pool = schwimmbad.choose_pool(mpi=n_proc > 1, processes=n_proc, use_dill=False)
 
     from pytsa.sampler import main_pool
 
