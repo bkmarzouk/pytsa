@@ -10,6 +10,26 @@ from ..cache_tools import hash_alpha_beta
 
 _BAD = np.nan
 
+reps = [
+    ['short', "Nend < Nmin"],
+    ['fspace', "Violated field space condition"],
+    ['int_back', "Background integration error"],
+    ['timeout_back', "Background integration timeout"],
+    ['nexit', "Failed to compute acceptable horizon exit time"],
+    ['eternal', "Could not find end of inflation"],
+    ['eps', "Failed to compute epsilon slow-roll data"],
+    ['eta', "Failed to compute eta slow-roll data"],
+    ['mij', "Failed to compute Mij eigenvalue data"],
+    ['ics_2pf', "Unable to find initial conditions for 2pf"],
+    ['kexit_2pf', "Unable to find horizon exit mode for 2pf"],
+    ['int_2pf', "2pf integration error"],
+    ['timeout_2pf', "2pf integration timeout"],
+    ["ics_3pf_", "Unable to find initial conditions for 3pf, "],
+    ["kexit_3pf_", "Unable to find horizon exit mode for 3pf, "],
+    ["int_3pf_", "3pf integration error, "],
+    ["timeout_3pf_", "3pf integration timeout, "]
+]
+
 
 class TrackMethods:
 
@@ -151,7 +171,14 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
 
         row_data = sample.get_row_data(*obs_keys)
 
+        for n, s in zip(sample.err_n, sample.err_s):
 
+            if n != 0:
+
+                if s in errors_data:
+                    errors_data[s] += 1
+                else:
+                    errors_data[s] = 1
 
         if isinstance(row_data, float) and np.isnan(row_data):
             raw[sample.index][:] = _BAD
@@ -196,6 +223,31 @@ def write_results(args_dict: dict, sample_pool: np.ndarray):
         for h, l in zip(headers, latexs):
             f.write(f"{h} {l}\n")
 
+    errors_path = os.path.join(sampler_run_dir, f"errors_{name}.txt")
+
+    error_lines = []
+
+    for key, txt in reps:
+        if key in errors_data:
+            error_lines.append("{:55s} {}\n".format(txt, errors_data[key]))
+
+    keys_3pf = [k for k in errors_data.keys() if "3pf" in k]
+
+    for k3 in keys_3pf:
+        for pattern, rep in reps[::-1]:
+
+            if k3.startswith(pattern):
+
+                txt = k3.replace(pattern, rep)
+
+                error_lines.append("{:55s} {}\n".format(txt, errors_data[k3]))
+
+    efficiency = round(100 * len(res_getdist) / len(raw), 2)
+
+    error_lines.append("\n->{:55s} {}%\n".format("Sampling efficiency", efficiency))
+
+    with open(errors_path, "w") as f:
+        f.writelines(error_lines)
 
 def main(pool, args_dict: dict):
     n_samples = args_dict['n_samples']
