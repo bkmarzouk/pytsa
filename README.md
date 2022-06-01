@@ -78,10 +78,10 @@ from pytsa.sampler import setup_sampler
 from scipy.stats import <distributions>
 
 # Initialize sampler object
-name = <name_for_sampling_routine>
+sampler_name = <name_for_sampling_routine>
 setup = setup_sampler.SamplerMethods(
     model,
-    name,
+    sampler_name,
     cache_loc=<location to build sampler>  # defaults to ./samplers
 )
 
@@ -126,3 +126,54 @@ Note: If there is a field value / velocity or parameter that is to be set consta
 constant value in place of `<statistical_distribution>` kwarg.
 
 There are complete examples of the sampler setup procedure in ``./example_samplers``.
+
+Once the setup script has been writting, simply run ``python <sampler_setup.py>`` and the 
+core defintions and a `run.py` file will be constructed and placed in the cache location.
+By default, this will be `./samplers/<sammpler_name>`.
+
+If a misdefinition is detected or if the definitions are insufficient, an error will be thrwon at build time.
+Moreover, if an example already exists with the defined name at the cache location
+with differing parameters an error will again be raised.
+
+### Running sampling routines
+
+Once the core sampler has been built, we are ready to go. Executing the sampler
+is performed via the command line, and this is where `mpi` definitions can further be assigned.
+
+The command structure is as follows:
+```bash
+<mpi_args> python run.py <routine_name> <other_flags>
+```
+where `<mpi_args>` may be e.g. `mpiexec -n 32` for a 32-core process. The routine
+name is used to help distinguish different execution which may differ 
+in incompatible ways based on flags (described below).
+
+**Required**
+- `--n_samples <int>` number of samples to compute.
+- `--apriori` or `--latin` runs the sampler in apriori or Latin-hypercube sampling mode
+
+**Optional**
+- `--ns` indicates computation of the 2pt correlation function: spectral index, running, and scalar amplitude.
+- `--eq` indicates computation of equilateral fNL.
+- `--fo` indicates computation of folded fNL.
+- `--sq` indicates computation of moderately-squeezed fNL.
+- `--alpha <*vals>` and `--beta <*vals>`, indicate additional fNL calculations. 
+Values should correspond to Fergusson-Shellard parameterization.
+- `--verbose` prints finer-grained information whilst sampling.
+- `--entropy` define initial system entropy for random number generators. Assures reproducibility.
+
+If only **required** information is given, then the sampler will only report results for
+slow-roll parameters (at horizon exit and end of inflation) 
+as well as the mass-matrix eigenvalues at the same time-steps.
+
+#### Reading the output
+If a sampling job has successfully complete there will be some files at your disposal.
+These will be located in the `<sampler_name>/<routine_name>` directory:
+- `errors_<routine_name>.txt` containing an overview of rejected samples and overall efficiency.
+- `getdist_<routine_name>.txt` and `getdist_<routine_name>.paramnames` containing
+samples with complete data. These can be read directly into `GetDist` analysis software.
+- `pandas_<routine_name>.df`, a `pandas` data-frame containing all sample data, any failed components of the data 
+collection will be represented with `numpy.nan` values. Appropriate post-processing in this file has been
+left for the user. In order to load the data, simply call e.g. 
+`data = pandas.read_pickle("/path/to/pandas_<routine_name>.df")`. To check what's there you can use `data.columns`,
+then index whatever you want with `data['<column_name>]`.
