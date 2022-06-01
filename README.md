@@ -15,7 +15,7 @@ which was developed by David Mulryne and John Ronayne.
 - A priori and Latin hypercube sampling methods.
 - MPI ready: run sampling jobs locally or on computing clusters.
 
-![GitHub-Mark-Light](md_figs/fig_k.png#gh-dark-mode-only)![GitHub-Mark-Dark](md_figs/fig_white.png#gh-light-mode-only)
+![GitHub-Mark-Light](md_figs/fig_white.png#gh-dark-mode-only)![GitHub-Mark-Dark](md_figs/fig_k.png#gh-light-mode-only)
 
 To install the code as a package run the following command from the root directory:
 ```bash
