@@ -1,10 +1,65 @@
-# PyT-Sample
-A general sampling tool for the prediction of observables in inflationary models, based on the code PyTransport. The code is designed fundamentally to compute the distribution(s) of observables for inflationary models, in particular, by employing random-sampling to circumvent the dimensionality of parameter and priori spaces.
+# PyTransport Sampler (pytsa)
+A general sampling tool for the prediction of observables in inflationary models, 
+based on the code PyTransport. The code is designed fundamentally to compute the distribution(s) of observables for inflationary models, in particular, by employing random-sampling to circumvent the dimensionality of parameter and priori spaces.
 
-## How to use the code
-We begin by following the standard process of building a PyTransport installation file. In particular, we define a potential, and fieldspace metric (optional), and execute the compile step. During construction, model parameters are optionally defined -- PyT-Sample will enable these parameters to be fixed, or sampled over. Examples of files can be found in the ``Install'' directory.
+To install the code as a package (recommended) run the following command from the root directory:
+```bash
+python -m install -e .
+```
 
-After the model has been installed, a sampler parameter file needs to be configured. These should be written in the directory ``sampler-configs'', where there exists an object-oriented module that will be used to construct the sampler, along with all of it's supporting files.
+## Installing inflationary models
+Installing inflationary models relies upon symbolic definitions of the potential and field-space metric if appropriate.
+The core symbolic engine relies on ```SymPy```, and expressions and parameters should be defined using this package.
+
+Skeleton from setting up models:
+```python
+from pytsa import pytrans_setup as setup
+import sympy as sym
+
+# Define number of fields and parameters for model
+nf = <number of fields>
+np = <number of params>
+
+# Build symbolic array for fields, each indexed with f[<index>] like a list.
+f = sym.symarray('f', nf)
+
+# Build symbolic array for number of parameters, each indexed with p[<index>] like a list. 
+p = sym.symarrat('p', np)
+
+# Build potential from combination of fields and params.
+pot = <some function of f, p>
+
+# Define field space metric: Note index down covariant expression G_{ab}
+met = sym.Matrix([[<metric components>], ..., [<more metric components>]])
+
+# Translate model into c++ source code. Note that we pass the metric G=G
+setup.potential(
+    pot,  # symbolic definition of the potential
+    nf,   # number of fields for the model
+    nf,   # number of params for the model
+    G=G,  # symbolic definition for the field space metric, optional
+    simplify_fmet=True,  # simplifies expressions relating to field space metric
+    simplify_pot=True,   # simplifies expressions relating to the potenital
+    simplify_covd=True,  # simplifies covariant derivative expressions
+    silent=False         # indicates whether to suppress output when building
+)
+
+# Run compiling step
+
+model_name = <string corresponding to model name>
+setup.compile_module(
+    <model_name>,     # A string that defines the model name, this will be used to import
+    <non-canonical>,  # True of False, indicating whether we have used a non-canonical field space metric
+)
+```
+
+Once the script is defined, simply run ``python <installation_script.py>``, 
+and an importable verions of the model can be imported within a script with 
+```python
+from pytsa.models import <model_name>
+````
+
+A selection of complete example installation files is provided in the ```./example_models``` directory.
 
 ## Initializing a Sampler Object
 In any sampler configuration file, we must include the following import statements
