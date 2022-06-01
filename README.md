@@ -1,8 +1,21 @@
 # PyTransport Sampler (pytsa)
-A general sampling tool for the prediction of observables in inflationary models, 
-based on the code PyTransport. The code is designed fundamentally to compute the distribution(s) of observables for inflationary models, in particular, by employing random-sampling to circumvent the dimensionality of parameter and priori spaces.
+**A general sampling tool for the exploration of inflationary observables.**
 
-To install the code as a package (recommended) run the following command from the root directory:
+This code is designed to derive general predictions for inflationary cosmology with random sampling techniques. 
+The goal is not to optimize a model's compatibility with observation, but to make 
+predictions from a robust exploration of initial conditions and parameter spaces.
+A recent application of this software can be found in [this paper](https://arxiv.org/abs/2105.03637).
+
+The code serves as an extension to 
+[PyTransport](https://github.com/jronayne/PyTransport) (see accompanying [paper](https://arxiv.org/abs/1609.00381))
+which was developed by David Mulryne and John Ronayne.
+
+**Contents**
+- Updated python 3 version of PyTransport, with internal routines for tensor algebra.
+- A priori and Latin hypercube sampling methods.
+- MPI ready: run sampling jobs locally or on computing clusters.
+
+To install the code as a package run the following command from the root directory:
 ```bash
 python -m install -e .
 ```
