@@ -172,6 +172,8 @@ def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
     
     """
 
+    # For very high density stepper, sometimes there is no change in time-series values from N[ii]->N[ii+1]
+    # Remove these array values to avoid numerical stiffness and non-monotonicity
     if remove_duplicate_steps:
         for ii in range(1, len(bg))[::-1]:
             if np.all(bg[ii] == bg[ii - 1]):
@@ -210,7 +212,7 @@ def adjust_back(bg, Nr=80.0, reposition=True, remove_duplicate_steps=True):
     else:
         out = bg
 
-    # Cross check final field values haven't changed
+    # Cross-check final field values haven't changed
     assert np.all(out[-1][1:] == bg[-1][1:]), [out[-1][1:], bg[-1][1:]]
 
     # Finally, we check that the background hasn't been too finely sampled, s.t back[ii] == back[ii+1]
@@ -253,67 +255,35 @@ def find_massless_condition(MTE, N_before_massless, k, back, params):
     return new_ics[0], new_ics[1:]
 
 
-def ICsBM(NBMassless, k, back, params, MTE, return_all=False):
-    """
-    Compute the initial conditions for correlation functions NBMassless efolds before the massless condition is realized
+def ICsBM(NBMassless, k, back, params, MTE):
+    nF = np.size(back[0, 1:]) // 2
+    massEff = -1
 
-    :param NBMassless: Number of efolds befpore the massless condition
-    :param k: Horizon exit scale (k = aH)
-    :param back: Background evolution
-    :param params: Model parameters
-    :param MTE: pytsa module
-    :param return_all: if True, returns the ICs, efold at which the massless condition is attained, mass evolution
-    :return: ICs or (see return_all)
-    """
+    # calculate the element of back for which -k^2/a^2 + M^2 for M the largest eigenvalue of mass matrix
+    jj = 0
+    while (massEff < 0 and jj < np.size(back[:, 0]) - 1):
+        w, v = np.linalg.eig(MTE.ddV(back[jj, 1:1 + nF], params))
+        eigen = np.max(w)
+        massEff = -k ** 2 * np.exp(-2.0 * back[jj, 0]) + eigen
+        jj = jj + 1
+    if jj == np.size(back[:, 0]):
+        print("\n\n\n\n warning massless condition not found \n\n\n\n")
+        return np.nan, np.nan
+    NMassless = back[jj - 2, 0]
+    ll = 0
+    Ncond = -1.
+    while (Ncond < 0.0 and ll < np.size(back[:, 0]) - 1):
+        Ncond = back[ll, 0] - (NMassless - NBMassless)
+        ll = ll + 1
 
-    # Evolve masses for all of background
-    masses_array = evolveMasses(back, params, MTE)
+    if ll == np.size(back[:, 0]) or (NMassless - back[0, 0]) < NBMassless:
+        print("\n\n\n\n warning initial condition not found \n\n\n\n")
+        return np.nan, np.nan
 
-    diff_evo = np.zeros((len(back), 2), dtype=float)
+    NexitMinus = back[ll - 2, 0]
+    backExitMinus = back[ll - 2, 1:]
 
-    for idx, (mass_step, back_step) in enumerate(zip(masses_array, back)):
-        diff_evo[0] = back_step[0]
-        mass = np.max(mass_step[1:])
-
-    m_array = np.zeros((len(back), 3))
-
-    for idx, (m_eigs, step) in enumerate(zip(masses_array, back)):
-        m_array[idx][0] = m_eigs[0]  # N
-        m_array[idx][1] = k ** 2 / MTE.H(step[1:], params) ** 2 / np.exp(2 * step[0])  # k^2 / (aH)^2  - \
-        m_array[idx][2] = np.max(m_eigs[1:])  # M^2 / H^2
-
-    N_i = None
-    N_f = None
-
-    if m_array[0][2] < m_array[0][1]:
-        for idx, row in enumerate(m_array):
-            if row[2] > row[1]:
-                N_f = row[0]
-                N_i = m_array[idx - 1][0]
-                break
-    else:
-        for idx, row in enumerate(m_array):
-            if row[2] < row[1]:
-                N_f = row[0]
-                N_i = m_array[idx - 1][0]
-                break
-
-    if N_i is None or N_f is None:
-        raise ValueError("Unable to locate massless condition")
-
-    N_massless = 0.5 * (N_f + N_i)
-
-    N_start = N_massless - NBMassless
-
-    if N_start < 0:
-        raise ValueError("Unable to locate massless condition!")
-
-    ics_start = splt.approx_row_spline(N_start, 1, back, 0)
-
-    if return_all:
-        return ics_start, N_massless, m_array
-
-    return N_start, ics_start
+    return NexitMinus, backExitMinus
 
 
 def ICsBE(NBExit, k, back, params, MTE):
@@ -337,7 +307,6 @@ def ICsBE(NBExit, k, back, params, MTE):
     if ll == np.size(back[:, 0]) or (NExit - back[0, 0]) < NBExit:
         print("\n\n\n\n warning initial condition not found \n\n\n\n")
         return np.nan, np.nan
-
     NexitMinus = back[ll - 2, 0]
     backExitMinus = back[ll - 2, 1:]
 
@@ -629,6 +598,8 @@ def kexitN(Nexit: float, back: np.ndarray, params: np.ndarray, MTE, fit="nearest
     assert Nexit >= back[0][0], Nexit
     assert Nexit <= back[-1][0], Nexit
 
+    # TODO: Read in spline tools, remove dep on depric
+
     if fit == "spl":
         back_exit = arr_eval_spl_val(Nexit, back, 0)
     elif fit == "nearest":
@@ -813,7 +784,6 @@ def get_eta_data(back, params, Nexit, MTE):
 
 
 def get_mass_data(back, params, Nexit, MTE):
-
     mij = _eps_eta_mij_hub(back, params, Nexit, MTE, "mij")
 
     eigs_exit = np.sort(np.linalg.eigvals(mij[0]))
