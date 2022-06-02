@@ -1,5 +1,5 @@
 import sympy as sym
-from pytsa import pytrans_setup
+from pytsa.pytrans_setup import Translator
 
 # Example installation file for single field quadratic inflation
 
@@ -9,10 +9,10 @@ nP = 1  # number of params
 f = sym.symarray('f', nF)  # symbolic array for fields
 p = sym.symarray('p', nP)  # symbolic array for params
 
-V = sum([sym.Rational(1, 2) * f[i] ** 2 * p[i] ** 2 for i in range(nF)])  # Symbolic expression for the potential
+V = sym.Rational(1, 2) * f[0] ** 2 * p[0] ** 2  # Symbolic expression for the potential
 
-# Run translator for building c++ source code
-pytrans_setup.potential(V, nF, nP, simplify_fmet=True, simplify_pot=True, simplify_covd=True, silent=False)
+# Translate model into c++ source code. Note that we pass the metric G=G
+Translator(nF, nP, V)
 
-# Compile model ! Should now be importable with prefix pyt_, e.g. import pyt_quad as model
-pytrans_setup.compile_module('quad', False)
+# Compile module ! Should now be importable python module with prefix pyt_, e.g. import pyt_dquad_2sphere as model
+Translator.install('quad')

@@ -172,45 +172,57 @@ def riemann_operation_matrix(N, verbose=True):
     return OM
 
 
-def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, recache=False, simplify=True):
+def FieldSpaceSym(n_fields: int, n_params: int, metric: sym.Matrix or None, recache=False, simplify=True, verbose=True):
     if metric is None:
         metric = sym.eye(n_fields)
 
     try:
         fs_derived = cache_tools.load_fmet(metric, delete=recache, simplify=simplify)
-        print("-- Derived field space calculations loaded from cache")
+
+        if verbose:
+            print("-- Derived field space calculations loaded from cache")
 
     except OSError:
-        print("-- Performing field space calculations ...")
+
+        if verbose:
+            print("-- Performing field space calculations ...")
+
         fs_derived = _FieldSpaceSym(n_fields, n_params, metric, simplify)
 
     return fs_derived
 
 
-def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=False, simplify=True):
+def PotentialSym(n_fields: int, n_params: int, potential: sym.Expr, recache=False, simplify=True, verbose=True):
     try:
         pot_derived = cache_tools.load_pot(potential, delete=recache, simplify=simplify)
-        print("-- Derived potential calculations loaded from cache")
+
+        if verbose:
+            print("-- Derived potential calculations loaded from cache")
 
     except OSError:
-        print("-- Performing potential calculations ...")
+
+        if verbose:
+            print("-- Performing potential calculations ...")
         pot_derived = _PotentialSym(n_fields, n_params, potential, simplify)
 
     return pot_derived
 
 
 def CovDSym(n_fields: int, n_params: int, metric: sym.Matrix or None, potential: sym.Expr, recache=False,
-            simplify_fmet=True, simplify_pot=True, simplify=True):
+            simplify_fmet=True, simplify_pot=True, simplify=True, verbose=True):
     if metric is None:
         metric = sym.eye(n_fields)
 
     try:
         covd_derived = cache_tools.load_covd(metric, potential, delete=recache, simplify_fmet=simplify_fmet,
                                              simplify_pot=simplify_pot, simplify=simplify)
-        print("-- Derived covariant derivatives loaded from cache")
+        if verbose:
+            print("-- Derived covariant derivatives loaded from cache")
 
     except OSError:
-        print("-- Performing covariant derivative calculations ...")
+
+        if verbose:
+            print("-- Performing covariant derivative calculations ...")
         covd_derived = _CovariantDerivativesSym(n_fields, n_params, metric, potential,
                                                 simplify_fmet, simplify_pot, simplify)
 
