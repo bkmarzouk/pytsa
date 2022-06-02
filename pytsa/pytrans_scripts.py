@@ -813,17 +813,13 @@ def get_eta_data(back, params, Nexit, MTE):
 
 
 def get_mass_data(back, params, Nexit, MTE):
-    def get_mij_data(back, params, Nexit, MTE):
-        return _eps_eta_mij_hub(back, params, Nexit, MTE, "mij")
 
-    mij = get_mij_data(back, params, Nexit, MTE)
+    mij = _eps_eta_mij_hub(back, params, Nexit, MTE, "mij")
 
     eigs_exit = np.sort(np.linalg.eigvals(mij[0]))
     eigs_end = np.sort(np.linalg.eigvals(mij[1]))
 
-    Hexit, Hend = _eps_eta_mij_hub(back, params, Nexit, MTE, "hub") ** 2
-
-    return np.array([eigs_exit / Hexit, eigs_end / Hend], dtype=float)
+    return np.array([eigs_exit, eigs_end], dtype=float)
 
 
 def evolve_mass_spectrum(back, params, MTE, scale_eigs=False, hess_approx=False, covariant=False):
@@ -844,8 +840,8 @@ def evolve_mass_spectrum(back, params, MTE, scale_eigs=False, hess_approx=False,
 
     for idx, step in enumerate(back):
         mij = MTE.massMatrix(step[1:], params, hess_approx, covariant)
-        H = MTE.H(step[1:], params)
-        out[idx][1:] = np.sort(np.linalg.eigvals(mij)) / H ** 2
+        out[idx][0] = step[0]
+        out[idx][1:] = np.sort(np.linalg.eigvals(mij))
 
     if scale_eigs:
         out[::, 1:] = np.sqrt(np.abs(out[::, 1:]))

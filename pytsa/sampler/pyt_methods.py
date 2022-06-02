@@ -232,6 +232,7 @@ def compute_background(index: int):
     ics, params = sampler.get_sample(index)
 
     N_evo = np.linspace(0, 3000, step_density * 3000)
+
     background = model.backEvolve(
         N_evo,
         ics,
@@ -251,6 +252,12 @@ def compute_background(index: int):
 
         else:
             raise ValueError(background)
+
+    # Note we clip the final step of back where epsilon > 1
+    # this indicates inflation is over, and inferring masses at this time produces large values to the exponential
+    # gradient in epsilon. All background data therefore corresponds to epsilon < 1
+
+    background = background[:-1]
 
     # Update evolution to correspond to epsilon > 1 end
     N_evo = background.T[0]

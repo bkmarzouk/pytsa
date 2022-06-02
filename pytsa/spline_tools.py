@@ -72,33 +72,6 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
     else:
         return array[ii]
 
-    idx_h = None
-    val_h = None
-
-    idx_l = None
-    val_l = None
-
-    for idx, v in enumerate(array.T[col_idx]):
-        if v > pivot_value:
-            idx_h = idx
-            val_h = v
-            break
-
-    backwards = array.T[col_idx][::-1]
-
-    for idx, v in enumerate(backwards):
-        if v < pivot_value:
-            idx_l = -(idx + 1)
-            val_l = v
-            break
-
-    if abs(val_l - pivot_value) < abs(val_h - pivot_value):
-        approx_idx = idx_l
-    else:
-        approx_idx = idx_h
-
-    return array[approx_idx]
-
 
 def approx_row_spline(pivot_value, pivot_width, array: np.ndarray, col_idx):
     """

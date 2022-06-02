@@ -243,6 +243,13 @@ public:
 		    }
 		}
 
+        for (int ii=0; ii < nF; ii++){
+            for (int jj=0; jj < nF; jj++){
+                int mij_idx = ii*nF + jj;
+                mijout[mij_idx] /= Hi*Hi;
+            }
+        }
+
         return mijout;
     }
 
