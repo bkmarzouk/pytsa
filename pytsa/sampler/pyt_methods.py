@@ -210,7 +210,6 @@ class SampleCore(object):
 
 
 def extract_core(index: int) -> SampleCore:
-
     sample_path = os.path.join(samples_dir, "sample.%06d" % index)
 
     with open(sample_path, "rb") as f:
@@ -300,7 +299,7 @@ def compute_background(index: int):
     if isinstance(background, tuple):
         return SampleCore.int_background(index).get_last_status()
 
-    back_adj = py_scripts.adjust_back(background)  # Adjusted background
+    back_adj = py_scripts.adjust_back(background, Nr=Nmin + 20.)  # Adjusted background
 
     nexit_adj = py_scripts.compute_Nexit_for_matching(model, back_adj, params)
     nexit = py_scripts.compute_Nexit_for_matching(model, background, params)
