@@ -94,7 +94,7 @@ class _SamplingParameters(object):
         for p in range(self.nP):
             assert self.params[p] is not None, p
 
-    def set_field(self, *indices, method, latex: str or None = None, record=True):
+    def set_field(self, *indices, method, latex: str or None = None):
         """
         Set initial values for fields
 
@@ -103,8 +103,6 @@ class _SamplingParameters(object):
         :param latex: latex definition
         :param record: if True, records IC in results
         """
-        if method == "sr" or method == "SR":
-            method = Constant.slow_roll()
 
         if isinstance(method, float or int):
             method = Constant(method)
@@ -115,7 +113,7 @@ class _SamplingParameters(object):
             self.fields[idx] = method
             self.latex_f[idx] = f"f_{idx}" if latex is None else latex
 
-    def set_dot_field(self, *indices, method, latex: str or None = None, record=True):
+    def set_dot_field(self, *indices, method, latex: str or None = None):
         """
         Set initial values for initial field derivatives w.r.t. cosmic time
 
@@ -136,7 +134,7 @@ class _SamplingParameters(object):
             self.dot_fields[idx] = method
             self.latex_df[idx] = f"v_{idx}" if latex is None else latex
 
-    def set_param(self, *indices, method, latex: str or None = None, record=True):
+    def set_param(self, *indices, method, latex: str or None = None):
         """
         Set model parameter values
 
@@ -219,7 +217,7 @@ class SamplerMethods(_SamplingParameters):
         self.fieldspace_terminate[fidx] = [fmin, fmax]
 
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
-        assert 0, "currently unsupported"
+        assert 0, "currently unsupported"  # TODO: multiple field conditions satisfied simulatneously
 
     def set_analysis_params(self, N_sub_evo=6., tols=None, N_adiabatic=1., N_min=60., tmax_bg=120,
                             tmax_2pf=300, tmax_3pf=600, step_density=20):
