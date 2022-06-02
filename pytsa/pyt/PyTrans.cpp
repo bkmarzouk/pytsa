@@ -1177,7 +1177,7 @@ PyDoc_STRVAR(doc_Eta, "Compute eta SR param (Hubble not Potential");
 PyDoc_STRVAR(doc_V, "Evaluate the potential at given field values");
 PyDoc_STRVAR(doc_dV, "Evaluate 1st (covariant) derivative of potential at given field values");
 PyDoc_STRVAR(doc_ddV, "Evaluate 2nd (covariant) derivative of potential at given field values");
-PyDoc_STRVAR(doc_findEndOfInflation, "Find the end of inflation from initial conditions");
+PyDoc_STRVAR(doc_findEndOfInflation, "Finds end of inflation; i.e. when epsilon > 1");
 PyDoc_STRVAR(doc_massMatrix, "Compute mass (squared) matrix from background");
 PyDoc_STRVAR(doc_backEvolve, "Compute background evolution for a range of efoldings");
 PyDoc_STRVAR(doc_sigEvolve, "Evolve 2pt correlation functions");
