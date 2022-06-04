@@ -22,6 +22,12 @@ To install the code as a package run the following command from the root directo
 python -m install -e .
 ```
 
+The setup should have installed an example model file `dquad_2sphere.py`. To test whether the submodule was installed,
+you can run some unittests via
+```bash
+pytest tests/installation_tests.py
+```
+
 ## Installing inflationary models
 Installing inflationary models relies upon symbolic definitions of the potential and field-space metric if appropriate.
 The core symbolic engine relies on ```SymPy```, and expressions and parameters should be defined using this package.

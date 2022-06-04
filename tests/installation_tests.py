@@ -1,10 +1,11 @@
 import unittest
 import numpy as np
-import pyt_quad
-import pyt_dquad_euclidean
-import pyt_dquad_2sphere
 
-_GLOBAL_TOLS = np.array([1e-4, 1e-4])  # tols for testing; relatively weak for speed. Tests may fail if edited
+
+def _import():
+    global test_model
+    from pytsa.models import dquad_2sphere as test_model
+    return test_model
 
 
 class ModelDefs:
@@ -64,75 +65,49 @@ class ModelDefs:
         pass
 
 
-class _Expectations:
-    nF: int
-    nP: int
-    Hi: float
-    Nend: float
-    Epsi: float
-    Etai: float
-    Vi: float
-    dVi: np.ndarray
-    ddVi: np.ndarray
-    back: np.ndarray
-    sig: np.ndarray
-    alpha: np.ndarray
-    masses: np.ndarray
+class TestDoubleQuadratic2Sphere(unittest.TestCase):
+    # Test compiled model file
 
+    tols = np.array([1e-5, 1e-5])
+    ics = np.array([-1.5890304023505983, -18.389416025688845, 0.00232248417286116, 0.00418422599903375])
+    pars = np.array([0.01329597888476721, 0.005246064625353842, 5.195022895180804])
+    try:
+        test_model = _import()
+    except ImportError:
+        test_model = None
 
-class TestQuadratic(unittest.TestCase):
-    # Test quadratic model
+    def _get_back(self):
+        N_evo = np.linspace(0, 3000, 20 * 3000)
 
-    pyt_model = pyt_quad
-    ics = np.array([20., 1e-4], dtype=float)
-    pars = np.array([1e-3], dtype=float)
-    n_end = 101.17024620322667
-    n_arr = np.linspace(0, n_end, 1000)
-    eps_arr = np.array([7.499812504629944e-05, 1.1057319168321953], dtype=float)
+        back = test_model.backEvolve(N_evo, self.ics, self.pars, self.tols, True, -1)
 
-    def get_back(self):
-        return self.pyt_model.backEvolve(self.n_arr, self.ics, self.pars, _GLOBAL_TOLS, True)
+        return back
+
+    def test_import(self):
+
+        assert self.test_model is not None, test_model
 
     def test_nf(self):
-        assert self.pyt_model.nF() == 1
+        assert test_model.nF() == 2
 
     def test_np(self):
-        assert self.pyt_model.nP() == 1
+        assert test_model.nP() == 3
 
-    def test_n_end(self):
-        assert np.isclose(self.pyt_model.findEndOfInflation(self.ics, self.pars, _GLOBAL_TOLS), self.n_end)
+    def test_back(self):
+        back = self._get_back()
+
+        expt = np.array([8.05363423e+02, -1.28122309e-01, 1.34744008e-01, 2.48930507e-04, -1.14051532e-03])
+
+        assert np.allclose(back[-1], expt)
 
     def test_eps(self):
-        back = self.get_back()
+        back = self._get_back()
 
-        eps_start = self.pyt_model.Epsilon(back[0][1:1 + 2 * self.pyt_model.nF()], self.pars)
-        eps_end = self.pyt_model.Epsilon(back[-1][1:1 + 2 * self.pyt_model.nF()], self.pars)
+        eps = test_model.Epsilon(back[-1][1:], self.pars)
 
-        assert np.allclose(self.eps_arr, np.array([eps_start, eps_end]))
+        expt = 1.1929047258540073
 
-
-class TestDoubleQuadratic(unittest.TestCase):
-    # Test double quadratic model
-
-    pyt_model = pyt_dquad_euclidean
-
-    def test_nf(self):
-        assert self.pyt_model.nF() == 2
-
-    def test_np(self):
-        assert self.pyt_model.nP() == 2
-
-
-class TestDoubleQuadratic2Sphere(unittest.TestCase):
-    # Test double quadratic model
-
-    pyt_model = pyt_dquad_2sphere
-
-    def test_nf(self):
-        assert self.pyt_model.nF() == 2
-
-    def test_np(self):
-        assert self.pyt_model.nP() == 3
+        assert np.isclose(eps, expt), [eps, expt]
 
 
 if __name__ == "__main__":

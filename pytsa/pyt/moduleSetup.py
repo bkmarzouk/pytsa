@@ -28,7 +28,7 @@ assert os.path.exists(cppt_dir), cppt_dir
 assert os.path.exists(stepper_path), stepper_path
 
 # Do not modify comment at end of following line
-mod_name = 'quad'  # PYT_MODNAME
+mod_name = 'dquad_2sphere'  # PYT_MODNAME
 
 # module extension for c++ source contributions
 module_extension = Extension(
