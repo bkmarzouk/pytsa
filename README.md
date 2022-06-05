@@ -34,7 +34,7 @@ The core symbolic engine relies on ```SymPy```, and expressions and parameters s
 
 Skeleton from setting up models:
 ```python
-from pytsa import pytrans_setup as setup
+from pytsa.pytrans_setup import Translator
 import sympy as sym
 
 # Define number of fields and parameters for model
@@ -54,24 +54,19 @@ pot = <some function of f, p>
 met = sym.Matrix([[<metric components>], ..., [<more metric components>]])
 
 # Translate model into c++ source code. Note that we pass the metric G=G
-setup.potential(
-    pot,  # symbolic definition of the potential
-    nf,   # number of fields for the model
-    nf,   # number of params for the model
-    G=G,  # symbolic definition for the field space metric, optional
-    simplify_fmet=True,  # simplifies expressions relating to field space metric
-    simplify_pot=True,   # simplifies expressions relating to the potenital
-    simplify_covd=True,  # simplifies covariant derivative expressions
-    silent=False         # indicates whether to suppress output when building
+Translator(
+    nf,     # number of fields for the model
+    nf,     # number of params for the model
+    pot,    # symbolic definition of the potential
+    G=met,  # symbolic definition for the field space metric, optional
+    simplify_metric=True,     # simplifies expressions relating to field space metric
+    simplify_potential=True,  # simplifies expressions relating to the potenital
+    simplify_covd=True,       # simplifies covariant derivative expressions
+    verbose=True              # indicates whether to suppress output when building
 )
 
-# Run compiling step
-
-model_name = <string corresponding to model name>
-setup.compile_module(
-    <model_name>,     # A string that defines the model name, this will be used to import
-    <non-canonical>,  # True of False, indicating whether we have used a non-canonical field space metric
-)
+# Run compile and installation
+Translator.install(<string corresponding to model name>)
 ```
 
 Once the script is defined, simply run ``python <installation_script.py>``, 
