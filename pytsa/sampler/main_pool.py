@@ -217,7 +217,8 @@ def write_results(args_dict: dict, indices: np.ndarray):
 
     efficiency = round(100 * len(res_getdist) / len(raw), 2)
 
-    error_lines.append("\n-> {:55s} {}%\n".format("Sampling efficiency", efficiency))
+    error_lines.append("\n")
+    error_lines.append("-> {:55s} {}%\n".format("Sampling efficiency", efficiency))
 
     with open(errors_path, "w") as f:
         f.writelines(error_lines)
