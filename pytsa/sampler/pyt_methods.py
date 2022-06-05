@@ -232,7 +232,7 @@ def compute_background(index: int):
 
     N_evo = np.linspace(0, 3000, step_density * 3000)
 
-    background = model.backEvolve(
+    background: np.ndarray or int = model.backEvolve(
         N_evo,
         ics,
         params,
@@ -252,14 +252,24 @@ def compute_background(index: int):
         else:
             raise ValueError(background)
 
+    elif isinstance(background, np.ndarray) and background.shape == (1, 1 + 2 * n_fields):  # Only managed single step
+        return SampleCore.inflation_too_short(index).get_last_status()
+
+    else:
+        pass
+
+
     # Note we clip the final step of back where epsilon > 1
     # this indicates inflation is over, and inferring masses at this time produces large values to the exponential
     # gradient in epsilon. All background data therefore corresponds to epsilon < 1
+
+    print(background.shape)
 
     background = background[:-1]
 
     # Update evolution to correspond to epsilon > 1 end
     N_evo = background.T[0]
+
     Nend = N_evo[-1]
 
     # check for exit condition in field space constraints
