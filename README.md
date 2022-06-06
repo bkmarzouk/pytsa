@@ -8,7 +8,7 @@ A recent application of this software can be found in [this paper](https://arxiv
 
 The code serves as an extension to 
 [PyTransport](https://github.com/jronayne/PyTransport) (see accompanying [paper](https://arxiv.org/abs/1609.00381))
-which was developed by David Mulryne and John Ronayne.
+which was developed by David Mulryne and John Ronayne. Some parts of the current technology were developed with David Seery.
 
 **Contents**
 - Updated python 3 version of PyTransport, with internal routines for tensor algebra.
