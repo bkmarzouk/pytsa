@@ -46,12 +46,11 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 # Installation location for models
 MODELS_LOC = os.path.join(cwd, "models")
 
-_pytrans_c_path = os.path.join(cwd, 'pyt', '_PyTransC.cpp')
-_pytrans_nc_path = os.path.join(cwd, 'pyt', '_PyTransNC.cpp')
-_pytrans_path = None  # Updated to c or nc version
+_pytrans_path = os.path.join(cwd, 'pyt', '_PyTrans.cpp')
 pytrans_path = os.path.join(cwd, 'pyt', 'PyTrans.cpp')
 
-stepper_path = os.path.join(cwd, 'cppt', 'stepper', 'rkf45.hpp')
+cppt_dir = os.path.join(cwd, "cppt")
+stepper_path = os.path.join(cppt_dir, 'stepper', 'rkf45.hpp')
 
 
 def _delta_ctime(a, b):
@@ -79,8 +78,21 @@ def _set_template_headers(non_canonical: bool):
     :param non_canonical: if True methods use non-canonical
     """
 
-    global _pytrans_path
-    _pytrans_path = _pytrans_nc_path if non_canonical else _pytrans_c_path
+    with open(_pytrans_path, "r") as f:
+        lines = f.readlines()
+
+    src_dir = os.path.join(cppt_dir, "NC") if non_canonical else cppt_dir
+    step_dir = os.path.join(cppt_dir, "stepper")
+
+    with open(pytrans_path, "w") as f:
+
+        for l in lines:
+            if "CPPT_DIR" in l:
+                f.write(l.replace("CPPT_DIR", src_dir))
+            elif "STEP_DIR" in l:
+                f.write(l.replace("STEP_DIR", step_dir))
+            else:
+                f.write(l)
 
 
 def _rewrite_indices(expr, nF, nP):
@@ -427,8 +439,6 @@ class Translator:
 
         # Make copy of cpp file that will be compiled
         assert isinstance(_pytrans_path, str) and os.path.exists(_pytrans_path), _pytrans_path
-        
-        shutil.copyfile(_pytrans_path, pytrans_path)
 
         # Load PyTransport C++ file
         with open(pytrans_path, "r") as f:

@@ -20,10 +20,10 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/model.h"//model
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/stepper/rkf45.hpp"//stepper
+#include"CPPT_DIR/evolve.h"//evolve
+#include"CPPT_DIR/moments.h"//moments
+#include"CPPT_DIR/model.h"//model
+#include"STEP_DIR/rkf45.hpp"//stepper
 //*************************************************************************************************
 
 #include <math.h>
