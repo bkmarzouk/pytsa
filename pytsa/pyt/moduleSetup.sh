@@ -2,10 +2,10 @@
 
 CWD="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 
-echo $CWD/modelSetup.py
+#echo $CWD/modelSetup.py
 
 MODELS_DIR=$CWD/../models
 
-echo $MODELS_DIR
+#echo $MODELS_DIR
 
 CC=gcc python $CWD/moduleSetup.py install --force --prefix $MODELS_DIR

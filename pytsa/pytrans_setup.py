@@ -46,7 +46,11 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 # Installation location for models
 MODELS_LOC = os.path.join(cwd, "models")
 
+_pytrans_c_path = os.path.join(cwd, 'pyt', '_PyTransC.cpp')
+_pytrans_nc_path = os.path.join(cwd, 'pyt', '_PyTransNC.cpp')
+_pytrans_path = None  # Updated to c or nc version
 pytrans_path = os.path.join(cwd, 'pyt', 'PyTrans.cpp')
+
 stepper_path = os.path.join(cwd, 'cppt', 'stepper', 'rkf45.hpp')
 
 
@@ -75,30 +79,8 @@ def _set_template_headers(non_canonical: bool):
     :param non_canonical: if True methods use non-canonical
     """
 
-    # This is where the header files are kept (simpler versions avail if not NC)
-    cppt_dir = os.path.join(cwd, "cppt", "NC") if non_canonical else os.path.join(cwd, "cppt")
-
-    # Load lines from template
-    with open(pytrans_path, "r") as f:
-        lines = f.readlines()
-
-    with open(pytrans_path, "w") as f:
-
-        # Update header file names accordingly
-        for line in lines:
-            if line.endswith("//evolve\n"):
-                header_fpath = os.path.join(cppt_dir, 'evolve.h')
-                f.write('#include' + '"' + header_fpath + '"' + '//evolve' + '\n')
-            elif line.endswith("//moments\n"):
-                header_fpath = os.path.join(cppt_dir, 'moments.h')
-                f.write('#include' + '"' + header_fpath + '"' + '//moments' + '\n')
-            elif line.endswith("//model\n"):
-                header_fpath = os.path.join(cppt_dir, 'model.h')
-                f.write('#include' + '"' + header_fpath + '"' + '//model' + '\n')
-            elif line.endswith("//stepper\n"):  # invariant to NC
-                f.write('#include' + '"' + stepper_path + '"' + '//stepper' + '\n')
-            else:
-                f.write(line)
+    global _pytrans_path
+    _pytrans_path = _pytrans_nc_path if non_canonical else _pytrans_c_path
 
 
 def _rewrite_indices(expr, nF, nP):
@@ -426,7 +408,11 @@ class Translator:
         print('   [{time}] start'.format(time=t_start))
         cwd = os.path.dirname(__file__)
         location = os.path.join(cwd, 'pyt')
-        setup_file_path = os.path.join(cwd, 'pyt', 'moduleSetup.py')
+
+        # Make copy of setup file that will install module
+        _setup_file_path = os.path.join(cwd, "pyt", "_moduleSetup.py")
+        setup_file_path = os.path.join(cwd, "pyt", "moduleSetup.py")
+        shutil.copyfile(_setup_file_path, setup_file_path)
 
         with open(setup_file_path, "r") as f:
             module_setup_lines = f.readlines()
@@ -439,12 +425,16 @@ class Translator:
                 else:
                     f.write(line)
 
+        # Make copy of cpp file that will be compiled
+        assert isinstance(_pytrans_path, str) and os.path.exists(_pytrans_path), _pytrans_path
+        
+        shutil.copyfile(_pytrans_path, pytrans_path)
+
         # Load PyTransport C++ file
-        pytrans_cpp_path = os.path.join(cwd, 'pyt', 'PyTrans.cpp')
-        with open(pytrans_cpp_path, "r") as f:
+        with open(pytrans_path, "r") as f:
             pytrans_cpp_lines = f.readlines()
 
-        with open(pytrans_cpp_path, "w") as f:
+        with open(pytrans_path, "w") as f:
             for line in pytrans_cpp_lines:
                 if not line.endswith("//FuncDef\n") and not line.endswith("//initFunc\n") and not line.endswith(
                         "//modDef\n"):
@@ -474,6 +464,10 @@ class Translator:
 
         if os.path.exists(os.path.join(location, f"{name}.egg-info")):
             subprocess.run(["rm", "-r", f"{name}.egg-info"], cwd=location)
+
+        # remove temporary file versions
+        os.remove(setup_file_path)
+        os.remove(pytrans_path)
 
         models_root = os.path.abspath(os.path.join(cwd, "models"))
 

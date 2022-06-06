@@ -20,10 +20,9 @@
 #include "numpy/arrayobject.h"
 
 //don't adjust the labels at the end of the 4 lines below (they are used to fix directory structure)
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/evolve.h"//evolve
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/moments.h"//moments
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/model.h"//model
-#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/stepper/rkf45.hpp"//stepper
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/evolve.h"//evolve
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/moments.h"//moments
+#include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/NC/model.h"//model
 #include"/home/kareem/cosmo-share/repos/pytsa/pytsa/cppt/stepper/rkf45.hpp"//stepper
 //*************************************************************************************************
 
@@ -1195,11 +1194,11 @@ extern "C" {
 #endif
 
 // **************************************************************************************
-static struct PyModuleDef PyTransModule = {PyModuleDef_HEAD_INIT, "dquad_euclidean", PyTrans_docs, -1, dquad_euclidean_funcs}; //modDef
+//modDef
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 // **************************************************************************************
-PyMODINIT_FUNC PyInit_dquad_euclidean(void)    {import_array();  return PyModule_Create(&PyTransModule);} //initFunc
+//initFunc
 // do not alter the comment at the end of preceeding line -- it is used by preprocessor
 
 #ifdef __cplusplus
