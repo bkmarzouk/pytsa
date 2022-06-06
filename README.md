@@ -25,7 +25,7 @@ python -m install -e .
 The setup should have installed an example model file `dquad_2sphere.py`. To test whether the submodule was installed,
 you can run some unittests via
 ```bash
-pytest tests/installation_tests.py
+pytest tests/test_install.py
 ```
 
 ## Installing inflationary models

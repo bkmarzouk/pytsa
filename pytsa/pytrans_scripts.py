@@ -16,11 +16,8 @@
 
 # python code contains some useful scripts to use with the compiled pyt module.
 
-import os
-import pickle as pk
 import timeit
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 from scipy.interpolate import UnivariateSpline
