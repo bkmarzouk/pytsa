@@ -19,7 +19,7 @@ which was developed by David Mulryne and John Ronayne. Some parts of the current
 
 To install the code as a package run the following command from the root directory:
 ```bash
-python -m install -e .
+python -m pip install -e .
 ```
 
 The setup should have installed an example model file `dquad_2sphere.py`. To test whether the submodule was installed,
