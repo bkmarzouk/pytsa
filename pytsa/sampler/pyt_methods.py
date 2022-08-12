@@ -263,8 +263,6 @@ def compute_background(index: int):
     # this indicates inflation is over, and inferring masses at this time produces large values to the exponential
     # gradient in epsilon. All background data therefore corresponds to epsilon < 1
 
-    print(background.shape)
-
     background = background[:-1]
 
     # Update evolution to correspond to epsilon > 1 end

@@ -48,17 +48,14 @@ bool _SamplerMode(){
     bool sampler_mode;
 
     if ( tmp == NULL ) {
-//        cout << "NOT USING SAMPLER MODE" << endl;
         sampler_mode = false;
     }
     else {
         std::string s( tmp );
         if (s == "TRUE") {
-//            cout << "USING SAMPLER MODE" << endl;
             sampler_mode = true;
         }
         else {
-//            cout << "NOT USING SAMPLER MODE" << endl;
             sampler_mode = false;
         }
     }
@@ -69,8 +66,6 @@ bool _SamplerMode(){
 //    Assumes PyArray is contiguous in memory.             */
 double *pyvector_to_Carray(PyArrayObject *arrayin)
 {
-    //  int i,n;
-    //	n=arrayin->dimensions[0]; n is length of python array
     return (double *) arrayin->data;  /* pointer to arrayin data as double */
 }
 
@@ -1168,19 +1163,19 @@ static PyObject* MT_alphaEvolve(PyObject* self,  PyObject *args)
     return PyArray_Return(alpOut);
 }
 
-PyDoc_STRVAR(doc_H, "Compute the Hubble rate from background");
-PyDoc_STRVAR(doc_nF, "Get number of fields in model");
-PyDoc_STRVAR(doc_nP, "Get number of params in model");
-PyDoc_STRVAR(doc_Epsilon, "Compute epsilon SR param (Hubble not Potential)");
-PyDoc_STRVAR(doc_Eta, "Compute eta SR param (Hubble not Potential");
-PyDoc_STRVAR(doc_V, "Evaluate the potential at given field values");
-PyDoc_STRVAR(doc_dV, "Evaluate 1st (covariant) derivative of potential at given field values");
-PyDoc_STRVAR(doc_ddV, "Evaluate 2nd (covariant) derivative of potential at given field values");
-PyDoc_STRVAR(doc_findEndOfInflation, "Finds end of inflation; i.e. when epsilon > 1");
-PyDoc_STRVAR(doc_massMatrix, "Compute mass (squared) matrix from background");
-PyDoc_STRVAR(doc_backEvolve, "Compute background evolution for a range of efoldings");
-PyDoc_STRVAR(doc_sigEvolve, "Evolve 2pt correlation functions");
-PyDoc_STRVAR(doc_alphaEvolve, "Evolve 3pt correlation functions";)
+PyDoc_STRVAR(doc_H, "H(fields_dotfields, params).\n\nComputes the Hubble rate of expansion.\n\nParameters\n----------\nfields_dotfields : numpy array of shape (1, 2*num_fields) of dtype float\nthe field values followed by field velocities.\nparams : numpy array of shape (1, num_params) of dtype float, containing the model parameters.\n\nReturns\n-------\nHubbleRate : double\nHubble rate at input parameters.");
+PyDoc_STRVAR(doc_nF, "nF().\n\nGet number of fields in model.\n\nReturns\n-------nF: int\nNumber of fields associated with model.");
+PyDoc_STRVAR(doc_nP, "nP().\n\nGet number of parameters in model.\n\nReturns\n-------nP: int\nNumber of parameters associated with model.");
+PyDoc_STRVAR(doc_Epsilon, "Eps(fields_dotfields, params).\n\nCompute epsilon slow-roll parameter in terms of the Hubble rate.\n\nParameters\n----------\nfields_dotfields : numpy array of shape (1, 2*num_fields) of dtype float\nthe field values followed by field velocities.\nparams : numpy array of shape (1, num_params) of dtype float\nthe model parameters.\n\nReturns\n-------\nEpsilon : double\nEpsilon slow-roll parameter.");
+PyDoc_STRVAR(doc_Eta, "Eta(fields_dotfields, params).\n\nCompute eta slow-roll parameter in terms of the Hubble rate.\n\nParameters\n----------\nfields_dotfields : numpy array of shape (1, 2*num_fields) of dtype float\nthe field values followed by field velocities.\nparams : numpy array of shape (1, num_params) of dtype float\nthe model parameters.\n\nReturns\n-------\nEta : double\nEta slow-roll parameter.");
+PyDoc_STRVAR(doc_V, "V(fields, params).\n\nCompute the potential at given field values.\n\nParameters\n----------\nfields : np.ndarray of shape(1, num_fields) of dtype float\nthe field values.\nparams : numpy array of shape (1, num_params) of dtype float\nthe model parameters.\n\nReturns\n------\n potential : float\nValue of potential with input field and parameter combination.");
+PyDoc_STRVAR(doc_dV, "dV(fields, params).\n\nCompute 1st (covariant) derivative of potential at given field values\n\nParameters\n----------\nfields : np.ndarray of shape(1, num_fields) of dtype float\nthe field values.\nparams : numpy array of shape (1, num_params) of dtype float\nthe model parameters.\n\nReturns\n------\n 1st potential derivative : numpy array of shape (1, num_fields) of type float\nValue of potential derivatives with input field and parameter combination.");
+PyDoc_STRVAR(doc_ddV, "ddV(fields, params).\n\nCompute 2nd (covariant) derivative of potential at given field values\n\nParameters\n----------\nfields : np.ndarray of shape(1, num_fields) of dtype float\nthe field values.\nparams : numpy array of shape (1, num_params) of dtype float\nthe model parameters.\n\nReturns\n------\n 2nd potential derivative : numpy array of shape (num_fields, num_fields) of type float\nValue of potential derivatives with input field and parameter combination.");
+PyDoc_STRVAR(doc_findEndOfInflation, "TODO : finish doc.\n\nfindEndOfInflation().\n\nFinds end of inflation; i.e. when epsilon > 1\n\nParameters\n----------\n");
+PyDoc_STRVAR(doc_massMatrix, "TODO : finish doc.\n\nmassMatrix().\n\nCompute mass (squared) matrix from background\n\nParameters\n----------\n");
+PyDoc_STRVAR(doc_backEvolve, "finish doc \n\nbackEvolve(N, fields_dotfields, params, tols, full, tmax=-1, flag_return=False).\n\nCompute background evolution for a range of efoldings\n\nParameters\n----------\nN : 1D numpy array of dtype float,\ncorresponding to efolds to integrate over.\nics : numpy array of dtype float of size (1, 2*num_fields),\ncorresponding to the initial conditions of evolution.\nparams : numpy array of dtype float of size (1, num_params),\ncorresponding to the model parameters.\ntols : numpy array of dtype float of size 2,\ncorresponding to the abs. and rel. integration tolerances.\nexit : boolean,\nif True, integrate until slow roll violation, else attempt maximal integration.\ntmax : (optional) int,\nmaximum time (wall-clock) to attempt integration before bad exit. Defaults to -1, corresponding to unconstrained.\nflag_return : (optional) bool,\nif True, returns flag containing error code for bad integration procedure. Otherwise returns Null.");
+PyDoc_STRVAR(doc_sigEvolve, "sigEvolve(N, k, ics, tols, full, tmax=-1, flag_return=False).\n\nEvolve 2pt correlation functions\n\nParameters\n----------\nN : 1D numpy array of type float,\ncorresponding to the efold times for wich outputs should be returned. First and last elements should correspond to initial and final efolding of evolution.\nk : float,\nFourier mode.\nics : numpy array of dtype float of size (1, 2*num_fields),\ncorresponding to the initial conditions of evolution.\ntols : numpy array of dtype float of size 2,\ncorresponding to the abs. and rel. integration tolerances.\nfull : boolean,\nThe function returns a two dimensional numpy array the zeroth column of which contains the times (Narray). If full=False the next column contains the power spectrum of ζ at these times, and this is the final column (there are therefore only 2 columns in total). If full = True then there is in addition 2 nF + 2 nF * 2 nF columns. See docs @ https://arxiv.org/pdf/1609.00381.pdf.\nflag_return : (optional) bool,\nif True, returns flag containing error code for bad integration procedure. Otherwise returns Null.");
+PyDoc_STRVAR(doc_alphaEvolve, "alphaEvolve(N, k1, k2, k3, ics, tols, full, tmax=-1, flag_return=False).\n\nEvolve 3pt correlation functions\n\nParameters\n----------\nN : 1D numpy array of type float,\ncorresponding to the efold times for wich outputs should be returned. First and last elements should correspond to initial and final efolding of evolution.\nk1 : float,\nfirst Fourier mode.\nk2 : float,\nsecondFourier mode.\nk3 : float,\nthird Fourier mode.\nics : numpy array of dtype float of size (1, 2*num_fields),\ncorresponding to the initial conditions of evolution.\ntols : numpy array of dtype float of size 2,\ncorresponding to the abs. and rel. integration tolerances.\nfull : boolean,\nThe function returns a two dimensional numpy array, the first column of which contains the times (Narray). If full=False the next four columns contains the power spectrum of zeta for each of the three k values input, and the value of the bispectrum of zeta for a triangle with sides of length of these k values. A total of [1+ 4] columns. If full=True, there are an additional 2*nF + 6 *2 nF* 2 nF + 2 nF * 2 nF * 2 nF columns. The first 2nF of these columns contain the fields, and field velocities at the time steps requested (the background cosmology). See docs in appendix of @ https://arxiv.org/pdf/1609.00381.pdf.\ntmax : (optional) int,\nmaximum time (wall-clock) to attempt integration before bad exit. Defaults to -1, corresponding to unconstrained.\nflag_return : (optional) bool,\nif True, returns flag containing error code for bad integration procedure. Otherwise returns Null.");
 
 static char PyTrans_docs[] =
 "This is a custom PyTransport package for solving the moment transport equations of inflationary cosmology\n";
