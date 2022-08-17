@@ -7,6 +7,7 @@
 **/build
 **/dist
 /pytsa/pyt/lib/python3.8/site-packages/*
+**/.ipynb_checkpoints/
 
 # Ignore .idea
 .idea
