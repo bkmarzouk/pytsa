@@ -74,3 +74,6 @@ if __name__ == "__main__":
     from pytsa.sampler import main_pool
 
     main_pool.main(pool, args_dict)
+
+    del os.environ['pytsa_VERBOSE']
+    del os.environ['pytsa_SAMPLER']

@@ -320,7 +320,6 @@ def compute_background(index: int):
 
 def any_nan_inf(*vals):
     arr = np.array([*vals])
-
     return np.any(np.isnan(arr)) or np.any(np.isinf(arr))
 
 
