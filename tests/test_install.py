@@ -1,11 +1,10 @@
 import unittest
 import numpy as np
 
-
-def _import():
-    global test_model
+try:
     from pytsa.models import dquad_2sphere as test_model
-    return test_model
+except ImportError:
+    assert 0, "Unable to do tests, no module"
 
 
 class ModelDefs:
@@ -71,10 +70,6 @@ class TestDoubleQuadratic2Sphere(unittest.TestCase):
     tols = np.array([1e-5, 1e-5])
     ics = np.array([-1.5890304023505983, -18.389416025688845, 0.00232248417286116, 0.00418422599903375])
     pars = np.array([0.01329597888476721, 0.005246064625353842, 5.195022895180804])
-    try:
-        test_model = _import()
-    except ImportError:
-        test_model = None
 
     def _get_back(self):
         N_evo = np.linspace(0, 3000, 20 * 3000)
@@ -84,8 +79,7 @@ class TestDoubleQuadratic2Sphere(unittest.TestCase):
         return back
 
     def test_import(self):
-
-        assert self.test_model is not None, test_model
+        assert test_model is not None, test_model
 
     def test_nf(self):
         assert test_model.nF() == 2
