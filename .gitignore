@@ -49,3 +49,6 @@ notebooks/sample_data/
 !.gitignore
 
 /pytsa/pyt/PyTrans.cpp
+
+/pytsa/models/
+!/pytsa/models/__init__.py

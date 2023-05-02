@@ -17,7 +17,8 @@ from setuptools import setup, Extension
 import os
 import numpy as np
 
-#  Get path to sources we want to compile and directories that contain header files
+#  Get path to sources we want to compile and directories
+#  that contain header files
 cwd = os.path.dirname(__file__)
 template_path = os.path.join(cwd, "PyTrans.cpp")
 cppt_dir = os.path.abspath(os.path.join(cwd, "../cppt"))
@@ -34,14 +35,14 @@ mod_name = "TMP"  # PYT_MODNAME
 module_extension = Extension(
     mod_name,
     sources=[template_path, stepper_path],
-    language='c++',
-    extra_compile_args=['-pipe'],
-    extra_link_args=["-I{}".format(np.get_include())]
+    language="c++",
+    extra_compile_args=["-pipe"],
+    extra_link_args=["-I{}".format(np.get_include())],
 )
 
 setup(
     name=mod_name,
     version="1.0",
     ext_modules=[module_extension],
-    include_dirs=[np.get_include(), cppt_dir]
+    include_dirs=[np.get_include(), cppt_dir],
 )

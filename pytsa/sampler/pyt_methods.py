@@ -5,18 +5,18 @@ import dill
 
 from pytsa import pytrans_scripts as py_scripts
 from ..cache_tools import hash_alpha_beta
-from .setup_sampler import LatinSampler, APrioriSampler, SamplerMethods
-from pytsa.sampler.mpi_helpers import rank
+from .setup_sampler import LatinSampler, APrioriSampler
+from pytsa.sampler.mpi_helpers import mpi_rank
 
 try:
-    env_verbose = os.environ['pytsa_VERBOSE']
+    env_verbose = os.environ["pytsa_VERBOSE"]
     verbose = bool(int(env_verbose))
 except KeyError:
     env_verbose = None
     verbose = False
 
 try:
-    env_sampler = os.environ['pytsa_SAMPLER']
+    env_sampler = os.environ["pytsa_SAMPLER"]
     with open(env_sampler, "rb") as f:
         sampler: LatinSampler or APrioriSampler = dill.load(f)
 
@@ -62,22 +62,25 @@ error_dict = {
     -60: "ics_3pf_{alpha_beta}",
     -61: "kexit_3pf_{alpha_beta}",
     -62: "int_3pf_{alpha_beta}",
-    -63: "timeout_3pf_{alpha_beta}"
+    -63: "timeout_3pf_{alpha_beta}",
 }
 
 _BAD = np.nan
 
 
 class SampleCore(object):
-
     # Track background quantities for observables, and log errors
 
-    def __init__(self, index: int, back_status: int, back: np.ndarray or None = None,
-                 back_raw: np.ndarray or None = None,
-                 Nexit: float or None = None,
-                 Nexit_raw: float or None = None,
-                 params: np.ndarray or None = None):
-
+    def __init__(
+        self,
+        index: int,
+        back_status: int,
+        back: np.ndarray or None = None,
+        back_raw: np.ndarray or None = None,
+        Nexit: float or None = None,
+        Nexit_raw: float or None = None,
+        params: np.ndarray or None = None,
+    ):
         self.index = index
         self.path = os.path.join(samples_dir, "sample.%06d" % index)
 
@@ -126,21 +129,18 @@ class SampleCore(object):
         return cls(index, -34)
 
     def task_eps(self, failed: bool, value):
-
         if failed:
             self._update_sample(-40, result_key="eps", result_value=value)
         else:
             self._update_sample(0, "eps", result_key="eps", result_value=value)
 
     def task_eta(self, failed: bool, value):
-
         if failed:
             self._update_sample(-41, result_key="eta", result_value=value)
         else:
             self._update_sample(0, result_key="eta", result_value=value)
 
     def task_mij(self, failed: bool, adiabatic: bool, value):
-
         self.adiabatic = adiabatic
 
         if failed:
@@ -149,7 +149,6 @@ class SampleCore(object):
             self._update_sample(0, result_key="mij", result_value=value)
 
     def task_2pf(self, code: int, value):
-
         if -60 <= code <= -50:
             self._update_sample(code, result_key="2pf", result_value=value)
         else:
@@ -157,20 +156,28 @@ class SampleCore(object):
             self._update_sample(0, result_key="2pf", result_value=value)
 
     def task_3pf(self, code: int, alpha_beta, value):
-
         if -70 <= code <= -60:
-            self._update_sample(code, alpha_beta, result_key=alpha_beta, result_value=value)
+            self._update_sample(
+                code, alpha_beta, result_key=alpha_beta, result_value=value
+            )
         else:
             assert code == 0, [code, value]
             self._update_sample(0, result_key=alpha_beta, result_value=value)
 
-    def _update_sample(self, error_code: int, alpha_beta=None, result_value=None, result_key=None):
-
+    def _update_sample(
+        self,
+        error_code: int,
+        alpha_beta=None,
+        result_value=None,
+        result_key=None,
+    ):
         self.err_n.append(error_code)
 
         es = error_dict[error_code]
 
-        self.err_s.append(es if alpha_beta is None else es.format(alpha_beta=alpha_beta))
+        self.err_s.append(
+            es if alpha_beta is None else es.format(alpha_beta=alpha_beta)
+        )
 
         assert result_key is not None
 
@@ -179,7 +186,6 @@ class SampleCore(object):
         self.cache()
 
     def cache(self):
-
         p = self.path
 
         if not os.path.exists(p):
@@ -191,16 +197,15 @@ class SampleCore(object):
             self.cache()
 
     def get_row_data(self, *obs_keys):
-
         if self.err_n[0] != 0:  # Did not find background
             return _BAD
 
         results = np.array([], dtype=np.float64)
 
-        for k in ['eps', 'eta']:
+        for k in ["eps", "eta"]:
             results = np.concatenate((results, self.results[k]))
 
-        for masses in self.results['mij']:
+        for masses in self.results["mij"]:
             results = np.concatenate((results, masses))
 
         for obs in obs_keys:
@@ -226,7 +231,7 @@ def compute_background(index: int):
         pass
 
     if verbose:
-        print(f"-- computing background {index} @ {rank}")
+        print(f"-- computing background {index} @ {mpi_rank}")
 
     ics, params = sampler.get_sample(index)
 
@@ -242,7 +247,6 @@ def compute_background(index: int):
     )  # Raw background
 
     if isinstance(background, int):
-
         if background == -32:
             return SampleCore.int_background(index).get_last_status()
 
@@ -252,16 +256,20 @@ def compute_background(index: int):
         else:
             raise ValueError(background)
 
-    elif isinstance(background, np.ndarray) and background.shape == (1, 1 + 2 * n_fields):  # Only managed single step
+    elif isinstance(background, np.ndarray) and background.shape == (
+        1,
+        1 + 2 * n_fields,
+    ):  # Only managed single step
         return SampleCore.inflation_too_short(index).get_last_status()
 
     else:
         pass
 
-
     # Note we clip the final step of back where epsilon > 1
-    # this indicates inflation is over, and inferring masses at this time produces large values to the exponential
-    # gradient in epsilon. All background data therefore corresponds to epsilon < 1
+    # this indicates inflation is over, and inferring masses at this time
+    # produces large values to the exponential
+    # gradient in epsilon. All background data therefore corresponds to
+    # epsilon < 1
 
     background = background[:-1]
 
@@ -272,29 +280,23 @@ def compute_background(index: int):
 
     # check for exit condition in field space constraints
     if len(fspace_terminate) > 0:
-
         _idx = np.inf
 
         for idx, step in enumerate(background):
-
             for fidx, bounds in fspace_terminate.items():
-
                 if bounds[0] <= step[1 + fidx] <= bounds[1]:
                     _idx = np.min([_idx, idx])
 
         if np.isinf(_idx):
             return SampleCore.field_space_violation(index).get_last_status()
 
-        background = background[:_idx + 1]
+        background = background[: _idx + 1]
         N_evo = background.T[0]
         Nend = N_evo[-1]
 
     if len(fspace_reject) > 0:
-
         for idx, step in enumerate(background):
-
             for fidx, bounds in fspace_reject.items():
-
                 if bounds[0] <= step[1 + fidx] <= bounds[1]:
                     SampleCore.field_space_violation(index).get_last_status()
 
@@ -307,7 +309,9 @@ def compute_background(index: int):
     if isinstance(background, tuple):
         return SampleCore.int_background(index).get_last_status()
 
-    back_adj = py_scripts.adjust_back(background, Nr=Nmin + 20.)  # Adjusted background
+    back_adj = py_scripts.adjust_back(
+        background, Nr=Nmin + 20.0
+    )  # Adjusted background
 
     nexit_adj = py_scripts.compute_Nexit_for_matching(model, back_adj, params)
     nexit = py_scripts.compute_Nexit_for_matching(model, background, params)
@@ -315,7 +319,9 @@ def compute_background(index: int):
     if np.isnan(nexit_adj):
         return SampleCore.nexit_background(index).get_last_status()
 
-    return SampleCore(index, 0, back_adj, background, nexit_adj, nexit, params).get_last_status()
+    return SampleCore(
+        index, 0, back_adj, background, nexit_adj, nexit, params
+    ).get_last_status()
 
 
 def any_nan_inf(*vals):
@@ -333,8 +339,10 @@ def compute_epsilon(index: int):
 
     if "eps" not in sample_core.results:
         if verbose:
-            print(f"-- computing epsilon {sample_core.index} @ {rank}")
-        eps = py_scripts.get_epsilon_data(sample_core.back, sample_core.params, sample_core.Nexit, model)
+            print(f"-- computing epsilon {sample_core.index} @ {mpi_rank}")
+        eps = py_scripts.get_epsilon_data(
+            sample_core.back, sample_core.params, sample_core.Nexit, model
+        )
 
         failed = any_nan_inf(eps)
 
@@ -346,8 +354,10 @@ def compute_eta(index: int):
 
     if "eta" not in sample_core.results:
         if verbose:
-            print(f"-- computing eta {sample_core.index} @ {rank}")
-        eta = py_scripts.get_eta_data(sample_core.back, sample_core.params, sample_core.Nexit, model)
+            print(f"-- computing eta {sample_core.index} @ {mpi_rank}")
+        eta = py_scripts.get_eta_data(
+            sample_core.back, sample_core.params, sample_core.Nexit, model
+        )
 
         failed = any_nan_inf(eta)
 
@@ -358,25 +368,28 @@ def compute_mij(index: int):
     sample_core = extract_core(index)
 
     if "mij" not in sample_core.results:
-
         if verbose:
-            print(f"-- computing masses {sample_core.index} @ {rank}")
+            print(f"-- computing masses {sample_core.index} @ {mpi_rank}")
 
-        masses_exit, masses_end = py_scripts.get_mass_data(sample_core.back, sample_core.params, sample_core.Nexit,
-                                                           model)
+        masses_exit, masses_end = py_scripts.get_mass_data(
+            sample_core.back, sample_core.params, sample_core.Nexit, model
+        )
         back = sample_core.back
 
         NEND = back.T[0][-1]
 
         N_adi_check = np.array([N for N in back.T[0] if N > NEND - Nadi])
 
-        # Check for adiabatic limit: Criteria here requires that m^2 >= 2 H^2 over the last efolds of inflation
+        # Check for adiabatic limit: Criteria here requires that m^2 >= 2 H^2
+        # over the last efolds of inflation
         # for all but one tachyonic mode.
         # precise nember defined as N_adiabatic in setup
 
         adi = True
         for _ in N_adi_check:
-            masses = py_scripts.get_mass_data(sample_core.back, sample_core.params, _, model)
+            masses = py_scripts.get_mass_data(
+                sample_core.back, sample_core.params, _, model
+            )
 
             n_tachyon = (masses < 0).sum()
 
@@ -398,21 +411,23 @@ def compute_mij(index: int):
 def compute_obs(data: _HintTasks):
     task_dict = data.task_dict
 
-    if task_dict['task_2pt'] is True:
+    if task_dict["task_2pt"] is True:
         compute_2pf(data)
 
-    if task_dict['task_3pt_eq'] is True:
+    if task_dict["task_3pt_eq"] is True:
         compute_3pf(data, eq=True, fo=False, sq=False)
 
-    if task_dict['task_3pt_fo'] is True:
+    if task_dict["task_3pt_fo"] is True:
         compute_3pf(data, eq=False, fo=True, sq=False)
 
-    if task_dict['task_3pt_sq'] is True:
+    if task_dict["task_3pt_sq"] is True:
         compute_3pf(data, eq=False, fo=False, sq=True)
 
-    if len(task_dict['alpha']) > 0:
-        for alpha, beta in zip(task_dict['alpha'], ['beta']):
-            compute_3pf(data, alpha=alpha, beta=beta, eq=False, fo=False, sq=False)
+    if len(task_dict["alpha"]) > 0:
+        for alpha, beta in zip(task_dict["alpha"], ["beta"]):
+            compute_3pf(
+                data, alpha=alpha, beta=beta, eq=False, fo=False, sq=False
+            )
 
     return 0
 
@@ -421,9 +436,8 @@ def compute_2pf(data: _HintTasks):
     sample_core = extract_core(data.index)
 
     if "2pf" not in sample_core.results:
-
         if verbose:
-            print(f"-- computing 2pf {sample_core.index} @ {rank}")
+            print(f"-- computing 2pf {sample_core.index} @ {mpi_rank}")
 
         result = py_scripts.compute_spectral_index(
             model,
@@ -432,7 +446,7 @@ def compute_2pf(data: _HintTasks):
             tols,
             Nsub,
             Nexit=sample_core.Nexit,
-            tmax=tmax_2pf
+            tmax=tmax_2pf,
         )
 
         if isinstance(result, int):
@@ -454,14 +468,16 @@ def compute_3pf(data: _HintTasks, **task_kwargs):
     elif task_kwargs["fo"]:
         alpha_beta = "fo"
     else:
-        alpha = task_kwargs['alpha']
-        beta = task_kwargs['beta']
+        alpha = task_kwargs["alpha"]
+        beta = task_kwargs["beta"]
         alpha_beta = hash_alpha_beta(alpha, beta)
 
     if alpha_beta not in sample_core.results:
-
         if verbose:
-            print(f"-- computing fnl {alpha_beta} {sample_core.index} @ {rank}")
+            print(
+                f"-- computing fnl "
+                f"{alpha_beta} {sample_core.index} @ {mpi_rank}"
+            )
 
         result = py_scripts.compute_fnl(
             model,
@@ -471,7 +487,7 @@ def compute_3pf(data: _HintTasks, **task_kwargs):
             Nsub,
             Nexit=sample_core.Nexit,
             tmax=tmax_3pf,
-            **task_kwargs
+            **task_kwargs,
         )
 
         if isinstance(result, int):
