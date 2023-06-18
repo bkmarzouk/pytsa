@@ -5,16 +5,17 @@ from numpy.random import bit_generator, Generator
 
 
 class RandomStates(object):
-
     def __init__(self, n_states, entropy=None):
         """
         Spawns sequence of random states from an initial seeding value
-        :param entropy: initial seed value, if None assigned from system entropy
+        :param entropy: initial seed value, if None assign from system entropy
         :param n_states: number of child seeds to spawn
         """
         seq = bit_generator.SeedSequence(entropy=entropy)
 
-        self.entropy = seq.entropy  # Note that we log the entropy after seq init in case input entropy is None
+        self.entropy = (
+            seq.entropy
+        )  # We log the entropy after seq init in case input entropy is None
         self.n_states = n_states  # Number of states to spawn
         self.states = seq.spawn(n_states)  # builds new uncorrelated streams
 
@@ -34,7 +35,8 @@ class RandomStates(object):
 
         :param path: Path to random states object
         :param n_states: number of states to spawn
-        :param entropy: system entropy to initialize sequence with; should be None unless for test cases
+        :param entropy: system entropy to initialize sequence with;
+                should be None unless for test cases
         :return: RandomStates object
         """
 
@@ -47,7 +49,6 @@ class RandomStates(object):
                 # check states match
                 assert s.n_states == n_states, [s.n_states, n_states]
 
-                # if None zero entropy for initialization, check this matches too
                 if entropy is not None:
                     assert s.entropy == entropy, [s.entropy, entropy]
 

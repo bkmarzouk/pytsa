@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.interpolate.interpolate
 from scipy.interpolate import UnivariateSpline, interp1d
 
 k_order = 1
@@ -7,11 +6,7 @@ use_interp1d = True
 s_method = interp1d if use_interp1d else UnivariateSpline
 
 if use_interp1d:
-    k_order = {
-        1: 'linear',
-        2: 'quadratic',
-        3: 'cubic'
-    }[k_order]
+    k_order = {1: "linear", 2: "quadratic", 3: "cubic"}[k_order]
 
 
 def update_default_k(k):
@@ -26,7 +21,8 @@ def update_default_k(k):
 
 def monotonic(array: np.ndarray, col_idx=0, strict=True):
     """
-    Checks that column (col_idx) of a 2D array is strictly monotonically increasing
+    Checks that column (col_idx) of a 2D array is strictly monotonically
+    increasing
 
     :param array: 2d numpy array
     :param strict: if True, strictly monotonic
@@ -36,14 +32,26 @@ def monotonic(array: np.ndarray, col_idx=0, strict=True):
     col = array.T[col_idx]
 
     if strict:
-        return np.all(np.concatenate([col[:-1] < np.roll(col, -1)[:-1], np.array([col[-2] < col[-1]])]))
+        return np.all(
+            np.concatenate(
+                [
+                    col[:-1] < np.roll(col, -1)[:-1],
+                    np.array([col[-2] < col[-1]]),
+                ]
+            )
+        )
 
-    return np.all(np.concatenate([col[:-1] <= np.roll(col, -1)[:-1], np.array([col[-2] <= col[-1]])]))
+    return np.all(
+        np.concatenate(
+            [col[:-1] <= np.roll(col, -1)[:-1], np.array([col[-2] <= col[-1]])]
+        )
+    )
 
 
 def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
     """
-    Finds the closest data point in the array to a target pivot value, and returns the containing row data
+    Finds the closest data point in the array to a target pivot value,
+    and returns the containing row data
 
     :param pivot_value: value to approximate array at
     :param array: input array
@@ -58,7 +66,6 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
     compare_to = array.T[col_idx]
 
     for ii in range(1, len(array)):
-
         if compare_to[ii] >= pivot_value > compare_to[ii - 1]:
             lower = compare_to[ii - 1]
             upper = compare_to[ii]
@@ -75,7 +82,8 @@ def approx_row_closest(pivot_value, array: np.ndarray, col_idx):
 
 def approx_row_spline(pivot_value, pivot_width, array: np.ndarray, col_idx):
     """
-    Finds the closest data point in the array to a target pivot value, and returns the containing row data
+    Finds the closest data point in the array to a target pivot value,
+    and returns the containing row data
 
     :param pivot_value: value to approximate array at
     :param array: input array
@@ -83,8 +91,10 @@ def approx_row_spline(pivot_value, pivot_width, array: np.ndarray, col_idx):
     :return: row from array approximately matching the pivot value
     """
 
-    assert monotonic(array, col_idx), "Can only formulate approximate row data if independent col is strictly " \
-                                      "monotonically increasing!"
+    assert monotonic(array, col_idx), (
+        "Can only formulate approximate row data if independent col "
+        "is strictly monotonically increasing!"
+    )
 
     pivot_width /= 2
 
@@ -95,10 +105,16 @@ def approx_row_spline(pivot_value, pivot_width, array: np.ndarray, col_idx):
     window_array = array.copy()[indices]
 
     ind_data = window_array.T[col_idx]
-    dep_data = [window_array.T[ii] for ii in range(window_array.shape[1]) if ii != col_idx]
+    dep_data = [
+        window_array.T[ii]
+        for ii in range(window_array.shape[1])
+        if ii != col_idx
+    ]
 
     if use_interp1d:
-        spl_data = [s_method(ind_data, _dep, kind=k_order) for _dep in dep_data]
+        spl_data = [
+            s_method(ind_data, _dep, kind=k_order) for _dep in dep_data
+        ]
     else:
         spl_data = [s_method(ind_data, _dep, k=k_order) for _dep in dep_data]
 

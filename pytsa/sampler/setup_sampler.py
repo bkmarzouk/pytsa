@@ -4,21 +4,21 @@ import dill
 import pickle as pk
 import numpy as np
 import scipy.stats
-from pytsa.cache_tools import hash_alpha_beta
 from pytsa.sampler.rng_states import RandomStates
-from pytsa.sampler.mpi_helpers import make_dir, single_proc_task, barrier, rank
+from pytsa.sampler.mpi_helpers import make_dir, barrier, mpi_rank
 
-default_cache = os.path.abspath(os.path.join(os.path.dirname(__file__), "", "..", "..", "samplers"))
+default_cache = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "", "..", "..", "samplers")
+)
 
 assert os.path.exists(default_cache)
 
 
 class Constant(object):
-
     def __init__(self, val):
         """
-        Mimics methods from scipy.stats for constructing samples via rvs or ppf. Returns constant in either case
-        for any value
+        Mimics methods from scipy.stats for constructing samples via rvs or ppf
+        Returns constant in either case for any value
 
         :param val: constant value to return
         """
@@ -67,7 +67,6 @@ def _check_method(m):
 
 
 class _SamplingParameters(object):
-
     def __init__(self, pyt_model):
         """
         Container for sampling parameters
@@ -154,7 +153,6 @@ class _SamplingParameters(object):
             self.latex_p[idx] = f"p_{idx}" if latex is None else latex
 
     def _get_hash_data(self):
-
         hd = {}
 
         for idx in range(self.nF):
@@ -168,7 +166,6 @@ class _SamplingParameters(object):
 
 
 class SamplerMethods(_SamplingParameters):
-
     def __init__(self, pyt_model, sampler_name, cache_loc=default_cache):
         """
         Setup routine for sampler
@@ -185,52 +182,79 @@ class SamplerMethods(_SamplingParameters):
 
         self._analysis_pars_set = False
 
-    def add_fieldspace_constraint(self, fidx, fmin=-np.inf, fmax=np.inf, dot_field=False):
+    def add_fieldspace_constraint(
+        self, fidx, fmin=-np.inf, fmax=np.inf, dot_field=False
+    ):
         """
         Define region of fieldspace where inflation is permitted.
         If deviation occurs, the sample is rejected.
 
         :param fidx: Field index
-        :param fmin: minimum allowed field value. By default, -inf, i.e. no lower bound
-        :param fmax: maximum allowed field value. By default, +inf, i.e. no upper bound
+        :param fmin: minimum allowed field value. By default, -inf,
+                i.e. no lower bound
+        :param fmax: maximum allowed field value. By default, +inf,
+                i.e. no upper bound
         """
 
         if fidx in self.fieldspace_reject:
-            raise AttributeError("Attribute already defined for field number {}".format(fidx))
+            raise AttributeError(
+                "Attribute already defined for field number {}".format(fidx)
+            )
 
         self.fieldspace_reject[fidx] = [fmin, fmax]
 
     def add_end_inflation_constraint(self, fidx, fmin, fmax):
         """
-        Define region of fieldspace where inflation instantaneously ends. E.g. in d-brane inflation.
-        The first efold N when f \in [fmin, fmax] will terminate inflation. Sample(s) will be accepted
-        if this condition is met, in conjunction with a sufficient number of efoldings.
+        Define region of fieldspace where inflation instantaneously ends.
+        E.g. in d-brane inflation.
+        The first efold N when f in [fmin, fmax] will terminate inflation.
+        Sample(s) will be accepted
+        if this condition is met, in conjunction with a sufficient number of
+        efoldings.
 
         :param fidx: Field index
         :param fmin: minimum allowed field value. By default,
-        :param fmax: maximum allowed field value. By default, +inf, i.e. no upper bound
+        :param fmax: maximum allowed field value. By default, +inf,
+                i.e. no upper bound
         """
 
         if fidx in self.fieldspace_terminate:
-            raise AttributeError("Attribute already defined for field number {}".format(fidx))
+            raise AttributeError(
+                "Attribute already defined for field number {}".format(fidx)
+            )
 
         self.fieldspace_terminate[fidx] = [fmin, fmax]
 
     def add_mutual_constraint(self, fields=None, dotfields=None, **kwargs):
-        assert 0, "currently unsupported"  # TODO: multiple field conditions satisfied simulatneously
+        assert (
+            0
+        ), "currently unsupported"  # TODO: Satisfy multiple conditions simul.
 
-    def set_analysis_params(self, N_sub_evo=6., tols=None, N_adiabatic=1., N_min=60., tmax_bg=120,
-                            tmax_2pf=300, tmax_3pf=600, step_density=20):
+    def set_analysis_params(
+        self,
+        N_sub_evo=6.0,
+        tols=None,
+        N_adiabatic=1.0,
+        N_min=60.0,
+        tmax_bg=120,
+        tmax_2pf=300,
+        tmax_3pf=600,
+        step_density=20,
+    ):
         """
-        Set integration parameters and efoldings for ICs, adiabicity and minimal inflation
+        Set integration parameters and efoldings for ICs,
+        adiabicity and minimal inflation
 
         :param N_sub_evo: efoldings of sub-horizon evolution to track
         :param tols: integration tols (abs, rel)
         :param N_adiabatic: Number of efoldings to probe the adiabaitic limit
         :param N_min: min efolds of inflation
-        :param tmax_bg: Maximum time in seconds that is spent computing background
-        :param tmax_2pf: Maximum time in seconds that is spent computing 2point function
-        :param tmax_3pf: Maximum time in seconds that is spent computing 3point function
+        :param tmax_bg: Maximum time in seconds that is spent computing
+                background
+        :param tmax_2pf: Maximum time in seconds that is spent computing
+                2point function
+        :param tmax_3pf: Maximum time in seconds that is spent computing
+                3point function
         """
         if tols is None:
             tols = [1e-8, 1e-8]
@@ -245,24 +269,42 @@ class SamplerMethods(_SamplingParameters):
         self._analysis_pars_set = True
 
     def get_hash_data(self) -> dict:
-
         assert self._analysis_pars_set, "Analysis parameters not set!"
 
         base = self._get_hash_data()
 
-        prefixes = ['fields_rej_', 'fields_end_']
+        prefixes = ["fields_rej_", "fields_end_"]
 
-        for conditions, p in zip([self.fieldspace_reject, self.fieldspace_terminate], prefixes):
-
+        for conditions, p in zip(
+            [self.fieldspace_reject, self.fieldspace_terminate], prefixes
+        ):
             for key in conditions:
                 base[p + f"_{key}"] = conditions[key]
 
-        keys = ['Nsub', 'tols', 'Nadi', 'Nmin', 'tmax_bg', 'tmax_2pf', 'tmax_3pf', 'step_density']
+        keys = [
+            "Nsub",
+            "tols",
+            "Nadi",
+            "Nmin",
+            "tmax_bg",
+            "tmax_2pf",
+            "tmax_3pf",
+            "step_density",
+        ]
 
         for value, key in zip(
-                [self.N_sub_evo, self.tols, self.N_adiabatic, self.N_min, self.tmax_bg, self.tmax_2pf, self.tmax_3pf,
-                 self.step_density],
-                keys):
+            [
+                self.N_sub_evo,
+                self.tols,
+                self.N_adiabatic,
+                self.N_min,
+                self.tmax_bg,
+                self.tmax_2pf,
+                self.tmax_3pf,
+                self.step_density,
+            ],
+            keys,
+        ):
             base[key] = value
 
         return base
@@ -286,8 +328,10 @@ class SamplerMethods(_SamplingParameters):
         self._dump_self()
 
         dest = os.path.join(cache_loc, "run.py")
-        if rank == 0 and not os.path.exists(dest):
-            src = os.path.join(os.path.abspath(os.path.dirname(__file__)), "run.py")
+        if mpi_rank == 0 and not os.path.exists(dest):
+            src = os.path.join(
+                os.path.abspath(os.path.dirname(__file__)), "run.py"
+            )
             shutil.copy(src, dest)
 
         barrier()
@@ -299,7 +343,7 @@ class SamplerMethods(_SamplingParameters):
 
         path = os.path.join(self.sampler_path)
 
-        if not os.path.exists(path) and rank == 0:
+        if not os.path.exists(path) and mpi_rank == 0:
             with open(path, "wb") as f:
                 print("-- sampler configuration data @ {}".format(path))
                 dill.dump(self, f)
@@ -317,8 +361,7 @@ class SamplerMethods(_SamplingParameters):
 
         current_data = self.get_hash_data()
 
-        if rank == 0:
-
+        if mpi_rank == 0:
             if not os.path.exists(hash_path):
                 with open(hash_path, "wb") as f:
                     pk.dump(current_data, f)
@@ -327,17 +370,24 @@ class SamplerMethods(_SamplingParameters):
                     existing_data: dict = pk.load(f)
 
                 # check for key data
-                assert current_data.keys() == existing_data.keys(), [current_data.keys(), existing_data.keys()]
+                assert current_data.keys() == existing_data.keys(), [
+                    current_data.keys(),
+                    existing_data.keys(),
+                ]
 
                 # check values match
                 for k in current_data.keys():
                     cur_val = current_data[k]  # Current value
                     exi_val = existing_data[k]  # Existing value
-                    assert current_data[k] == existing_data[k], f"KEY ERROR @ {k}:\n{cur_val} != {exi_val}"
+                    assert (
+                        current_data[k] == existing_data[k]
+                    ), f"KEY ERROR @ {k}:\n{cur_val} != {exi_val}"
 
         barrier()
 
-    def sr2val(self, idx: int or np.ndarray, fvals: np.ndarray, pvals: np.ndarray):
+    def sr2val(
+        self, idx: int or np.ndarray, fvals: np.ndarray, pvals: np.ndarray
+    ):
         """
         Get slow roll value for field index/indices
         :param idx:
@@ -353,21 +403,30 @@ class SamplerMethods(_SamplingParameters):
 
 
 class _SamplerRoutine(object):
-
-    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list, param_methods: list):
+    def __init__(
+        self,
+        random_states: RandomStates,
+        field_methods: list,
+        dotfield_methods: list,
+        param_methods: list,
+    ):
         """
         Base class for samplers.
 
-        :param seed: if given, seed is used for prng before 'get_samples' call in derived function.
-                        Note: in LatinHypercube method, this is called earlier, during the distribution
-                                of grid squares.
+        :param seed: if given, seed is used for prng before 'get_samples'
+                     call in derived function.
+                     Note: in LatinHypercube method, this is called earlier,
+                     during the distribution of grid squares.
         """
         self.random_states = random_states
 
         self.n_field = len(field_methods)
         self.field_methods = field_methods
 
-        assert len(dotfield_methods) == self.n_field, [len(dotfield_methods), self.n_field]
+        assert len(dotfield_methods) == self.n_field, [
+            len(dotfield_methods),
+            self.n_field,
+        ]
         self.dotfield_methods = dotfield_methods
 
         self.n_params = len(param_methods)
@@ -375,12 +434,16 @@ class _SamplerRoutine(object):
 
         if isinstance(self, LatinHypercube):
             print("-- I am latin")
-            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+            for m in (
+                self.field_methods + self.dotfield_methods + self.param_methods
+            ):
                 assert hasattr(m, "ppf"), m
 
         elif isinstance(self, APriori):
             print("-- I am apriori")
-            for m in self.field_methods + self.dotfield_methods + self.param_methods:
+            for m in (
+                self.field_methods + self.dotfield_methods + self.param_methods
+            ):
                 assert hasattr(m, "rvs"), m
 
         else:
@@ -391,19 +454,28 @@ class _SamplerRoutine(object):
 
 
 class APriori(_SamplerRoutine):
-
-    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
-                 param_methods: list):
+    def __init__(
+        self,
+        random_states: RandomStates,
+        field_methods: list,
+        dotfield_methods: list,
+        param_methods: list,
+    ):
         """
-        Draws values apriori from statistical distributions defined with paramters
+        Draws values apriori from statistical distributions defined with
+        paramters
 
-        :param seed: integer or None, defining a random (or absence of) random seed
+        :param seed: integer or None, defining a random (or absence of) random
+        seed
         """
-        super(APriori, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
+        super(APriori, self).__init__(
+            random_states, field_methods, dotfield_methods, param_methods
+        )
 
     def get_sample(self, sample_index: int):
         """
-        Get samples for parameters as defined by corresponding statistical distributions
+        Get samples for parameters as defined by corresponding
+        statistical distributions
 
         :param n_samples: number of samples
         :return: array of samples with shape (n_samples, n_params)
@@ -432,25 +504,36 @@ class APriori(_SamplerRoutine):
 
 
 class LatinHypercube(_SamplerRoutine):
-
-    def __init__(self, random_states: RandomStates, field_methods: list, dotfield_methods: list,
-                 param_methods: list):
+    def __init__(
+        self,
+        random_states: RandomStates,
+        field_methods: list,
+        dotfield_methods: list,
+        param_methods: list,
+    ):
         """
-        Constructs latin hypercube for inverse sampling the CDF of a given distribution
+        Constructs latin hypercube for inverse sampling the CDF of a
+        given distribution
 
-        :param n_cells: number of cells (along one dimension) to define sample regions
+        :param n_cells: number of cells (along one dimension) to define sample
+               regions
         :param seed: prng seed for constructing samples
         :param cube_seed: prng seed for constructing hypercube
         """
-        super(LatinHypercube, self).__init__(random_states, field_methods, dotfield_methods, param_methods)
+        super(LatinHypercube, self).__init__(
+            random_states, field_methods, dotfield_methods, param_methods
+        )
         self.n_samples = random_states.n_states - 1
         self.grid = self.build_grid()
         g = np.linspace(0, 1, self.n_samples + 1)
-        self.unif = list(zip(g, np.roll(g, -1)))[:-1]  # const density intervals
+        self.unif = list(zip(g, np.roll(g, -1)))[
+            :-1
+        ]  # const density intervals
 
     def coords_1d(self, grid_state):
         """
-        Construct non-repeating list of integers on the interval [0, n_cells-1], that represent
+        Construct non-repeating list of integers on the interval
+        [0, n_cells-1], that represent
         sampling intervals for a single parameter of a unique sample
 
         :return: interval coords
@@ -470,7 +553,8 @@ class LatinHypercube(_SamplerRoutine):
 
     def build_grid(self):
         """
-        Construct grid of coordinates representing sampling intervals for the n-dimensional parameter space
+        Construct grid of coordinates representing sampling intervals for the
+        n-dimensional parameter space
 
         :return: nxn coordinate grid
         """
@@ -488,7 +572,8 @@ class LatinHypercube(_SamplerRoutine):
 
     def get_sample(self, sample_index: int):
         """
-        Get samples for parameters as defined by corresponding statistical distributions
+        Get samples for parameters as defined by corresponding statistical
+        distributions
 
         :param verbose: print statements if True
         :return: array of samples with shape (n_cells, n_params)
@@ -504,31 +589,57 @@ class LatinHypercube(_SamplerRoutine):
         unif_regions = self.unif
 
         for idx in range(self.n_field):
-            lb, ub = unif_regions[grid_indices[idx]]  # gets boundaries for subnterval between 0 and 1
-            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
-            m.random_state = state  # update random state to match for current sample
+            lb, ub = unif_regions[
+                grid_indices[idx]
+            ]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(
+                loc=lb, scale=ub - lb
+            )  # initialize rng for region
+            m.random_state = (
+                state  # update random state to match for current sample
+            )
             unif_rv = m.rvs()  # random point from cdf on [0, 1]
-            fdf_out[idx] = self.field_methods[idx].ppf(unif_rv)  # Get sampled value
+            fdf_out[idx] = self.field_methods[idx].ppf(
+                unif_rv
+            )  # Get sampled value
 
-            lb, ub = unif_regions[grid_indices[idx + self.n_field]]  # gets boundaries for subnterval between 0 and 1
-            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
-            m.random_state = state  # update random state to match for current sample
+            lb, ub = unif_regions[
+                grid_indices[idx + self.n_field]
+            ]  # gets boundaries for subnterval between 0 and 1
+            m = scipy.stats.uniform(
+                loc=lb, scale=ub - lb
+            )  # initialize rng for region
+            m.random_state = (
+                state  # update random state to match for current sample
+            )
             unif_rv = m.rvs()  # random point from cdf on [0, 1]
-            fdf_out[idx + self.n_field] = self.dotfield_methods[idx].ppf(unif_rv)  # Get sampled value
+            fdf_out[idx + self.n_field] = self.dotfield_methods[idx].ppf(
+                unif_rv
+            )  # Get sampled value
 
         for idx in range(self.n_params):
             lb, ub = self.unif[grid_indices[idx + self.n_field * 2]]
-            m = scipy.stats.uniform(loc=lb, scale=ub - lb)  # initialize rng for region
-            m.random_state = state  # update random state to match for current sample
+            m = scipy.stats.uniform(
+                loc=lb, scale=ub - lb
+            )  # initialize rng for region
+            m.random_state = (
+                state  # update random state to match for current sample
+            )
             unif_rv = m.rvs()  # random point from cdf on [0, 1]
-            par_out[idx] = self.param_methods[idx].ppf(unif_rv)  # Get sampled value
+            par_out[idx] = self.param_methods[idx].ppf(
+                unif_rv
+            )  # Get sampled value
 
         return fdf_out, par_out
 
 
 class _XSampler:
-
-    def __init__(self, is_apriori: bool, random_states: RandomStates, hyp_pars: SamplerMethods):
+    def __init__(
+        self,
+        is_apriori: bool,
+        random_states: RandomStates,
+        hyp_pars: SamplerMethods,
+    ):
         self.random_states = random_states
         self.hyp_pars = hyp_pars
 
@@ -539,18 +650,24 @@ class _XSampler:
         if is_apriori:
             self.sampler = APriori(random_states, fields, dotfields, params)
         else:
-            self.sampler = LatinHypercube(random_states, fields, dotfields, params)
+            self.sampler = LatinHypercube(
+                random_states, fields, dotfields, params
+            )
 
     def get_sample(self, idx: int):
         _fdf, pars = self.sampler.get_sample(idx)
 
         if np.any(_fdf == "sr"):
             sr_idx = np.where(_fdf == "sr")[0]
-            _fdf[sr_idx] = self.hyp_pars.sr2val(sr_idx - self.hyp_pars.nF, _fdf[:self.hyp_pars.nF], pars)
+            _fdf[sr_idx] = self.hyp_pars.sr2val(
+                sr_idx - self.hyp_pars.nF, _fdf[: self.hyp_pars.nF], pars
+            )
 
-        # TODO: This is an inefficient way of type-casting the fdf results from object to float
-        #       NOTE: WE have object type to accomodate the 'sr' key; maybe define this as a floating
-        #             point constant such that we don't have to do this?
+        # TODO: This is an inefficient way of type-casting the fdf results
+        #  from object to float
+        #  WE have object type to accomodate the 'sr' key;
+        #  maybe define this as a floating
+        #  point constant such that we don't have to do this?
         fdf = np.zeros(self.hyp_pars.nF * 2, dtype=float)
         for idx, val in enumerate(_fdf):
             fdf[idx] = val
@@ -559,31 +676,29 @@ class _XSampler:
 
 
 class APrioriSampler(_XSampler):
-
     def __init__(self, random_states: RandomStates, hyp_pars: SamplerMethods):
         super(APrioriSampler, self).__init__(True, random_states, hyp_pars)
 
 
 class LatinSampler(_XSampler):
-
     def __init__(self, random_states: RandomStates, hyp_pars: SamplerMethods):
         super(LatinSampler, self).__init__(False, random_states, hyp_pars)
 
 
 def build_results_template(cache, n_samples, n_vals):
     path = os.path.join(cache, "data.npy")
-    if not os.path.exists(path) and rank == 0:
+    if not os.path.exists(path) and mpi_rank == 0:
         np.save(path, np.zeros((n_samples, n_vals), dtype=np.float64))
 
     barrier()
 
 
 def job_config(task_pars: dict):
-    name = task_pars['name']
-    n_samples = task_pars['n_samples']
-    entropy = task_pars['entropy']
-    apriori = task_pars['apriori']
-    sampler_cwd = task_pars['cwd']
+    name = task_pars["name"]
+    n_samples = task_pars["n_samples"]
+    entropy = task_pars["entropy"]
+    apriori = task_pars["apriori"]
+    sampler_cwd = task_pars["cwd"]
 
     n_states = n_samples if apriori else n_samples + 1
 
@@ -594,34 +709,38 @@ def job_config(task_pars: dict):
 
     tasks_path = os.path.join(root_dir, "sampler.tasks")
 
-    assert_keys = ['entropy', 'apriori', 'cwd', 'name', 'n_samples']
+    assert_keys = ["entropy", "apriori", "cwd", "name", "n_samples"]
     assert_pars = {k: task_pars[k] for k in assert_keys}
 
-    if rank == 0:
-
+    if mpi_rank == 0:
         if os.path.exists(tasks_path):
-
             with open(tasks_path, "rb") as f:
-
                 cached_task_pars: dict = pk.load(f)
 
-            assert assert_pars.keys() == assert_pars.keys(), [cached_task_pars.keys(), assert_pars.keys()]
+            assert assert_pars.keys() == assert_pars.keys(), [
+                cached_task_pars.keys(),
+                assert_pars.keys(),
+            ]
 
             for k in assert_keys:
                 parsed_par = task_pars[k]
                 cached_par = cached_task_pars[k]
 
-                assert parsed_par == cached_par, f"Parameter error @ {k}: {parsed_par} != {cached_par}"
+                assert (
+                    parsed_par == cached_par
+                ), f"Parameter error @ {k}: {parsed_par} != {cached_par}"
 
         else:
-
             with open(tasks_path, "wb") as f:
-
                 pk.dump(assert_pars, f)
 
-        random_states = RandomStates.from_cache(root_dir, entropy=entropy, n_states=n_states)
+        random_states = RandomStates.from_cache(
+            root_dir, entropy=entropy, n_states=n_states
+        )
 
-        methods_path = os.path.abspath(os.path.join(sampler_cwd, "sampler.methods"))
+        methods_path = os.path.abspath(
+            os.path.join(sampler_cwd, "sampler.methods")
+        )
 
         with open(methods_path, "rb") as f:
             sampler_methods: SamplerMethods = dill.load(f)
@@ -642,11 +761,9 @@ def job_config(task_pars: dict):
 
 
 if __name__ == "__main__":
-
     make_demo_fig = False
 
     if make_demo_fig:
-
         import matplotlib.pyplot as plt
 
         N = 2

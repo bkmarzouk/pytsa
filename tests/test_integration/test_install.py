@@ -8,7 +8,6 @@ except ImportError:
 
 
 class ModelDefs:
-
     # Typehints for (expected) compiled module behaviour
 
     @staticmethod
@@ -68,13 +67,24 @@ class TestDoubleQuadratic2Sphere(unittest.TestCase):
     # Test compiled model file
 
     tols = np.array([1e-5, 1e-5])
-    ics = np.array([-1.5890304023505983, -18.389416025688845, 0.00232248417286116, 0.00418422599903375])
-    pars = np.array([0.01329597888476721, 0.005246064625353842, 5.195022895180804])
+    ics = np.array(
+        [
+            -1.5890304023505983,
+            -18.389416025688845,
+            0.00232248417286116,
+            0.00418422599903375,
+        ]
+    )
+    pars = np.array(
+        [0.01329597888476721, 0.005246064625353842, 5.195022895180804]
+    )
 
     def _get_back(self):
         N_evo = np.linspace(0, 3000, 20 * 3000)
 
-        back = test_model.backEvolve(N_evo, self.ics, self.pars, self.tols, True, -1)
+        back = test_model.backEvolve(
+            N_evo, self.ics, self.pars, self.tols, True, -1
+        )
 
         return back
 
@@ -90,7 +100,15 @@ class TestDoubleQuadratic2Sphere(unittest.TestCase):
     def test_back(self):
         back = self._get_back()
 
-        expt = np.array([8.05363423e+02, -1.28122309e-01, 1.34744008e-01, 2.48930507e-04, -1.14051532e-03])
+        expt = np.array(
+            [
+                8.05363423e02,
+                -1.28122309e-01,
+                1.34744008e-01,
+                2.48930507e-04,
+                -1.14051532e-03,
+            ]
+        )
 
         assert np.allclose(back[-1], expt)
 
