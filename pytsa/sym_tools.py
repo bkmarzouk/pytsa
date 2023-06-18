@@ -1061,7 +1061,6 @@ class _CovariantDerivativesSym(object):
 
     def get_curvature_sym_arrays(self):
         print("-- Repacking curvature quantities into flat arrays")
-
         metric = self.fmet_sym.G_array
         christoffel = sym.symarray("Gamma", (2 * self.nf) ** 3)
         riemann = sym.symarray("Riemann", self.nf**4)
@@ -1072,33 +1071,33 @@ class _CovariantDerivativesSym(object):
         _cr = self.covd_riemann
 
         # populate connexion matrix
-        for ii in range(2 * self.nf):
-            for jj in range(2 * self.nf):
-                for kk in range(2 * self.nf):
-                    if ii < self.nf:
-                        ii = -ii - 1
+        for i in range(2 * self.nf):
+            for j in range(2 * self.nf):
+                for k in range(2 * self.nf):
+                    if i < self.nf:
+                        ii = -i - 1
                     else:
-                        ii = ii - (self.nf - 1)
-                    if jj < self.nf:
-                        jj = -jj - 1
+                        ii = i - (self.nf - 1)
+                    if j < self.nf:
+                        jj = -j - 1
                     else:
-                        jj = jj - (self.nf - 1)
-                    if kk < self.nf:
-                        kk = -kk - 1
+                        jj = j - (self.nf - 1)
+                    if k < self.nf:
+                        kk = -k - 1
                     else:
-                        kk = kk - (self.nf - 1)
+                        kk = k - (self.nf - 1)
 
                     if kk < 0 or jj < 0 or ii > 0:
                         christoffel[
-                            (2 * self.nf) * (2 * self.nf) * ii
-                            + (2 * self.nf) * jj
-                            + kk
+                            (2 * self.nf) * (2 * self.nf) * i
+                            + (2 * self.nf) * j
+                            + k
                         ] = sym.Rational(0)
                     else:
                         christoffel[
-                            (2 * self.nf) * (2 * self.nf) * ii
-                            + (2 * self.nf) * jj
-                            + kk
+                            (2 * self.nf) * (2 * self.nf) * i
+                            + (2 * self.nf) * j
+                            + k
                         ] = _ch[abs(ii) - 1, jj - 1, kk - 1]
 
         # populate Riemann matrix
